@@ -46,9 +46,9 @@ First, create an instance of `WristbandAuth` in your Express directory structure
 
 ```typescript
 // ESModules
-import { createWristbandAuth } from '@wristband/node-express';
+import { createWristbandAuth } from '@wristband/express-auth';
 // CommonJS
-// const { createWristbandAuth } = require('@wristband/node-express');
+// const { createWristbandAuth } = require('@wristband/express-auth');
 
 const wristbandAuth = createWristbandAuth({
   clientId: "ic6saso5hzdvbnof3bwgccejxy",
