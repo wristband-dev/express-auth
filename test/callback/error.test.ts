@@ -1,0 +1,167 @@
+/* eslint-disable import/no-extraneous-dependencies */
+
+import nock from 'nock';
+import httpMocks from 'node-mocks-http';
+
+import { LoginState } from '../../src/types';
+import { encryptLoginState } from '../../src/utils';
+import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src/index';
+
+const CLIENT_ID = 'clientId';
+const CLIENT_SECRET = 'clientSecret';
+const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
+const LOGIN_URL = 'http://localhost:6001/api/auth/login';
+const REDIRECT_URI = 'http://localhost:6001/api/auth/callback';
+const WRISTBAND_APPLICATION_DOMAIN = 'invotasticb2c-invotastic.dev.wristband.dev';
+
+describe('Callback Errors', () => {
+  let wristbandAuth: WristbandAuth;
+
+  beforeEach(() => {
+    wristbandAuth = createWristbandAuth({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+      loginUrl: LOGIN_URL,
+      redirectUri: REDIRECT_URI,
+      wristbandApplicationDomain: WRISTBAND_APPLICATION_DOMAIN,
+    });
+    nock.cleanAll();
+  });
+
+  test('Invalid state query param', async () => {
+    // Mock Express objects
+    let mockExpressReq = httpMocks.createRequest({
+      query: { code: 'code' },
+    });
+    let mockExpressRes = httpMocks.createResponse();
+
+    // Missing state query parameter should throw an error
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('Invalid query parameter [state] passed from Wristband during callback');
+    }
+
+    mockExpressReq = httpMocks.createRequest({
+      query: { code: 'code', state: ['1', '2'] },
+    });
+    mockExpressRes = httpMocks.createResponse();
+
+    // Multiple state query parameters should throw an error
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('Invalid query parameter [state] passed from Wristband during callback');
+    }
+  });
+
+  test('Invalid code query param', async () => {
+    // Mock login state
+    const loginState: LoginState = {
+      codeVerifier: 'codeVerifier',
+      redirectUri: REDIRECT_URI,
+      state: 'state',
+      tenantDomainName: 'devs4you',
+    };
+    const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+
+    // Mock Express objects
+    let mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state' },
+      cookies: { 'login:state:1234567890': encryptedLoginState },
+    });
+    let mockExpressRes = httpMocks.createResponse();
+
+    // Missing code query parameter should throw an error for happy path scenarios.
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('Invalid query parameter [code] passed from Wristband during callback');
+    }
+
+    mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state', code: ['a', 'b'] },
+      cookies: { 'login:state:1234567890': 'blah' },
+    });
+    mockExpressRes = httpMocks.createResponse();
+    // Multiple code query parameters should throw an error.
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('Invalid query parameter [code] passed from Wristband during callback');
+    }
+  });
+
+  test('Invalid error query param', async () => {
+    // Mock Express objects
+    const mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state', error: ['a', 'b'] },
+      cookies: { 'login:state:1234567890': 'blah' },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    // Multiple error query parameters should throw an error.
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('Invalid query parameter [error] passed from Wristband during callback');
+    }
+  });
+
+  test('Invalid error_description query param', async () => {
+    // Mock Express objects
+    const mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state', error_description: ['a', 'b'] },
+      cookies: { 'login:state:1234567890': 'blah' },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    // Multiple error_description query parameters should throw an error.
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('Invalid query parameter [error_description] passed from Wristband during callback');
+    }
+  });
+
+  test('Error query parameter throws WristbandError', async () => {
+    // Mock login state
+    const loginState: LoginState = {
+      codeVerifier: 'codeVerifier',
+      redirectUri: REDIRECT_URI,
+      state: 'state',
+      tenantDomainName: 'devs4you',
+    };
+    const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+
+    // Mock Express objects
+    const mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state', error: 'BAD', error_description: 'Really bad' },
+      cookies: { 'login:state:1234567890': encryptedLoginState },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    // Only some errors are handled automatically by the SDK. All others will throw a WristbandError.
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof WristbandError).toBe(true);
+      expect(error.getError()).toBe('BAD');
+      expect(error.getErrorDescription()).toBe('Really bad');
+    }
+  });
+});
