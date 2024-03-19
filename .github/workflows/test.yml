@@ -6,13 +6,13 @@ on:
       - 'README.md'
       - 'LICENSE'
     branches:
-      - main
+      - dev
   pull_request:
     paths-ignore:
       - 'README.md'
       - 'LICENSE'
     branches:
-      - main
+      - dev
 
 jobs:
   test:
