@@ -3,7 +3,7 @@ name: Release & Publish
 on:
   push:
     tags:
-      - "v*.*.*"
+      - 'v*'
     branches:
       - main
 
@@ -13,13 +13,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Release
-        uses: softprops/action-gh-release@v2
+      - name: Create Tag Release
+        id: create_release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ${{ github.event.release.tag_name }}
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
           draft: false
           prerelease: false
   npm-publish:
