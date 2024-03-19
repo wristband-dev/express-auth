@@ -15,43 +15,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  npm-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .npmrc file to publish to npm
+        uses: actions/setup-node@v4
         with:
-          tag_name: ${{ github.ref }}
-          name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-  # npm-publish:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Setup .npmrc file to publish to npm
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '18.x'
-  #         registry-url: 'https://registry.npmjs.org'
-  #     - name: Install modules
-  #       run: npm ci
-  #     - name: Build
-  #       run: npm run build
-  #     - name: Publish to npm
-  #       run: npm publish --access public --tag latest
-  #       env:
-  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-  # github-packages-publish:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Setup .npmrc file to publish to GitHub Packages
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '18.x'
-  #         registry-url: 'https://npm.pkg.github.com'
-  #         scope: '@wristband-dev'
-  #     - name: Install modules
-  #       run: npm ci
-  #     - name: Build
-  #       run: npm run build
-  #     - name: Publish to GitHub Packages
-  #       run: npm publish
-  #       env:
-  #         NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          node-version: '18.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install modules
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Publish to npm
+        run: npm publish --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
