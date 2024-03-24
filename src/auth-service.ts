@@ -57,7 +57,7 @@ export class AuthService {
       throw new TypeError('The [redirectUri] config must have a value.');
     }
     if (!authConfig.wristbandApplicationDomain) {
-      throw new TypeError('The [redirectUri] config must have a value.');
+      throw new TypeError('The [wristbandApplicationDomain] config must have a value.');
     }
     if (authConfig.useTenantSubdomains) {
       if (!authConfig.rootDomain) {
