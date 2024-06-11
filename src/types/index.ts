@@ -8,6 +8,7 @@
  * @property {string} clientId - The client ID for the application.
  * @property {string} clientSecret - The client secret for the application.
  * @property {string} customApplicationLoginPageUrl - Custom application login (tenant discovery) page URL if you are self-hosting the application login/tenant discovery UI.
+ * @property {string} dangerouslyDisableSecureCookies - If set to true, the "Secure" attribute will not be included in any cookie settings. This should only be done when testing in local development (if necessary).
  * @property {string} loginStateSecret - A secret (32 or more characters in length) used for encryption and decryption of login state cookies.
  * @property {string} loginUrl - The URL for initiating the login request.
  * @property {string} redirectUri - The redirect URI for callback after authentication.
@@ -21,6 +22,7 @@ export type AuthConfig = {
   clientId: string;
   clientSecret: string;
   customApplicationLoginPageUrl?: string;
+  dangerouslyDisableSecureCookies?: boolean;
   loginStateSecret: string;
   loginUrl: string;
   redirectUri: string;

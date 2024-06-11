@@ -90,6 +90,83 @@ describe('Multi Tenant Login', () => {
       expect(options.maxAge).toBe(3600000);
       expect(options.path).toBe('/');
       expect(options.sameSite).toBe('lax');
+      expect(options.secure).toBe(true);
+
+      const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.state).toEqual(keyParts[1]);
+      expect(searchParams.get('state')).toEqual(keyParts[1]);
+      expect(loginState.codeVerifier).toBeTruthy();
+      expect(loginState.redirectUri).toBe(redirectUri);
+      expect(loginState.customState).toBeUndefined();
+      expect(loginState.tenantDomainName).toBe('devs4you');
+      expect(loginState.returnUrl).toBeUndefined();
+    });
+
+    test('Dangerously Disable Secure Cookies Configuration', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        dangerouslyDisableSecureCookies: true,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationDomain,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${rootDomain}` },
+        query: { tenant_domain: 'devs4you' },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+      // Validate Redirect response
+      const { cookies, statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin, searchParams } = locationUrl;
+      expect(origin).toEqual(`https://devs4you-${wristbandApplicationDomain}`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
+
+      // Validate no-cache headers
+      const headers = mockExpressRes._getHeaders();
+      expect(Object.keys(headers)).toHaveLength(2);
+      expect(headers['cache-control']).toBe('no-store');
+      expect(headers['pragma']).toBe('no-cache');
+
+      // Validate query params of Authorize URL
+      expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
+      expect(searchParams.get('redirect_uri')).toEqual(redirectUri);
+      expect(searchParams.get('response_type')).toEqual('code');
+      expect(searchParams.get('state')).toBeTruthy();
+      expect(searchParams.get('scope')).toEqual('openid offline_access email');
+      expect(searchParams.get('code_challenge')).toBeTruthy();
+      expect(searchParams.get('code_challenge_method')).toEqual('S256');
+      expect(searchParams.get('nonce')).toBeTruthy();
+      expect(searchParams.get('login_hint')).toBeFalsy();
+
+      // Validate login state cookie key
+      expect(Object.keys(cookies)).toHaveLength(1);
+      const loginStateCookie = Object.entries(cookies)[0];
+      const cookieKey: string = loginStateCookie[0];
+      const keyParts: string[] = cookieKey.split(':');
+      expect(keyParts).toHaveLength(3);
+      expect(keyParts[0]).toEqual('login');
+      expect(keyParts[1]).toBeTruthy();
+      expect(parseInt(keyParts[2], 10)).toBeGreaterThan(0);
+
+      // Validate login state cookie value
+      const cookieValue = loginStateCookie[1];
+      expect(Object.keys(cookieValue)).toHaveLength(2);
+      const { options, value } = cookieValue;
+
+      expect(options.httpOnly).toBe(true);
+      expect(options.maxAge).toBe(3600000);
+      expect(options.path).toBe('/');
+      expect(options.sameSite).toBe('lax');
       expect(options.secure).toBe(false);
 
       const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
