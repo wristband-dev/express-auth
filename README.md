@@ -120,7 +120,7 @@ app.use(
       maxAge: 1800,
       path: '/',
       sameSite: true,
-      secure: false,
+      secure: true,
     },
   })
 );
@@ -316,6 +316,7 @@ function createWristbandAuth(authConfig: AuthConfig): WristbandAuth {}
 | clientId | string | Yes | The client ID for the application. |
 | clientSecret | string | Yes | The client secret for the application. |
 | customApplicationLoginPageUrl | string | No | Custom Application-Level Login Page URL (Tenant Discovery) if you are building/self-hosting that portion of the UI. By default, the SDK will use your Wristband-hosted Application-Level Login pgae URL. The SDK will redirect to either the self-hosted or Wristband-hosted URL in certain cases where it cannot resolve a proper Tenant-Level Login URL. |
+| dangerouslyDisableSecureCookies | boolean | No | USE WITH CAUTION: If set to true, the "Secure" attribute will not be included in any cookie settings. This should only be done when testing in local development (if necessary). |
 | loginStateSecret | string | Yes | A secret -- 32 or more characters in length -- used for encryption and decryption of login state cookies. |
 | loginUrl | string | Yes | The URL for initiating the login request. |
 | redirectUri | string | Yes | The redirect URI for callback after authentication. |

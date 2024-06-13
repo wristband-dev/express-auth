@@ -119,14 +119,19 @@ export function clearOldestLoginStateCookie(req: Request, res: Response): void {
   }
 }
 
-export function createLoginStateCookie(res: Response, state: string, encryptedLoginState: string): void {
+export function createLoginStateCookie(
+  res: Response,
+  state: string,
+  encryptedLoginState: string,
+  dangerouslyDisableSecureCookies: boolean
+): void {
   // Add the new login state cookie (1 hour max age).
   res.cookie(`${LOGIN_STATE_COOKIE_PREFIX}${state}:${Date.now().valueOf()}`, encryptedLoginState, {
     httpOnly: true,
     maxAge: 3600000,
     path: '/',
     sameSite: 'lax',
-    secure: false,
+    secure: !dangerouslyDisableSecureCookies,
   });
 }
 

@@ -31,6 +31,7 @@ export class AuthService {
   private wristbandService: WristbandService;
   private clientId: string;
   private customApplicationLoginPageUrl?: string;
+  private dangerouslyDisableSecureCookies: boolean;
   private loginStateSecret: string;
   private loginUrl: string;
   private redirectUri: string;
@@ -85,6 +86,10 @@ export class AuthService {
     );
     this.clientId = authConfig.clientId;
     this.customApplicationLoginPageUrl = authConfig.customApplicationLoginPageUrl || '';
+    this.dangerouslyDisableSecureCookies =
+      typeof authConfig.dangerouslyDisableSecureCookies !== 'undefined'
+        ? authConfig.dangerouslyDisableSecureCookies
+        : false;
     this.loginStateSecret = authConfig.loginStateSecret;
     this.loginUrl = authConfig.loginUrl;
     this.redirectUri = authConfig.redirectUri;
@@ -117,7 +122,7 @@ export class AuthService {
     // Clear any stale login state cookies and add a new one fo rthe current request.
     clearOldestLoginStateCookie(req, res);
     const encryptedLoginState: string = await encryptLoginState(loginState, this.loginStateSecret);
-    createLoginStateCookie(res, loginState.state, encryptedLoginState);
+    createLoginStateCookie(res, loginState.state, encryptedLoginState, this.dangerouslyDisableSecureCookies);
 
     // Create the Wristband Authorize Endpoint URL which the user will get redirectd to.
     const authorizeUrl: string = getOAuthAuthorizeUrl(req, {
