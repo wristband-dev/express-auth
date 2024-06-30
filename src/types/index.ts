@@ -37,9 +37,13 @@ export type AuthConfig = {
  * Represents the configuration for login.
  * @typedef {Object} LoginConfig
  * @property {Object.<string, any>} [customState] - Custom state data for the login request.
+ * @property {string} [defaultTenantDomain] - An optional default tenant domain name to use for the login request in the
+ * event the tenant domain cannot be found in either the subdomain or query parameters (depending on your subdomain
+ * configuration).
  */
 export type LoginConfig = {
   customState?: { [key: string]: any };
+  defaultTenantDomain?: string;
 };
 
 /**

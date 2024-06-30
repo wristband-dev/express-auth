@@ -115,5 +115,182 @@ describe('Custom Login Configurations', () => {
       expect(loginState.customState).toEqual(CUSTOM_STATE);
       expect(loginState.tenantDomainName).toBe('devs4you');
     });
+
+    test('Default tenant domain at the Function Level, using subdomains, missing subdomain', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        rootDomain,
+        useCustomDomains: true,
+        useTenantSubdomains: true,
+        wristbandApplicationDomain,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${rootDomain}` },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+        defaultTenantDomain: 'global',
+      });
+
+      // Validate Redirect response
+      const { cookies, statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin } = locationUrl;
+      expect(origin).toEqual(`https://global.${wristbandApplicationDomain}`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
+
+      // Validate login state cookie
+      expect(Object.keys(cookies)).toHaveLength(1);
+      const loginStateCookie = Object.entries(cookies)[0];
+      const keyParts: string[] = loginStateCookie[0].split(':');
+      const cookieValue = loginStateCookie[1];
+      expect(Object.keys(cookieValue)).toHaveLength(2);
+      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.state).toEqual(keyParts[1]);
+      expect(loginState.customState).toBeUndefined();
+      expect(loginState.tenantDomainName).toBe('global');
+    });
+
+    test('Default tenant domain at the Function Level, using subdomains, with subdomain present', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        rootDomain,
+        useCustomDomains: true,
+        useTenantSubdomains: true,
+        wristbandApplicationDomain,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `devs4you.${rootDomain}` },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+        defaultTenantDomain: 'global',
+      });
+
+      // Validate Redirect response
+      const { cookies, statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin } = locationUrl;
+      expect(origin).toEqual(`https://devs4you.${wristbandApplicationDomain}`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
+
+      // Validate login state cookie
+      expect(Object.keys(cookies)).toHaveLength(1);
+      const loginStateCookie = Object.entries(cookies)[0];
+      const keyParts: string[] = loginStateCookie[0].split(':');
+      const cookieValue = loginStateCookie[1];
+      expect(Object.keys(cookieValue)).toHaveLength(2);
+      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.state).toEqual(keyParts[1]);
+      expect(loginState.customState).toBeUndefined();
+      expect(loginState.tenantDomainName).toBe('devs4you');
+    });
+
+    test('Default tenant domain at the Function Level, not using subdomains, missing query param', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl: `https://${rootDomain}/api/auth/login`,
+        redirectUri: `https://${rootDomain}/api/auth/callback`,
+        rootDomain,
+        useCustomDomains: true,
+        useTenantSubdomains: false,
+        wristbandApplicationDomain,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${rootDomain}` },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+        defaultTenantDomain: 'global',
+      });
+
+      // Validate Redirect response
+      const { cookies, statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin } = locationUrl;
+      expect(origin).toEqual(`https://global.${wristbandApplicationDomain}`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
+
+      // Validate login state cookie
+      expect(Object.keys(cookies)).toHaveLength(1);
+      const loginStateCookie = Object.entries(cookies)[0];
+      const keyParts: string[] = loginStateCookie[0].split(':');
+      const cookieValue = loginStateCookie[1];
+      expect(Object.keys(cookieValue)).toHaveLength(2);
+      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.state).toEqual(keyParts[1]);
+      expect(loginState.customState).toBeUndefined();
+      expect(loginState.tenantDomainName).toBe('global');
+    });
+
+    test('Default tenant domain at the Function Level, not using subdomains, with query param present', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl: `https://${rootDomain}/api/auth/login`,
+        redirectUri: `https://${rootDomain}/api/auth/callback`,
+        rootDomain,
+        useCustomDomains: true,
+        useTenantSubdomains: false,
+        wristbandApplicationDomain,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${rootDomain}` },
+        query: { tenant_domain: 'devs4you' },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+        defaultTenantDomain: 'global',
+      });
+
+      // Validate Redirect response
+      const { cookies, statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin } = locationUrl;
+      expect(origin).toEqual(`https://devs4you.${wristbandApplicationDomain}`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
+
+      // Validate login state cookie
+      expect(Object.keys(cookies)).toHaveLength(1);
+      const loginStateCookie = Object.entries(cookies)[0];
+      const keyParts: string[] = loginStateCookie[0].split(':');
+      const cookieValue = loginStateCookie[1];
+      expect(Object.keys(cookieValue)).toHaveLength(2);
+      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.state).toEqual(keyParts[1]);
+      expect(loginState.customState).toBeUndefined();
+      expect(loginState.tenantDomainName).toBe('devs4you');
+    });
   });
 });

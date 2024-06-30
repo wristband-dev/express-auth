@@ -335,7 +335,14 @@ function createWristbandAuth(authConfig: AuthConfig): WristbandAuth {}
 await login(req, res);
 ```
 
-Wristband requires that your application specify a Tenant-Level domain when redirecting to the Wristband Authorize Endpoint when initiating an auth request. When the frontend of you application redirects the user to your Express Login Endpoint, there are two ways to accomplish getting the `tenantDomainName` information: passing a query parameter or using tenant subdomains.
+Wristband requires that your application specify a Tenant-Level domain when redirecting to the Wristband Authorize Endpoint when initiating an auth request. When the frontend of your application redirects the user to your Express Login Endpoint, there are two ways to accomplish getting the `tenantDomainName` information: passing a query parameter or using tenant subdomains.
+
+The `login()` function can also take optional configuration if your application needs custom behavior:
+
+| LoginConfig Field | Type | Required | Description |
+| ----------------- | ---- | -------- | ----------- |
+| customState | JSON | No | Additional state to be saved in the Login State Cookie. Upon successful completion of an auth request/login attempt, your Callback Endpoint will return this custom state (unmodified) as part of the return type. |
+| defaultTenantDomain | string | No | An optional default tenant domain name to use for the login request in the event the tenant domain cannot be found in either the subdomain or query parameters (depending on your subdomain configuration). |
 
 #### Tenant Domain Query Param
 
@@ -381,9 +388,17 @@ const wristbandAuth = createWristbandAuth({
 });
 ```
 
+#### Default Tenant Domain
+
+For certain use cases, it may be useful to specify a default tenant domain in the event that the `login()` function cannot find a tenant domain in either the query parameters or in the URL subdomain. You can specify a fallback default tenant domain via a `LoginConfig` object:
+
+```ts
+await wristbandAuth.login(req, res, { defaultTenantDomain: 'default' });
+```
+
 #### Custom State
 
-The `login()` function can take optional configuration if your application needs custom behavior. Before your Login Endpoint redirects to Wristband, it will create a Login State Cookie to cache all necessary data required in the Callback Endpoint to complete any auth requests. You can inject additional state into that cookie via a `LoginConfig` object:
+Before your Login Endpoint redirects to Wristband, it will create a Login State Cookie to cache all necessary data required in the Callback Endpoint to complete any auth requests. You can inject additional state into that cookie via a `LoginConfig` object:
 
 ```ts
 await wristbandAuth.login(req, res, { customState: { test: 'abc' } });
@@ -391,10 +406,6 @@ await wristbandAuth.login(req, res, { customState: { test: 'abc' } });
 
 > [!WARNING]
 > Injecting custom state is an advanced feature, and it is recommended to use `customState` sparingly. Most applications may not need it at all. The max cookie size is 4kB. From our own tests, passing a `customState` JSON of at most 1kB should be a safe ceiling.
-
-| LoginConfig Field | Type | Required | Description |
-| ----------------- | ---- | -------- | ----------- |
-| customState | JSON | No | Additional state to be saved in the Login State Cookie. Upon successful completion of an auth request/login attempt, your Callback Endpoint will return this custom state (unmodified) as part of the return type. |
 
 #### Login Hints
 
