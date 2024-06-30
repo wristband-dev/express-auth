@@ -72,10 +72,14 @@ export class AuthService {
       }
     } else {
       if (authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError('The [loginUrl] must contain the "{tenant_domain}" token when using tenant subdomains.');
+        throw new TypeError(
+          'The [loginUrl] cannot contain the "{tenant_domain}" token when tenant subdomains are not used.'
+        );
       }
       if (authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError('The [redirectUri] must contain the "{tenant_domain}" token when using tenant subdomains.');
+        throw new TypeError(
+          'The [redirectUri] cannot contain the "{tenant_domain}" token when tenant subdomains are not used.'
+        );
       }
     }
 
@@ -108,7 +112,7 @@ export class AuthService {
 
     // Make sure a valid tenantDomainName exists for multi-tenant apps.
     let tenantDomainName: string = '';
-    tenantDomainName = resolveTenantDomain(req, this.useTenantSubdomains, this.rootDomain);
+    tenantDomainName = resolveTenantDomain(req, this.useTenantSubdomains, this.rootDomain, config.defaultTenantDomain);
     if (!tenantDomainName) {
       const apploginUrl = this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationDomain}/login`;
       return res.redirect(apploginUrl);

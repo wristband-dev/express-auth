@@ -58,9 +58,14 @@ export function parseTenantSubdomain(req: Request, rootDomain: string): string {
   return host!.substring(host!.indexOf('.') + 1) === rootDomain ? host!.substring(0, host!.indexOf('.')) : '';
 }
 
-export function resolveTenantDomain(req: Request, useTenantSubdomains: boolean, rootDomain: string): string {
+export function resolveTenantDomain(
+  req: Request,
+  useTenantSubdomains: boolean,
+  rootDomain: string,
+  defaultTenantDomain: string = ''
+): string {
   if (useTenantSubdomains) {
-    return parseTenantSubdomain(req, rootDomain);
+    return parseTenantSubdomain(req, rootDomain) || defaultTenantDomain;
   }
 
   const { tenant_domain: tenantDomainParam } = req.query;
@@ -69,7 +74,7 @@ export function resolveTenantDomain(req: Request, useTenantSubdomains: boolean, 
     throw new TypeError('More than one [tenant_domain] query parameter was passed to the login endpoint');
   }
 
-  return tenantDomainParam || '';
+  return tenantDomainParam || defaultTenantDomain;
 }
 
 export function createLoginState(req: Request, redirectUri: string, config: LoginStateMapConfig = {}): LoginState {
