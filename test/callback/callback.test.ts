@@ -302,7 +302,7 @@ describe('Multi Tenant Callback', () => {
   });
 
   describe('Redirect to Application-level Login', () => {
-    test('Missing login state cookie without subdomains', async () => {
+    test('Missing login state cookie without subdomains, and no default tenant domain', async () => {
       rootDomain = 'business.invotastic.com';
       loginUrl = `https://${rootDomain}/api/auth/login`;
       redirectUri = `https://${rootDomain}/api/auth/callback`;

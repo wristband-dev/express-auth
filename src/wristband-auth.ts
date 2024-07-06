@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
 import { AuthService } from './auth-service';
-import { AuthConfig, CallbackData, LoginConfig, LogoutConfig, TokenData } from './types';
+import { AuthConfig, CallbackConfig, CallbackData, LoginConfig, LogoutConfig, TokenData } from './types';
 
 /**
  * WristbandAuth is a utility interface providing methods for seamless interaction with Wristband for authenticating
@@ -41,7 +41,7 @@ export interface WristbandAuth {
    * URL redirect in the event of certain error scenarios.
    * @throws {Error} - If an error occurs during the callback handling.
    */
-  callback(req: Request, res: Response): Promise<CallbackData | void>;
+  callback(req: Request, res: Response, config?: CallbackConfig): Promise<CallbackData | void>;
 
   /**
    * Revokes the user's refresh token and redirects them to the Wristband logout endpoint to destroy
@@ -87,8 +87,8 @@ export class WristbandAuthImpl implements WristbandAuth {
     return this.authService.login(req, res, config);
   }
 
-  callback(req: Request, res: Response): Promise<CallbackData | void> {
-    return this.authService.callback(req, res);
+  callback(req: Request, res: Response, config?: CallbackConfig): Promise<CallbackData | void> {
+    return this.authService.callback(req, res, config);
   }
 
   logout(req: Request, res: Response, config?: LogoutConfig): Promise<void> {

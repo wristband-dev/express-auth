@@ -427,10 +427,10 @@ GET https://customer01.yourapp.io/auth/login?return_url=https://customer01.youra
 
 The return URL is stored in the Login State Cookie, and you can choose to send users to that return URL (if necessary) after the SDK's `callback()` funciton is done executing.
 
-### `callback(req: Request, res: Response): Promise<CallbackData | void>`
+### `callback(req: Request, res: Response, config?: CallbackConfig): Promise<CallbackData | void>`
 
 ```ts
-const callbackData = await callback(req, res);
+const callbackData = await callback(req, res, config);
 ```
 
 After a user authenticates on the Tenant-Level Login Page, Wristband will redirect to your Express Callback Endpoint with an authorization code which can be used to exchange for an access token. It will also pass the state parameter that was generated during the Login Endpoint.
@@ -452,6 +452,21 @@ The SDK will validate that the incoming state matches the Login State Cookie, an
 | returnUrl | string or `undefined` | The URL to return to after authentication is completed. |
 | tenantDomainName | string | The domain name of the tenant the user belongs to. |
 | userinfo | JSON | Data for the current user retrieved from the Wristband Userinfo Endpoint. The data returned in this object follows the format laid out in the [Wristband Userinfo Entity documentation](https://wristband.stoplight.io/docs/documentation/a2ca5c62520b8-user-info). The exact fields that get returned are based on the scopes you configured in the SDK. |
+
+<br>
+The `callback()` function can also take optional configuration if your application needs custom behavior:
+
+| CallbackConfig Field | Type | Required | Description |
+| -------------------- | ---- | -------- | ----------- |
+| defaultTenantDomain | string | No | An optional default tenant domain name to use in the event a redirect to the login endpoint is required. This can happen when subdomains are not utilized and the tenant domain from the login state is not present (e.g login state cookie expired). |
+
+#### Default Tenant Domain
+
+For certain use cases, it may be useful to specify an optional default tenant domain name to use in the event a redirect to the login endpoint is required. This can happen when subdomains are not utilized and the tenant domain from the login state is not present (e.g login state cookie expired). You can specify a fallback default tenant domain via a `CallbackConfig` object:
+
+```ts
+await wristbandAuth.callback(req, res, { defaultTenantDomain: 'default' });
+```
 
 
 #### Redirect Responses
