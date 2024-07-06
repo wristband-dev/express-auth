@@ -17,6 +17,7 @@ import {
 import { WristbandService } from './wristband-service';
 import {
   AuthConfig,
+  CallbackConfig,
   CallbackData,
   LoginConfig,
   LoginState,
@@ -144,7 +145,7 @@ export class AuthService {
     return res.redirect(authorizeUrl);
   }
 
-  async callback(req: Request, res: Response): Promise<CallbackData | void> {
+  async callback(req: Request, res: Response, config: CallbackConfig = {}): Promise<CallbackData | void> {
     res.header('Cache-Control', 'no-store');
     res.header('Pragma', 'no-cache');
 
@@ -166,8 +167,17 @@ export class AuthService {
     const appLoginUrl: string =
       this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationDomain}/login`;
     const tenantSubdomain: string = this.useTenantSubdomains ? parseTenantSubdomain(req, this.rootDomain) : '';
-    let tenantLoginUrl: string =
-      this.useTenantSubdomains && !!tenantSubdomain ? this.loginUrl.replace(TENANT_DOMAIN_TOKEN, tenantSubdomain) : '';
+    const defaultTenantDomain: string = config.defaultTenantDomain || '';
+
+    let tenantLoginUrl: string = '';
+    if (this.useTenantSubdomains) {
+      tenantLoginUrl =
+        !!tenantSubdomain || !!defaultTenantDomain
+          ? this.loginUrl.replace(TENANT_DOMAIN_TOKEN, tenantSubdomain || defaultTenantDomain)
+          : '';
+    } else {
+      tenantLoginUrl = defaultTenantDomain ? `${this.loginUrl}?tenant_domain=${defaultTenantDomain}` : '';
+    }
 
     // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
     const loginStateCookie: string = getAndClearLoginStateCookie(req, res);
@@ -179,7 +189,7 @@ export class AuthService {
 
     // Ensure there is a proper tenantDomain
     if (!this.useTenantSubdomains && !tenantDomainName) {
-      return res.redirect(appLoginUrl);
+      return res.redirect(tenantLoginUrl || appLoginUrl);
     }
     if (this.useTenantSubdomains && tenantSubdomain !== tenantDomainName) {
       return res.redirect(tenantLoginUrl);

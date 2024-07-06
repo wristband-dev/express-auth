@@ -1,4 +1,4 @@
-import { AuthConfig, CallbackData, LoginConfig, LogoutConfig, TokenData } from './types';
+import { AuthConfig, CallbackConfig, CallbackData, LoginConfig, LogoutConfig, TokenData } from './types';
 import { WristbandAuth, WristbandAuthImpl } from './wristband-auth';
 import { WristbandError } from './error';
 
@@ -14,5 +14,5 @@ function createWristbandAuth(authConfig: AuthConfig): WristbandAuth {
 /**
  * Exports
  */
-export type { AuthConfig, CallbackData, LoginConfig, LogoutConfig, TokenData, WristbandAuth };
+export type { AuthConfig, CallbackConfig, CallbackData, LoginConfig, LogoutConfig, TokenData, WristbandAuth };
 export { createWristbandAuth, WristbandError };
