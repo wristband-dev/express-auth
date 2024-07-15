@@ -116,7 +116,7 @@ export class AuthService {
     tenantDomainName = resolveTenantDomain(req, this.useTenantSubdomains, this.rootDomain, config.defaultTenantDomain);
     if (!tenantDomainName) {
       const apploginUrl = this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationDomain}/login`;
-      return res.redirect(apploginUrl);
+      return res.redirect(`${apploginUrl}?client_id=${this.clientId}`);
     }
 
     // Create the login state which will be cached in a cookie so that it can be accessed in the callback.
@@ -164,8 +164,9 @@ export class AuthService {
       throw new TypeError('Invalid query parameter [error_description] passed from Wristband during callback');
     }
 
-    const appLoginUrl: string =
+    const appLoginLocation: string =
       this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationDomain}/login`;
+    const appLoginUrl = `${appLoginLocation}?client_id=${this.clientId}`;
     const tenantSubdomain: string = this.useTenantSubdomains ? parseTenantSubdomain(req, this.rootDomain) : '';
     const defaultTenantDomain: string = config.defaultTenantDomain || '';
 
@@ -259,10 +260,10 @@ export class AuthService {
     const appLoginUrl: string =
       this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationDomain}/login`;
     if (this.useTenantSubdomains && host!.substring(host!.indexOf('.') + 1) !== this.rootDomain) {
-      return res.redirect(appLoginUrl);
+      return res.redirect(`${appLoginUrl}?client_id=${this.clientId}`);
     }
     if (!this.useTenantSubdomains && !config.tenantDomainName) {
-      return res.redirect(appLoginUrl);
+      return res.redirect(`${appLoginUrl}?client_id=${this.clientId}`);
     }
 
     // Always perform logout redirect to the Wristband logout endpoint.

@@ -48,7 +48,7 @@ export type LoginConfig = {
 
 /**
  * Represents the configuration for the auth callback.
- * @typedef {Object} LoginConfig
+ * @typedef {Object} CallbackConfig
  * @property {string} [defaultTenantDomain] - An optional default tenant domain name to use in the event a redirect to
  * the login endpoint is required. This can happen when subdomains are not utilized and the tenant domain from the login
  * state is not present (e.g login state cookie expired).

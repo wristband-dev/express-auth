@@ -35,6 +35,7 @@ export interface WristbandAuth {
    *
    * @param {Request} req - The Express request object.
    * @param {Response} res - The Express response object.
+   * @param {CallbackConfig} [config] - Additional configuration for handling auth callbacks from Wristband.
    * @returns {Promise<CallbackData | void>} - A Promise with all token data, userinfo, custom state, and return URL,
    * assuming the exchange of an auth code for a token succeeds (response contents depend on what inputs were given
    * to the login endpoint during the auth request). Otherwise, a Promise of type void is returned as a result of a
