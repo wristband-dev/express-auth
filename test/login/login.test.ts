@@ -417,10 +417,7 @@ describe('Multi Tenant Login', () => {
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://${wristbandApplicationDomain}`);
-      expect(pathname).toEqual('/login');
+      expect(location).toBe(`https://${wristbandApplicationDomain}/login?client_id=${CLIENT_ID}`);
     });
 
     test('Unresolved tenant subdomain', async () => {
@@ -454,10 +451,7 @@ describe('Multi Tenant Login', () => {
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://${wristbandApplicationDomain}`);
-      expect(pathname).toEqual('/login');
+      expect(location).toBe(`https://${wristbandApplicationDomain}/login?client_id=${CLIENT_ID}`);
     });
 
     test('Custom application login URL redirect', async () => {
@@ -492,10 +486,7 @@ describe('Multi Tenant Login', () => {
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual('https://google.com');
-      expect(pathname).toBe('/');
+      expect(location).toBe(`https://google.com?client_id=${CLIENT_ID}`);
     });
   });
 });

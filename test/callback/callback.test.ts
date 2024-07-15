@@ -332,10 +332,7 @@ describe('Multi Tenant Callback', () => {
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://${wristbandApplicationDomain}`);
-      expect(pathname).toEqual('/login');
+      expect(location).toBe(`https://${wristbandApplicationDomain}/login?client_id=${CLIENT_ID}`);
     });
 
     test('Missing login state cookie without subdomains and custom application login URL', async () => {
@@ -369,10 +366,7 @@ describe('Multi Tenant Callback', () => {
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://google.com`);
-      expect(pathname).toEqual('/');
+      expect(location).toBe(`https://google.com?client_id=${CLIENT_ID}`);
     });
 
     test('State is missing tenantDomainName', async () => {
@@ -415,10 +409,7 @@ describe('Multi Tenant Callback', () => {
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://${wristbandApplicationDomain}`);
-      expect(pathname).toEqual('/login');
+      expect(location).toBe(`https://${wristbandApplicationDomain}/login?client_id=${CLIENT_ID}`);
     });
   });
 
