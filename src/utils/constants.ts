@@ -3,3 +3,4 @@ export const JSON_MEDIA_TYPE: string = 'application/json;charset=UTF-8';
 export const LOGIN_REQUIRED_ERROR: string = 'login_required';
 export const LOGIN_STATE_COOKIE_PREFIX: string = 'login:';
 export const TENANT_DOMAIN_TOKEN: string = '{tenant_domain}';
+export const DEFAULT_AUTH_TIMEOUT_IN_SECONDS = 60;

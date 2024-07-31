@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import retry from 'async-retry';
 
-import { LOGIN_REQUIRED_ERROR, TENANT_DOMAIN_TOKEN } from './utils/constants';
+import { DEFAULT_AUTH_TIMEOUT_IN_SECONDS, LOGIN_REQUIRED_ERROR, TENANT_DOMAIN_TOKEN } from './utils/constants';
 import {
   clearOldestLoginStateCookie,
   createLoginState,
@@ -10,7 +10,9 @@ import {
   encryptLoginState,
   getAndClearLoginStateCookie,
   getOAuthAuthorizeUrl,
+  initPopup,
   isExpired,
+  openPopup,
   parseTenantSubdomain,
   resolveTenantDomain,
 } from './utils';
@@ -20,6 +22,7 @@ import {
   CallbackConfig,
   CallbackData,
   LoginConfig,
+  LoginWithPopup,
   LoginState,
   LogoutConfig,
   TokenData,
@@ -308,5 +311,35 @@ export class AuthService {
 
     // [Safety check] Errors during the refresh API call should bubble up, so this should never happen.
     throw new Error('Token response was null');
+  }
+
+  static async loginWithPopup(config: LoginWithPopup): Promise<void> {
+    // Safety checks
+    if (!config) {
+      throw new TypeError('The config object must be provided');
+    }
+    if (typeof config !== 'object') {
+      throw new TypeError('The config object must be a valid object');
+    }
+    if (!config.loginUrl) {
+      throw new TypeError('The loginUrl field must be a valid string');
+    }
+
+    if (!config.popup) {
+      // eslint-disable-next-line no-param-reassign
+      config.popup = openPopup('');
+    }
+
+    // eslint-disable-next-line no-param-reassign
+    config.popup!.location.href = config.loginUrl;
+
+    // const authParams = {};
+
+    const authResult = await initPopup({
+      ...config,
+      timeoutInSeconds: config.timeoutInSeconds || DEFAULT_AUTH_TIMEOUT_IN_SECONDS,
+    });
+
+    console.log(authResult);
   }
 }

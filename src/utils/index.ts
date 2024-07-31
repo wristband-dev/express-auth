@@ -4,8 +4,8 @@ import { Request, Response } from 'express';
 import { defaults, seal, unseal } from 'iron-webcrypto';
 import * as crypto from 'uncrypto';
 
-import { LOGIN_STATE_COOKIE_PREFIX } from './constants';
-import { LoginState, LoginStateMapConfig } from '../types';
+import { LOGIN_STATE_COOKIE_PREFIX, DEFAULT_AUTH_TIMEOUT_IN_SECONDS } from './constants';
+import { LoginState, LoginStateMapConfig, LoginWithPopup, TokenData } from '../types';
 
 export function generateRandomString(length: number): string {
   return randomBytes(length).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -179,4 +179,62 @@ export function getOAuthAuthorizeUrl(
 export function isExpired(expiresAt: number): boolean {
   const currentTime = Date.now().valueOf();
   return currentTime >= expiresAt;
+}
+
+export function openPopup(url: string): Window | null {
+  const w = 400;
+  const h = 600;
+  const left = window.screenX + (window.innerWidth - w) / 2;
+  const top = window.screenY + (window.innerHeight - h) / 2;
+  return window.open(url, 'wristband:auth:popup', `width=${w},height=${h},top=${top},left=${left}`);
+}
+
+export function initPopup(config: LoginWithPopup): Promise<TokenData> {
+  if (!config.popup) {
+    throw new TypeError('The popup object must be provided');
+  }
+
+  return new Promise((resolve, reject) => {
+    let popupListener: (event: MessageEvent) => void;
+    let timer: NodeJS.Timeout;
+
+    const timeout = setTimeout(
+      () => {
+        clearInterval(timer);
+        reject(new Error(config.popup?.toString()));
+        window.removeEventListener('message', popupListener, false);
+      },
+      (config.timeoutInSeconds || DEFAULT_AUTH_TIMEOUT_IN_SECONDS) * 1000
+    );
+
+    timer = setInterval(() => {
+      if (config.popup && config.popup.closed) {
+        clearInterval(timer);
+        clearTimeout(timeout);
+        window.removeEventListener('message', popupListener, false);
+        reject(new Error(config.popup.toString()));
+      }
+    }, 1000);
+
+    popupListener = (event: MessageEvent) => {
+      if (!event.data || event.data.type !== 'authorization_response') {
+        return;
+      }
+
+      clearTimeout(timeout);
+      clearInterval(timer);
+      window.removeEventListener('message', popupListener, false);
+      if (config.popup) {
+        config.popup.close();
+      }
+
+      if (event.data.response.error) {
+        reject(new Error(event.data.response));
+      }
+
+      resolve(event.data.response);
+    };
+
+    window.addEventListener('message', popupListener);
+  });
 }

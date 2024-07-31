@@ -101,6 +101,16 @@ export type LogoutConfig = {
   redirectUrl?: string;
 };
 
+/**
+ * Represents the login URL with popup configuration.
+ */
+export type LoginWithPopup = Partial<CallbackData> & {
+  loginUrl: string;
+  popup: Window | null;
+  timeoutInSeconds?: number;
+  options?: { timeoutInSeconds?: number };
+};
+
 /** *****************************
  * Internal-only types
  ***************************** */
