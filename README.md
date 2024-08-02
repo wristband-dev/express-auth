@@ -9,7 +9,7 @@
   </p>
   <p align="center">
     <b>
-      <a href="https://wristband.dev">Website</a>
+      <a href="https://wristband.dev">Website</a> • 
       <a href="https://docs.wristband.dev/">Documentation</a>
     </b>
   </p>
