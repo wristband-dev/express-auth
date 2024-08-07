@@ -135,7 +135,7 @@ There are <ins>three core API endpoints</ins> your Express server should expose 
 
 #### [Login Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#login-endpoint)
 
-The goal of the Login Endpoint is to initiate an auth request by redircting to the [Wristband Authorization Endpoint](https://docs.wristband.dev/reference/authorizev1). It will store any state tied to the auth request in a Login State Cookie, which will later be used by the Callback Endpoint. The frontend of your application should redirect to this endpoint when users need to log in to your application.
+The goal of the Login Endpoint is to initiate an auth request by redirecting to the [Wristband Authorization Endpoint](https://docs.wristband.dev/reference/authorizev1). It will store any state tied to the auth request in a Login State Cookie, which will later be used by the Callback Endpoint. The frontend of your application should redirect to this endpoint when users need to log in to your application.
 
 ```typescript
 import { wristbandAuth } from './wristband-auth.js';
@@ -157,30 +157,36 @@ app.get('/auth/login', async (req, res) => {
 The goal of the Callback Endpoint is to receive incoming calls from Wristband after the user has authenticated and ensure that the Login State cookie contains all auth request state in order to complete the Login Workflow. From there, it will call the [Wristband Token Endpoint](https://docs.wristband.dev/reference/tokenv1) to fetch necessary JWTs, call the [Wristband Userinfo Endpoint](https://docs.wristband.dev/reference/userinfov1) to get the user's data, and create a session for the application containing the JWTs and user data.
 
 ```typescript
+import type { CallbackResultType } from '@wristband/express-auth';
 import { wristbandAuth } from './wristband-auth.js';
 
 // Callback Endpoint - Route path can be whatever you prefer
 app.get('/auth/callback', async (req, res) => {
   try {
-    const callbackData = await wristbandAuth.callback(req, res);
+    const callbackResult = await wristbandAuth.callback(req, res);
+    const { callbackData, result } = callbackResult;
+    
+    // The SDK will have already invoked the redirect() function, so we just stop execution here.
+    if (result === CallbackResultType.REDIRECT_REQUIRED) {
+      return;
+    }
 
     // If the SDK does not need to return a redirect response, then we can save any necessary fields for the user's app session into a session cookie.
-    if (callbackData) {
-      // Store a simple flag to indicate the user has successfully authenticated.
-      req.session.isAuthenticated = true;
-      req.session.accessToken = callbackData.accessToken;
-      // Convert the "expiresIn" seconds into a Unix timestamp in milliseconds at which the token expires.
-      req.session.expiresAt = Date.now() + callbackData.expiresIn * 1000;
-      req.session.refreshToken = callbackData.refreshToken;
-      req.session.userId = callbackData.userinfo.sub;
-      req.session.tenantId = callbackData.userinfo.tnt_id;
-      req.session.identityProviderName = callbackData.userinfo.idp_name;
-      req.session.tenantDomainName = callbackData.tenantDomainName;
-      await req.session.save();
-  
-      // Send the user back to the application.
-      res.redirect(callbackData.returnUrl || `https://${callbackData.tenantDomainName}.yourapp.io/`);
-    }
+    // Store a simple flag to indicate the user has successfully authenticated.
+    req.session.isAuthenticated = true;
+    req.session.accessToken = callbackData.accessToken;
+    // Convert the "expiresIn" seconds into a Unix timestamp in milliseconds at which the token expires.
+    req.session.expiresAt = Date.now() + callbackData.expiresIn * 1000;
+    req.session.refreshToken = callbackData.refreshToken;
+    req.session.userId = callbackData.userinfo.sub;
+    req.session.tenantId = callbackData.userinfo.tnt_id;
+    req.session.identityProviderName = callbackData.userinfo.idp_name;
+    req.session.tenantDomainName = callbackData.tenantDomainName;
+
+    await req.session.save();
+
+    // Send the user back to the application.
+    res.redirect(callbackData.returnUrl || `https://${callbackData.tenantDomainName}.yourapp.io/`);
   } catch (error) {
     // Handle error
     console.error(error);
@@ -342,7 +348,8 @@ The `login()` function can also take optional configuration if your application 
 | LoginConfig Field | Type | Required | Description |
 | ----------------- | ---- | -------- | ----------- |
 | customState | JSON | No | Additional state to be saved in the Login State Cookie. Upon successful completion of an auth request/login attempt, your Callback Endpoint will return this custom state (unmodified) as part of the return type. |
-| defaultTenantDomain | string | No | An optional default tenant domain name to use for the login request in the event the tenant domain cannot be found in either the subdomain or query parameters (depending on your subdomain configuration). |
+| defaultTenantDomainName | string | No | An optional default tenant domain name to use for the login request in the event the tenant domain cannot be found in either the subdomain or query parameters (depending on your subdomain configuration). |
+| defaultTenantCustomDomain | string | No | An optional default tenant custom domain to use for the login request in the event the tenant custom domain cannot be found in the query parameters. |
 
 #### Tenant Domain Query Param
 
@@ -388,13 +395,33 @@ const wristbandAuth = createWristbandAuth({
 });
 ```
 
-#### Default Tenant Domain
+#### Default Tenant Domain Name
 
 For certain use cases, it may be useful to specify a default tenant domain in the event that the `login()` function cannot find a tenant domain in either the query parameters or in the URL subdomain. You can specify a fallback default tenant domain via a `LoginConfig` object:
 
 ```ts
-await wristbandAuth.login(req, res, { defaultTenantDomain: 'default' });
+await wristbandAuth.login(req, res, { defaultTenantDomainName: 'default' });
 ```
+
+#### Tenant Custom Domain Query Param
+
+If your application wishes to utilize tenant custom domains, you can pass the `tenant_custom_domain` query parameter to your Login Endpoint, and the SDK will be able to make the appropriate redirection to the Wristband Authorize Endpoint.
+
+```sh
+GET https://yourapp.io/auth/login?tenant_custom_domain=mytenant.com
+```
+
+The tenant custom domain takes precedence over all other possible domains else when present.
+
+#### Default Tenant Custom Domain
+
+For certain use cases, it may be useful to specify a default tenant custom domain in the event that the `login()` function cannot find a tenant custom domain in the query parameters. You can specify a fallback default tenant custom domain via a `LoginConfig` object:
+
+```ts
+await wristbandAuth.login(req, res, { defaultTenantCustomDomain: 'mytenant.com' });
+```
+
+The default tenant custom domain takes precedence over all other possible domains else when present except when the `tenant_custom_domain` query parameter exists in the request.
 
 #### Custom State
 
@@ -427,10 +454,10 @@ GET https://customer01.yourapp.io/auth/login?return_url=https://customer01.youra
 
 The return URL is stored in the Login State Cookie, and you can choose to send users to that return URL (if necessary) after the SDK's `callback()` funciton is done executing.
 
-### `callback(req: Request, res: Response, config?: CallbackConfig): Promise<CallbackData | void>`
+### `callback(req: Request, res: Response): Promise<CallbackResult>`
 
 ```ts
-const callbackData = await callback(req, res, config);
+const callbackResult = await callback(req, res);
 ```
 
 After a user authenticates on the Tenant-Level Login Page, Wristband will redirect to your Express Callback Endpoint with an authorization code which can be used to exchange for an access token. It will also pass the state parameter that was generated during the Login Endpoint.
@@ -439,7 +466,21 @@ After a user authenticates on the Tenant-Level Login Page, Wristband will redire
 GET https://customer01.yourapp.io/auth/callback?state=f983yr893hf89ewn0idjw8e9f&code=shcsh90jf9wc09j9w0jewc
 ```
 
-The SDK will validate that the incoming state matches the Login State Cookie, and then it will call the Wristband Token Endpoint to exchange the authorizaiton code for JWTs. Lastly, it will call the Wristband Userinfo Endpoint to get any user data as specified by the `scopes` in your SDK configuration. All of the token and user data gets returned so that your application can create an application session for the user and then redirect them back into your application. The `CallbackData` is defined as follows:
+The SDK will validate that the incoming state matches the Login State Cookie, and then it will call the Wristband Token Endpoint to exchange the authorizaiton code for JWTs. Lastly, it will call the Wristband Userinfo Endpoint to get any user data as specified by the `scopes` in your SDK configuration. The return type of the callback function is a CallbackResult object containing the result of what happened during callback execution as well as any accompanying data:
+
+| CallbackResult Field | Type | Description |
+| -------------------- | ---- | ----------- |
+| callbackData | CallbackData or undefined | The callback data received after authentication (`COMPLETED` result only). |
+| result | CallbackResultType  | Enum representing the end result of callback execution. |
+
+The following are the possible `CallbackResultType` enum values that can be returned from the callback execution:
+
+| CallbackResultType  | Description |
+| ------------------- | ----------- |
+| COMPLETED  | Indicates that the callback is successfully completed and data is available for creating a session. |
+| REDIRECT_REQUIRED  | Indicates that a redirect to the login endpoint is required. |
+
+When the callback returns a `COMPLETED` result, all of the token and userinfo data also gets returned. This enables your application to create an application session for the user and then redirect them back into your application. The `CallbackData` is defined as follows:
 
 
 | CallbackData Field | Type | Description |
@@ -450,23 +491,9 @@ The SDK will validate that the incoming state matches the Login State Cookie, an
 | idToken | string | The ID token uniquely identifies the user that is authenticating and contains claim data about the user. |
 | refreshToken | string or `undefined` | The refresh token that renews expired access tokens with Wristband, maintaining continuous access to services. |
 | returnUrl | string or `undefined` | The URL to return to after authentication is completed. |
+| tenantCustomDomain | string | The tenant custom domain for the tenant that the user belongs to (if applicable). |
 | tenantDomainName | string | The domain name of the tenant the user belongs to. |
 | userinfo | JSON | Data for the current user retrieved from the Wristband Userinfo Endpoint. The data returned in this object follows the format laid out in the [Wristband Userinfo Endpoint documentation](https://docs.wristband.dev/reference/userinfov1). The exact fields that get returned are based on the scopes you configured in the SDK. |
-
-<br>
-The `callback()` function can also take optional configuration if your application needs custom behavior:
-
-| CallbackConfig Field | Type | Required | Description |
-| -------------------- | ---- | -------- | ----------- |
-| defaultTenantDomain | string | No | An optional default tenant domain name to use in the event a redirect to the login endpoint is required. This can happen when subdomains are not utilized and the tenant domain from the login state is not present (e.g login state cookie expired). |
-
-#### Default Tenant Domain
-
-For certain use cases, it may be useful to specify an optional default tenant domain name to use in the event a redirect to the login endpoint is required. This can happen when subdomains are not utilized and the tenant domain from the login state is not present (e.g login state cookie expired). You can specify a fallback default tenant domain via a `CallbackConfig` object:
-
-```ts
-await wristbandAuth.callback(req, res, { defaultTenantDomain: 'default' });
-```
 
 
 #### Redirect Responses
@@ -480,8 +507,7 @@ There are certain scenarios where instead of callback data being returned by the
 The location of where the user gets redirected to in these scenarios depends on if the application is using tenant subdomains and if the SDK is able to determine which tenant the user is currently attempting to log in to. The resolution happens in the following order:
 
 1. If the tenant domain can be determined, then the user will get redirected back to your Express Login Endpoint.
-2. If a tenant domain cannot be determined AND you specified a `customApplicationLoginPageUrl` when instantiating the SDK, then the user will be sent to the custom Application-Level Login Page URL.
-3. Otherwise, the user will be sent to the Wristband-hosted Application-Level Login Page URL.
+2. Otherwise, the user will be sent to the Wristband-hosted Tenant-Level Login Page URL.
 
 #### Error Parameters
 
@@ -508,7 +534,7 @@ For all other error types, the SDK will throw a `WristbandError` object (contain
 ### `logout(req: Request, res: Response, config?: LogoutConfig): Promise<void>`
 
 ```ts
-await logout(req, res, config: { refreshToken: '98yht308hf902hc90wh09' });
+await logout(req, res, { refreshToken: '98yht308hf902hc90wh09' });
 ```
 
 When users of your application are ready to log out and/or their application session expires, your frontend should redirect the user to your Express Logout Endpoint.
@@ -520,24 +546,41 @@ GET https://customer01.yourapp.io/auth/logout
 If your application created a session, it should destroy it before invoking the `logout()` function.  This function can also take an optional `LogoutConfig` argument:
 
 | LogoutConfig Field | Type | Required | Description |
-| ----------------- | ---- | -------- | ----------- |
+| ------------------ | ---- | -------- | ----------- |
 | redirectUrl | string | No | Optional URL that Wristband will redirect to after the logout operation has completed.  |
 | refreshToken | string | No | The refresh token to revoke. |
+| tenantCustomDomain | string | No | The tenant custom domain for the tenant that the user belongs to (if applicable). |
 | tenantDomainName | string | No | The domain name of the tenant the user belongs to. |
 
 #### Revoking Refresh Tokens
 
 If your application requested refresh tokens during the Login Workflow (via the `offline_access` scope), it is crucial to revoke the user's access to that refresh token when logging out. Otherwise, the refresh token would still be valid and able to refresh new access tokens.  You should pass the refresh token into the LogoutConfig when invoking the `logout()` function, and the SDK will call to the [Wristband Revoke Token Endpoint](https://docs.wristband.dev/reference/revokev1) automatically.
 
-#### Resolving Tenant Domains
+#### Resolving Tenant Domain Names
 
 Much like the Login Endpoint, Wristband requires your application specify a Tenant-Level domain when redirecting to the [Wristband Logout Endpoint](https://docs.wristband.dev/reference/logoutv1). If your application does not utilize tenant subdomains, then you will need to explicitly pass it into the LogoutConfig.
 
 ```ts
-await logout(req, res, config: { refreshToken: '98yht308hf902hc90wh09', tenantDomain: 'customer01' });
+await logout(req, res, config: { refreshToken: '98yht308hf902hc90wh09', tenantDomainName: 'customer01' });
 ```
 
-If your application uses tenant subdomains, then passing the `tenantDomain` field to the LogoutConfig is not required since the SDK will automatically parse the subdomain from the URL.
+If your application uses tenant subdomains, then passing the `tenantDomainName` field to the LogoutConfig is not required since the SDK will automatically parse the subdomain from the URL.
+
+#### Tenant Custom Domains
+
+If you have a tenant that relies on a tenant custom domain, then you will need to explicitly pass it into the LogoutConfig.
+
+```ts
+await logout(req, res, { refreshToken: '98yht308hf902hc90wh09', tenantCustomDomain: 'mytenant.com' });
+```
+
+If your application supports a mixture of tenants that use tenant subdomains and tenant custom domains, then passing both the `tenantDomainName` and `tenantCustomDomain` fields to the LogoutConfig is necessary to ensure all use cases are handled by the SDK.
+
+```ts
+const { refreshToken, tenantCustomDomain, tenantDomainName } = session;
+
+await logout(req, res, { refreshToken, tenantCustomDomain, tenantDomainName });
+```
 
 #### Custom Logout Redirect URL
 
@@ -547,7 +590,7 @@ Some applications might require the ability to land on a different page besides 
 const logoutConfig = {
   redirectUrl: 'https://custom-logout.com',
   refreshToken: '98yht308hf902hc90wh09',
-  tenantDomain: 'customer01'
+  tenantDomainName: 'customer01'
 };
 await logout(req, res, logoutConfig);
 ```

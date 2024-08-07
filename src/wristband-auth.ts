@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
 import { AuthService } from './auth-service';
-import { AuthConfig, CallbackConfig, CallbackData, LoginConfig, LogoutConfig, TokenData } from './types';
+import { AuthConfig, CallbackResult, LoginConfig, LogoutConfig, TokenData } from './types';
 
 /**
  * WristbandAuth is a utility interface providing methods for seamless interaction with Wristband for authenticating
@@ -18,14 +18,19 @@ export interface WristbandAuth {
    * for the user attempting to login in order to start the Authorization Code flow.
    *
    * Your Express request can contain Wristband-specific query parameters:
-   * - return_url: The location of where to send users after authenticating. (Optional)
-   * - login_hint: A hint to Wristband about user's preferred login identifier. (Optional)
+   * - login_hint: A hint to Wristband about user's preferred login identifier. This can be appended as a query
+   * parameter in the redirect request to the Authorize URL.
+   * - return_url: The location of where to send users after authenticating.
+   * - tenant_custom_domain: The tenant custom domain for the tenant that the user belongs to, if applicable. Should be
+   * used as the domain of the authorize URL when present.
+   * - tenant_domain: The domain name of the tenant the user belongs to. Should be used in the tenant vanity domain of
+   * the authorize URL when not utilizing tenant subdomains nor tenant custom domains.
    *
-   * @param {Request} req - The Express request object.
-   * @param {Response} res - The Express response object.
-   * @param {LoginConfig} [config] - Additional configuration for creating an auth request to Wristband.
-   * @returns {Promise<void>} - A Promise as a result of a URL redirect to Wristband.
-   * @throws {Error} - If an error occurs during the login process.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
+   * @param {LoginConfig} [config] Additional configuration for creating an auth request to Wristband.
+   * @returns {Promise<void>} A Promise as a result of a URL redirect to Wristband.
+   * @throws {Error} If an error occurs during the login process.
    */
   login(req: Request, res: Response, config?: LoginConfig): Promise<void>;
 
@@ -33,37 +38,47 @@ export interface WristbandAuth {
    * Receives incoming requests from Wristband with an authorization code. It will then proceed to exchange the auth
    * code for an access token as well as fetch the userinfo for the user attempting to login.
    *
-   * @param {Request} req - The Express request object.
-   * @param {Response} res - The Express response object.
-   * @param {CallbackConfig} [config] - Additional configuration for handling auth callbacks from Wristband.
-   * @returns {Promise<CallbackData | void>} - A Promise with all token data, userinfo, custom state, and return URL,
-   * assuming the exchange of an auth code for a token succeeds (response contents depend on what inputs were given
-   * to the login endpoint during the auth request). Otherwise, a Promise of type void is returned as a result of a
-   * URL redirect in the event of certain error scenarios.
-   * @throws {Error} - If an error occurs during the callback handling.
+   * Your Express request can contain Wristband-specific query parameters:
+   * - code: The authorization code to use for exchanging for an access token.
+   * - error: An error code indicating that some an issue occurred during the login process.
+   * - error_description: A plaintext description giving more detail around the issue that occurred during the login
+   * process.
+   * - state: The state value that was originally sent to the Authorize URL.
+   * - tenant_custom_domain: If the tenant has a tenant custom domain defined, then this query parameter will be part
+   * of the incoming request to the Callback Endpoint. n the event a redirect to the Login Endpoint is required, then
+   * this should be appended as a query parameter when redirecting to the Login Endpoint.
+   * - tenant_domain: The domain name of the tenant the user belongs to. In the event a redirect to the Login Endpoint
+   * is required and neither tenant subdomains nor tenant custom domains are not being utilized, then this should be
+   * appended as a query parameter when redirecting to the Login Endpoint.
+   *
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
+   * @returns {Promise<CallbackResult>} A Promise containing the result of what happened during callback execution
+   * as well as any accompanying data.
+   * @throws {Error} If an error occurs during the callback handling.
    */
-  callback(req: Request, res: Response, config?: CallbackConfig): Promise<CallbackData | void>;
+  callback(req: Request, res: Response): Promise<CallbackResult>;
 
   /**
    * Revokes the user's refresh token and redirects them to the Wristband logout endpoint to destroy
    * their authenticated session in Wristband.
    *
-   * @param {Request} req - The Express request object.
-   * @param {Response} res - The Express response object.
-   * @param {LogoutConfig} [config] - Additional configuration for logging out the user.
-   * @returns {Promise<void>} - A Promise of type void as a result of a URL redirect to Wristband.
-   * @throws {Error} - If an error occurs during the logout process.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
+   * @param {LogoutConfig} [config] Additional configuration for logging out the user.
+   * @returns {Promise<void>} A Promise of type void as a result of a URL redirect to Wristband.
+   * @throws {Error} If an error occurs during the logout process.
    */
   logout(req: Request, res: Response, config?: LogoutConfig): Promise<void>;
 
   /**
    * Checks if the user's access token is expired and refreshed the token, if necessary.
    *
-   * @param {string} refreshToken - The refresh token.
-   * @param {number} expiresAt - Unix timestamp in milliseconds at which the token expires.
-   * @returns {Promise<TokenData | null>} - A Promise with the data from the token endpoint if the token was refreshed.
+   * @param {string} refreshToken The refresh token.
+   * @param {number} expiresAt Unix timestamp in milliseconds at which the token expires.
+   * @returns {Promise<TokenData | null>} A Promise with the data from the token endpoint if the token was refreshed.
    * Otherwise, a Promise with null value is returned.
-   * @throws {Error} - If an error occurs during the token refresh process.
+   * @throws {Error} If an error occurs during the token refresh process.
    */
   refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null>;
 }
@@ -78,7 +93,7 @@ export class WristbandAuthImpl implements WristbandAuth {
   /**
    * Creates an instance of WristbandAuth.
    *
-   * @param {AuthConfig} authConfig - The configuration for Wristband authentication.
+   * @param {AuthConfig} authConfig The configuration for Wristband authentication.
    */
   constructor(authConfig: AuthConfig) {
     this.authService = new AuthService(authConfig);
@@ -88,8 +103,8 @@ export class WristbandAuthImpl implements WristbandAuth {
     return this.authService.login(req, res, config);
   }
 
-  callback(req: Request, res: Response, config?: CallbackConfig): Promise<CallbackData | void> {
-    return this.authService.callback(req, res, config);
+  callback(req: Request, res: Response): Promise<CallbackResult> {
+    return this.authService.callback(req, res);
   }
 
   logout(req: Request, res: Response, config?: LogoutConfig): Promise<void> {

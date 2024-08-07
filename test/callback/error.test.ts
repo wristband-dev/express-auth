@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 /* eslint-disable import/no-extraneous-dependencies */
 
 import nock from 'nock';
@@ -32,7 +33,7 @@ describe('Callback Errors', () => {
   test('Invalid state query param', async () => {
     // Mock Express objects
     let mockExpressReq = httpMocks.createRequest({
-      query: { code: 'code' },
+      query: { code: 'code', tenant_domain: 'devs4you' },
     });
     let mockExpressRes = httpMocks.createResponse();
 
@@ -66,13 +67,12 @@ describe('Callback Errors', () => {
       codeVerifier: 'codeVerifier',
       redirectUri: REDIRECT_URI,
       state: 'state',
-      tenantDomainName: 'devs4you',
     };
     const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
 
     // Mock Express objects
     let mockExpressReq = httpMocks.createRequest({
-      query: { state: 'state' },
+      query: { state: 'state', tenant_domain: 'devs4you' },
       cookies: { 'login:state:1234567890': encryptedLoginState },
     });
     let mockExpressRes = httpMocks.createResponse();
@@ -137,19 +137,56 @@ describe('Callback Errors', () => {
     }
   });
 
+  test('Invalid tenant_domain query param', async () => {
+    // Mock Express objects
+    const mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state', tenant_domain: ['a', 'b'] },
+      cookies: { 'login:state:1234567890': 'blah' },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    // Multiple error query parameters should throw an error.
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('Invalid query parameter [tenant_domain] passed from Wristband during callback');
+    }
+  });
+
+  test('Invalid tenant_custom_domain query param', async () => {
+    // Mock Express objects
+    const mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state', tenant_custom_domain: ['a', 'b'] },
+      cookies: { 'login:state:1234567890': 'blah' },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    // Multiple error query parameters should throw an error.
+    try {
+      await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe(
+        'Invalid query parameter [tenant_custom_domain] passed from Wristband during callback'
+      );
+    }
+  });
+
   test('Error query parameter throws WristbandError', async () => {
     // Mock login state
     const loginState: LoginState = {
       codeVerifier: 'codeVerifier',
       redirectUri: REDIRECT_URI,
       state: 'state',
-      tenantDomainName: 'devs4you',
     };
     const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
 
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
-      query: { state: 'state', error: 'BAD', error_description: 'Really bad' },
+      query: { state: 'state', tenant_domain: 'devs4you', error: 'BAD', error_description: 'Really bad' },
       cookies: { 'login:state:1234567890': encryptedLoginState },
     });
     const mockExpressRes = httpMocks.createResponse();
@@ -163,5 +200,72 @@ describe('Callback Errors', () => {
       expect(error.getError()).toBe('BAD');
       expect(error.getErrorDescription()).toBe('Really bad');
     }
+  });
+
+  describe('Redirect to Application-level Login', () => {
+    test('Missing login state cookie, without subdomains, without tenant domain query param', async () => {
+      const rootDomain = 'business.invotastic.com';
+      const loginUrl = `https://${rootDomain}/api/auth/login`;
+      const redirectUri = `https://${rootDomain}/api/auth/callback`;
+      const wristbandApplicationDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        useTenantSubdomains: false,
+        wristbandApplicationDomain,
+      });
+      // Mock Express objects
+      const mockExpressReq = httpMocks.createRequest({
+        query: { state: 'state', code: 'code' },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      try {
+        await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        expect('').fail('Error expected to be thrown.');
+      } catch (error: any) {
+        expect(error instanceof WristbandError).toBe(true);
+        expect(error.getError()).toBe('missing_tenant_domain');
+        expect(error.getErrorDescription()).toBe(
+          'Callback request is missing the [tenant_domain] query parameter from Wristband'
+        );
+      }
+    });
+
+    test('Missing login state cookie, with subdomains, and without URL subdomain', async () => {
+      const rootDomain = 'business.invotastic.com';
+      const loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
+      const redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
+      const wristbandApplicationDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        customApplicationLoginPageUrl: 'https://google.com',
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        rootDomain,
+        useTenantSubdomains: true,
+        wristbandApplicationDomain,
+      });
+      // Mock Express objects
+      const mockExpressReq = httpMocks.createRequest({
+        query: { state: 'state', code: 'code' },
+        headers: { host: rootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      try {
+        await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        expect('').fail('Error expected to be thrown.');
+      } catch (error: any) {
+        expect(error instanceof WristbandError).toBe(true);
+        expect(error.getError()).toBe('missing_tenant_subdomain');
+        expect(error.getErrorDescription()).toBe('Callback request URL is missing a tenant subdomain');
+      }
+    });
   });
 });

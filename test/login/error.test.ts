@@ -41,6 +41,23 @@ describe('Login Errors', () => {
     }
   });
 
+  test('Multiple tenant_custom_domain params', async () => {
+    const mockExpressReq = httpMocks.createRequest({
+      query: { tenant_custom_domain: ['tenant1', 'tenant2'] },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    try {
+      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      expect.fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe(
+        'More than one [tenant_custom_domain] query parameter was passed to the login endpoint'
+      );
+    }
+  });
+
   test('Multiple return_url params', async () => {
     const mockExpressReq = httpMocks.createRequest({
       query: { tenant_domain: 'test', return_url: ['url1', 'url2'] },

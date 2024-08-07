@@ -7,6 +7,11 @@ import * as crypto from 'uncrypto';
 import { LOGIN_STATE_COOKIE_PREFIX } from './constants';
 import { LoginState, LoginStateMapConfig } from '../types';
 
+export function parseTenantSubdomain(req: Request, rootDomain: string): string {
+  const { host } = req.headers;
+  return host!.substring(host!.indexOf('.') + 1) === rootDomain ? host!.substring(0, host!.indexOf('.')) : '';
+}
+
 export function generateRandomString(length: number): string {
   return randomBytes(length).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
@@ -53,19 +58,14 @@ export function getAndClearLoginStateCookie(req: Request, res: Response): string
   return loginStateCookie;
 }
 
-export function parseTenantSubdomain(req: Request, rootDomain: string): string {
-  const { host } = req.headers;
-  return host!.substring(host!.indexOf('.') + 1) === rootDomain ? host!.substring(0, host!.indexOf('.')) : '';
-}
-
-export function resolveTenantDomain(
+export function resolveTenantDomainName(
   req: Request,
   useTenantSubdomains: boolean,
   rootDomain: string,
-  defaultTenantDomain: string = ''
+  defaultTenantDomainName: string = ''
 ): string {
   if (useTenantSubdomains) {
-    return parseTenantSubdomain(req, rootDomain) || defaultTenantDomain;
+    return parseTenantSubdomain(req, rootDomain) || defaultTenantDomainName;
   }
 
   const { tenant_domain: tenantDomainParam } = req.query;
@@ -74,7 +74,17 @@ export function resolveTenantDomain(
     throw new TypeError('More than one [tenant_domain] query parameter was passed to the login endpoint');
   }
 
-  return tenantDomainParam || defaultTenantDomain;
+  return tenantDomainParam || defaultTenantDomainName;
+}
+
+export function resolveTenantCustomDomain(req: Request, defaultTenantCustomDomain: string = ''): string {
+  const { tenant_custom_domain: tenantCustomDomainParam } = req.query;
+
+  if (!!tenantCustomDomainParam && typeof tenantCustomDomainParam !== 'string') {
+    throw new TypeError('More than one [tenant_custom_domain] query parameter was passed to the login endpoint');
+  }
+
+  return tenantCustomDomainParam || defaultTenantCustomDomain;
 }
 
 export function createLoginState(req: Request, redirectUri: string, config: LoginStateMapConfig = {}): LoginState {
@@ -88,7 +98,6 @@ export function createLoginState(req: Request, redirectUri: string, config: Logi
     state: generateRandomString(32),
     codeVerifier: generateRandomString(32),
     redirectUri,
-    ...(!!config.tenantDomainName && { tenantDomainName: config.tenantDomainName }),
     ...(!!returnUrl && typeof returnUrl === 'string' ? { returnUrl } : {}),
     ...(!!config.customState && !!Object.keys(config.customState).length ? { customState: config.customState } : {}),
   };
@@ -148,6 +157,7 @@ export function getOAuthAuthorizeUrl(
     redirectUri: string;
     scopes: string[];
     state: string;
+    tenantCustomDomain?: string;
     tenantDomainName?: string;
     useCustomDomains?: boolean;
     wristbandApplicationDomain: string;
@@ -172,8 +182,9 @@ export function getOAuthAuthorizeUrl(
   });
 
   const separator = config.useCustomDomains ? '.' : '-';
-  const authorizeUrl = `${config.tenantDomainName}${separator}${config.wristbandApplicationDomain}/api/v1/oauth2/authorize`;
-  return `https://${authorizeUrl}?${queryParams.toString()}`;
+  const tenantDomainToUse =
+    config.tenantCustomDomain || `${config.tenantDomainName}${separator}${config.wristbandApplicationDomain}`;
+  return `https://${tenantDomainToUse}/api/v1/oauth2/authorize?${queryParams.toString()}`;
 }
 
 export function isExpired(expiresAt: number): boolean {

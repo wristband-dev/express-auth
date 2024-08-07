@@ -98,7 +98,6 @@ describe('Multi Tenant Login', () => {
       expect(loginState.codeVerifier).toBeTruthy();
       expect(loginState.redirectUri).toBe(redirectUri);
       expect(loginState.customState).toBeUndefined();
-      expect(loginState.tenantDomainName).toBe('devs4you');
       expect(loginState.returnUrl).toBeUndefined();
     });
 
@@ -175,7 +174,6 @@ describe('Multi Tenant Login', () => {
       expect(loginState.codeVerifier).toBeTruthy();
       expect(loginState.redirectUri).toBe(redirectUri);
       expect(loginState.customState).toBeUndefined();
-      expect(loginState.tenantDomainName).toBe('devs4you');
       expect(loginState.returnUrl).toBeUndefined();
     });
 
@@ -219,7 +217,6 @@ describe('Multi Tenant Login', () => {
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
-      expect(loginState.tenantDomainName).toBe('devs4you');
     });
 
     test('Custom Domains and Tenant Subdomains Configuration', async () => {
@@ -264,7 +261,96 @@ describe('Multi Tenant Login', () => {
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
-      expect(loginState.tenantDomainName).toBe('devs4you');
+    });
+
+    test('Custom Domains with Tenant Custom Domain', async () => {
+      rootDomain = 'business.invotastic.com';
+      wristbandApplicationDomain = 'auth.invotastic.com';
+      loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
+      redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
+
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        rootDomain,
+        useCustomDomains: true,
+        useTenantSubdomains: true,
+        wristbandApplicationDomain,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `devs4you.${rootDomain}` },
+        query: { tenant_custom_domain: 'tenant.custom.com' },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+      // Validate Redirect response
+      const { cookies, statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin, searchParams } = locationUrl;
+      expect(origin).toEqual(`https://tenant.custom.com`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
+
+      // Validate login state cookie
+      expect(Object.keys(cookies)).toHaveLength(1);
+      const loginStateCookie = Object.entries(cookies)[0];
+      const keyParts: string[] = loginStateCookie[0].split(':');
+      const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.state).toEqual(keyParts[1]);
+      expect(searchParams.get('state')).toEqual(keyParts[1]);
+    });
+
+    test('Custom Domains with All Domain Params', async () => {
+      rootDomain = 'business.invotastic.com';
+      wristbandApplicationDomain = 'auth.invotastic.com';
+      loginUrl = `https://${rootDomain}/api/auth/login`;
+      redirectUri = `https://${rootDomain}/api/auth/callback`;
+
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        rootDomain,
+        useCustomDomains: true,
+        useTenantSubdomains: false,
+        wristbandApplicationDomain,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${rootDomain}` },
+        query: { tenant_domain: 'devs4you', tenant_custom_domain: 'tenant.custom.com' },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+      // Validate Redirect response
+      const { cookies, statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin, searchParams } = locationUrl;
+      expect(origin).toEqual(`https://tenant.custom.com`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
+
+      // Validate login state cookie
+      expect(Object.keys(cookies)).toHaveLength(1);
+      const loginStateCookie = Object.entries(cookies)[0];
+      const keyParts: string[] = loginStateCookie[0].split(':');
+      const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.state).toEqual(keyParts[1]);
+      expect(searchParams.get('state')).toEqual(keyParts[1]);
     });
 
     test('With login_hint and return_url query params', async () => {
@@ -315,7 +401,6 @@ describe('Multi Tenant Login', () => {
       const keyParts: string[] = loginStateCookie[0].split(':');
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
-      expect(loginState.tenantDomainName).toBe('devs4you');
       expect(loginState.returnUrl).toBe(`https://devs4you.${rootDomain}/settings`);
     });
 
@@ -389,12 +474,11 @@ describe('Multi Tenant Login', () => {
       const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
-      expect(loginState.tenantDomainName).toBe('devs4you');
     });
   });
 
   describe('Redirect to Application-level Login/Tenant Discovery', () => {
-    test('Unresolved tenant_domain query param', async () => {
+    test('Unresolved tenant_domain and tenant_custom_domain query params', async () => {
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
         clientSecret: CLIENT_SECRET,
@@ -404,7 +488,7 @@ describe('Multi Tenant Login', () => {
         wristbandApplicationDomain,
       });
 
-      // tenant_domain query param is missing, which should redirect to app-level login.
+      // tenant_domain and tenant_custom_domain query param is missing, which should redirect to app-level login.
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: rootDomain },
       });
