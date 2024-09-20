@@ -595,5 +595,43 @@ describe('Multi Tenant Logout', () => {
       expect(origin).toEqual('https://google.com');
       expect(pathname).toEqual('/');
     });
+
+    test('Logout redirect URL precedence over custom application login URL', async () => {
+      rootDomain = 'business.invotastic.com';
+      wristbandApplicationDomain = 'auth.invotastic.com';
+      loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
+      redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
+
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        rootDomain,
+        useCustomDomains: true,
+        useTenantSubdomains: true,
+        wristbandApplicationDomain,
+        customApplicationLoginPageUrl: 'https://google.com',
+      });
+
+      // Subdomain is missing from host, which should redirect to logout redirectUrl.
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: rootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await wristbandAuth.logout(mockExpressReq, mockExpressRes, { redirectUrl: 'https://yahoo.com' });
+
+      // Validate Redirect response
+      const { statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin } = locationUrl;
+      expect(origin).toEqual('https://yahoo.com');
+      expect(pathname).toEqual('/');
+    });
   });
 });

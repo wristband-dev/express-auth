@@ -286,10 +286,10 @@ export class AuthService {
       this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationDomain}/login`;
     if (!config.tenantCustomDomain) {
       if (this.useTenantSubdomains && host!.substring(host!.indexOf('.') + 1) !== this.rootDomain) {
-        return res.redirect(`${appLoginUrl}?client_id=${this.clientId}`);
+        return res.redirect(config.redirectUrl || `${appLoginUrl}?client_id=${this.clientId}`);
       }
       if (!this.useTenantSubdomains && !config.tenantDomainName) {
-        return res.redirect(`${appLoginUrl}?client_id=${this.clientId}`);
+        return res.redirect(config.redirectUrl || `${appLoginUrl}?client_id=${this.clientId}`);
       }
     }
 

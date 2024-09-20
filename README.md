@@ -57,6 +57,9 @@ or
 yarn add @wristband/express-auth
 ```
 
+> [!NOTE]
+> Ensure your Express server is configured to deal with cookies. This SDK expects the `req.cookies` object to be present on requests, which the <ins>[cookie-parser](https://github.com/expressjs/cookie-parser)</ins> middleware can handle.
+
 ## Usage
 
 ### 1) Initialize the SDK
@@ -547,7 +550,7 @@ If your application created a session, it should destroy it before invoking the 
 
 | LogoutConfig Field | Type | Required | Description |
 | ------------------ | ---- | -------- | ----------- |
-| redirectUrl | string | No | Optional URL that Wristband will redirect to after the logout operation has completed.  |
+| redirectUrl | string | No | Optional URL that Wristband will redirect to after the logout operation has completed. This will also take precedence over the `customApplicationLoginPageUrl` (if specified) in the SDK AuthConfig if the tenant domain cannot be determined when attempting to redirect to the Wristband Logout Endpoint. |
 | refreshToken | string | No | The refresh token to revoke. |
 | tenantCustomDomain | string | No | The tenant custom domain for the tenant that the user belongs to (if applicable). |
 | tenantDomainName | string | No | The domain name of the tenant the user belongs to. |
