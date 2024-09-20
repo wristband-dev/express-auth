@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import { createHash, randomBytes } from 'crypto';
 import { Request, Response } from 'express';
 import { defaults, seal, unseal } from 'iron-webcrypto';
@@ -6,6 +5,7 @@ import * as crypto from 'uncrypto';
 
 import { LOGIN_STATE_COOKIE_PREFIX } from './constants';
 import { LoginState, LoginStateMapConfig } from '../types';
+import { WristbandError } from '../error';
 
 export function parseTenantSubdomain(req: Request, rootDomain: string): string {
   const { host } = req.headers;
@@ -40,6 +40,12 @@ export async function decryptLoginState(loginStateCookie: string, loginStateSecr
 export function getAndClearLoginStateCookie(req: Request, res: Response): string {
   const { state } = req.query;
   const paramState = state ? state.toString() : '';
+
+  if (!req.cookies) {
+    throw new WristbandError(
+      'Please verify that your server is configured to handle cookies correctly. In Express, this typically requires the "cookie-parser" middleware.'
+    );
+  }
 
   // This should always resolve to a single cookie with this prefix, or possibly no cookie at all
   // if it got cleared or expired before the callback was triggered.
@@ -106,11 +112,15 @@ export function createLoginState(req: Request, redirectUri: string, config: Logi
 }
 
 export function clearOldestLoginStateCookie(req: Request, res: Response): void {
-  const { cookies } = req;
+  if (!req.cookies) {
+    throw new WristbandError(
+      'Please verify that your server is configured to handle cookies correctly. In Express, this typically requires the "cookie-parser" middleware.'
+    );
+  }
 
   // The max amount of concurrent login state cookies we allow is 3.  If there are already 3 cookies,
   // then we clear the one with the oldest creation timestamp to make room for the new one.
-  const allLoginCookieNames: string[] = Object.keys(cookies).filter((cookieName: string) => {
+  const allLoginCookieNames: string[] = Object.keys(req.cookies).filter((cookieName: string) => {
     return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}`);
   });
 
