@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import retry from 'async-retry';
+import { AxiosError } from 'axios';
 
 import { LOGIN_REQUIRED_ERROR, TENANT_DOMAIN_TOKEN } from './utils/constants';
 import {
@@ -320,8 +321,28 @@ export class AuthService {
     // Try up to 3 times to perform a token refresh.
     let tokenResponse: TokenResponse | null = null;
     await retry(
-      async () => {
-        tokenResponse = await this.wristbandService.refreshToken(refreshToken);
+      async (bail) => {
+        try {
+          tokenResponse = await this.wristbandService.refreshToken(refreshToken);
+        } catch (error: unknown) {
+          if (
+            error instanceof AxiosError &&
+            error.response &&
+            error.response.status >= 400 &&
+            error.response.status < 500
+          ) {
+            const errorDescription =
+              error.response.data && error.response.data.error_description
+                ? error.response.data.error_description
+                : 'Invalid Refresh Token';
+            // Only 4xx errors should short-circuit the retry loop early.
+            bail(new WristbandError('invalid_refresh_token', errorDescription));
+            return;
+          }
+
+          // Retry any 5xx errors.
+          throw new WristbandError('unexpected_error', 'Unexpected Error');
+        }
       },
       { retries: 2, minTimeout: 100, maxTimeout: 100 }
     );
@@ -336,7 +357,7 @@ export class AuthService {
       return { accessToken, idToken, refreshToken: responseRefreshToken, expiresIn };
     }
 
-    // [Safety check] Errors during the refresh API call should bubble up, so this should never happen.
-    throw new Error('Token response was null');
+    // This is merely a safety check, but this should never happen.
+    throw new WristbandError('unexpected_error', 'Unexpected Error');
   }
 }
