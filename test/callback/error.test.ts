@@ -73,7 +73,7 @@ describe('Callback Errors', () => {
     // Mock Express objects
     let mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_domain: 'devs4you' },
-      cookies: { 'login:state:1234567890': encryptedLoginState },
+      cookies: { 'login#state#1234567890': encryptedLoginState },
     });
     let mockExpressRes = httpMocks.createResponse();
 
@@ -88,7 +88,7 @@ describe('Callback Errors', () => {
 
     mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', code: ['a', 'b'] },
-      cookies: { 'login:state:1234567890': 'blah' },
+      cookies: { 'login#state#1234567890': 'blah' },
     });
     mockExpressRes = httpMocks.createResponse();
     // Multiple code query parameters should throw an error.
@@ -105,7 +105,7 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', error: ['a', 'b'] },
-      cookies: { 'login:state:1234567890': 'blah' },
+      cookies: { 'login#state#1234567890': 'blah' },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -123,7 +123,7 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', error_description: ['a', 'b'] },
-      cookies: { 'login:state:1234567890': 'blah' },
+      cookies: { 'login#state#1234567890': 'blah' },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -141,7 +141,7 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_domain: ['a', 'b'] },
-      cookies: { 'login:state:1234567890': 'blah' },
+      cookies: { 'login#state#1234567890': 'blah' },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -159,7 +159,7 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_custom_domain: ['a', 'b'] },
-      cookies: { 'login:state:1234567890': 'blah' },
+      cookies: { 'login#state#1234567890': 'blah' },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -187,7 +187,7 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_domain: 'devs4you', error: 'BAD', error_description: 'Really bad' },
-      cookies: { 'login:state:1234567890': encryptedLoginState },
+      cookies: { 'login#state#1234567890': encryptedLoginState },
     });
     const mockExpressRes = httpMocks.createResponse();
 

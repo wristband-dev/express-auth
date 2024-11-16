@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { defaults, seal, unseal } from 'iron-webcrypto';
 import * as crypto from 'uncrypto';
 
-import { LOGIN_STATE_COOKIE_PREFIX } from './constants';
+import { LOGIN_STATE_COOKIE_PREFIX, LOGIN_STATE_COOKIE_SEPARATOR } from './constants';
 import { LoginState, LoginStateMapConfig } from '../types';
 import { WristbandError } from '../error';
 
@@ -50,7 +50,7 @@ export function getAndClearLoginStateCookie(req: Request, res: Response): string
   // This should always resolve to a single cookie with this prefix, or possibly no cookie at all
   // if it got cleared or expired before the callback was triggered.
   const matchingLoginCookieNames = Object.keys(req.cookies).filter((cookieName) => {
-    return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}${paramState}:`);
+    return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}${paramState}${LOGIN_STATE_COOKIE_SEPARATOR}`);
   });
 
   let loginStateCookie = '';
@@ -128,14 +128,14 @@ export function clearOldestLoginStateCookie(req: Request, res: Response): void {
   if (allLoginCookieNames.length >= 3) {
     const mostRecentTimestamps: string[] = allLoginCookieNames
       .map((cookieName: string) => {
-        return cookieName.split(':')[2];
+        return cookieName.split(LOGIN_STATE_COOKIE_SEPARATOR)[2];
       })
       .sort()
       .reverse()
       .slice(0, 2);
 
     allLoginCookieNames.forEach((cookieName: string) => {
-      const timestamp: string = cookieName.split(':')[2];
+      const timestamp: string = cookieName.split(LOGIN_STATE_COOKIE_SEPARATOR)[2];
       if (!mostRecentTimestamps.includes(timestamp)) {
         res.clearCookie(cookieName);
       }
@@ -150,13 +150,17 @@ export function createLoginStateCookie(
   dangerouslyDisableSecureCookies: boolean
 ): void {
   // Add the new login state cookie (1 hour max age).
-  res.cookie(`${LOGIN_STATE_COOKIE_PREFIX}${state}:${Date.now().valueOf()}`, encryptedLoginState, {
-    httpOnly: true,
-    maxAge: 3600000,
-    path: '/',
-    sameSite: 'lax',
-    secure: !dangerouslyDisableSecureCookies,
-  });
+  res.cookie(
+    `${LOGIN_STATE_COOKIE_PREFIX}${state}${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now().valueOf()}`,
+    encryptedLoginState,
+    {
+      httpOnly: true,
+      maxAge: 3600000,
+      path: '/',
+      sameSite: 'lax',
+      secure: !dangerouslyDisableSecureCookies,
+    }
+  );
 }
 
 export function getOAuthAuthorizeUrl(

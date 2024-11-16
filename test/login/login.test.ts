@@ -6,6 +6,7 @@ import httpMocks from 'node-mocks-http';
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { decryptLoginState, encryptLoginState } from '../../src/utils';
 import { LoginState } from '../../src/types';
+import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -75,7 +76,7 @@ describe('Multi Tenant Login', () => {
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
       const cookieKey: string = loginStateCookie[0];
-      const keyParts: string[] = cookieKey.split(':');
+      const keyParts: string[] = cookieKey.split(LOGIN_STATE_COOKIE_SEPARATOR);
       expect(keyParts).toHaveLength(3);
       expect(keyParts[0]).toEqual('login');
       expect(keyParts[1]).toBeTruthy();
@@ -151,7 +152,7 @@ describe('Multi Tenant Login', () => {
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
       const cookieKey: string = loginStateCookie[0];
-      const keyParts: string[] = cookieKey.split(':');
+      const keyParts: string[] = cookieKey.split(LOGIN_STATE_COOKIE_SEPARATOR);
       expect(keyParts).toHaveLength(3);
       expect(keyParts[0]).toEqual('login');
       expect(keyParts[1]).toBeTruthy();
@@ -213,7 +214,7 @@ describe('Multi Tenant Login', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
@@ -257,7 +258,7 @@ describe('Multi Tenant Login', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
@@ -302,7 +303,7 @@ describe('Multi Tenant Login', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
@@ -347,7 +348,7 @@ describe('Multi Tenant Login', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
@@ -398,7 +399,7 @@ describe('Multi Tenant Login', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.returnUrl).toBe(`https://devs4you.${rootDomain}/settings`);
@@ -433,9 +434,9 @@ describe('Multi Tenant Login', () => {
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
         cookies: {
-          'login:++state01:1111111111': encryptedLoginState01,
-          'login:state02:2222222222': encryptedLoginState02,
-          'login:state03:3333333333': encryptedLoginState03,
+          'login#++state01#1111111111': encryptedLoginState01,
+          'login#state02#2222222222': encryptedLoginState02,
+          'login#state03#3333333333': encryptedLoginState03,
         },
         headers: { host: `devs4you.${rootDomain}` },
       });
@@ -457,7 +458,7 @@ describe('Multi Tenant Login', () => {
       expect(Object.keys(cookies)).toHaveLength(2);
       const oldLoginStateCookie = Object.entries(cookies)[0];
       const oldCookieName = oldLoginStateCookie[0];
-      expect(oldCookieName).toBe('login:++state01:1111111111');
+      expect(oldCookieName).toBe('login#++state01#1111111111');
       const oldCookieValue = oldLoginStateCookie[1];
       expect(Object.keys(oldCookieValue)).toHaveLength(2);
       expect(oldCookieValue.options.expires?.valueOf()).toBeLessThan(Date.now().valueOf());
@@ -466,7 +467,7 @@ describe('Multi Tenant Login', () => {
 
       // Validate new login state cookie
       const loginStateCookie = Object.entries(cookies)[1];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const { value } = cookieValue;

@@ -7,6 +7,7 @@ import httpMocks from 'node-mocks-http';
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { CallbackResult, CallbackResultType, LoginState } from '../../src/types';
 import { encryptLoginState } from '../../src/utils';
+import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -77,7 +78,7 @@ describe('Multi Tenant Callback', () => {
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
         query: { state: 'state', code: 'code', tenant_domain: 'devs4you' },
-        cookies: { 'login:state:1234567890': encryptedLoginState },
+        cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
       // Validate callback data contents
@@ -113,7 +114,7 @@ describe('Multi Tenant Callback', () => {
       const { cookies } = mockExpressRes;
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       expect(keyParts).toHaveLength(3);
       expect(keyParts[0]).toEqual('login');
       expect(keyParts[1]).toBe('state');
@@ -178,7 +179,7 @@ describe('Multi Tenant Callback', () => {
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: `devs4you.${rootDomain}` },
         query: { state: 'state', code: 'code' },
-        cookies: { 'login:state:1234567890': encryptedLoginState },
+        cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
       // Validate callback data contents
@@ -249,7 +250,7 @@ describe('Multi Tenant Callback', () => {
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: `devs4you.${rootDomain}` },
         query: { state: 'state', code: 'code' },
-        cookies: { 'login:state:1234567890': encryptedLoginState },
+        cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
       // Validate callback data contents
@@ -368,7 +369,7 @@ describe('Multi Tenant Callback', () => {
           error: 'login_required',
           error_description: 'Login required',
         },
-        cookies: { 'login:state:1234567890': encryptedLoginState },
+        cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
@@ -409,7 +410,7 @@ describe('Multi Tenant Callback', () => {
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: `devs4you.${rootDomain}` },
         query: { state: 'state', code: 'code', error: 'login_required', error_description: 'Login required' },
-        cookies: { 'login:state:1234567890': encryptedLoginState },
+        cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
@@ -446,7 +447,7 @@ describe('Multi Tenant Callback', () => {
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
         query: { state: 'state', code: 'code', tenant_domain: 'devs4you' },
-        cookies: { 'login:state:1234567890': encryptedLoginState },
+        cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
@@ -487,7 +488,7 @@ describe('Multi Tenant Callback', () => {
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: `devs4you.${rootDomain}` },
         query: { state: 'state', code: 'code' },
-        cookies: { 'login:state:1234567890': encryptedLoginState },
+        cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
