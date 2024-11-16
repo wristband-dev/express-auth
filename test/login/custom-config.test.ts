@@ -6,6 +6,7 @@ import httpMocks from 'node-mocks-http';
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { decryptLoginState } from '../../src/utils';
 import { LoginState } from '../../src/types';
+import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -65,7 +66,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -106,7 +107,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -149,7 +150,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -192,7 +193,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -235,7 +236,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -279,7 +280,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -333,7 +334,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -380,7 +381,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -424,7 +425,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -471,7 +472,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -515,7 +516,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -559,7 +560,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -603,7 +604,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -647,7 +648,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -691,7 +692,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
@@ -735,7 +736,7 @@ describe('Custom Login Configurations', () => {
       // Validate login state cookie
       expect(Object.keys(cookies)).toHaveLength(1);
       const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(':');
+      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
       const cookieValue = loginStateCookie[1];
       expect(Object.keys(cookieValue)).toHaveLength(2);
       const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
