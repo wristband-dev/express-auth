@@ -2,7 +2,7 @@
   "name": "@wristband/express-auth",
   "description": "SDK for integrating your ExpressJS application with Wristband. Handles user authentication and token management.",
   "author": "Wristband",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "license": "MIT",
   "private": false,
   "homepage": "https://wristband.dev",
@@ -94,8 +94,8 @@
   },
   "dependencies": {
     "async-retry": "^1.3.3",
-    "axios": "^1.7.4",
-    "express": "^4.18.2",
+    "axios": "^1.7.7",
+    "express": "^4.21.1",
     "iron-webcrypto": "^1.2.1",
     "uncrypto": "^0.1.3"
   }

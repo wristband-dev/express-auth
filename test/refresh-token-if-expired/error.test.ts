@@ -2,7 +2,7 @@
 
 import nock from 'nock';
 
-import { createWristbandAuth, WristbandAuth } from '../../src/index';
+import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src/index';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -43,5 +43,45 @@ describe('Refresh Token Errors', () => {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('The expiresAt field must be an integer greater than 0');
     }
+  });
+
+  test('Perform a token refresh with a bad token value', async () => {
+    const mockError = {
+      error: 'invalid_grant',
+      error_description: 'Invalid refresh token',
+    };
+    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
+      .persist()
+      .post('/api/v1/oauth2/token', 'grant_type=refresh_token&refresh_token=refreshToken')
+      .reply(400, mockError);
+
+    try {
+      await wristbandAuth.refreshTokenIfExpired('refreshToken', Date.now().valueOf() - 1000);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof WristbandError).toBe(true);
+      expect(error.error).toBe('invalid_refresh_token');
+      expect(error.errorDescription).toBe('Invalid refresh token');
+    }
+
+    scope.done();
+  });
+
+  test('Perform a token refresh with a server error', async () => {
+    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
+      .persist()
+      .post('/api/v1/oauth2/token', 'grant_type=refresh_token&refresh_token=refreshToken')
+      .reply(500);
+
+    try {
+      await wristbandAuth.refreshTokenIfExpired('refreshToken', Date.now().valueOf() - 1000);
+      expect('').fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof WristbandError).toBe(true);
+      expect(error.error).toBe('unexpected_error');
+      expect(error.errorDescription).toBe('Unexpected Error');
+    }
+
+    scope.done();
   });
 });
