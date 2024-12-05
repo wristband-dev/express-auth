@@ -151,7 +151,7 @@ describe('Callback Errors', () => {
       expect('').fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
-      expect(error.message).toBe('Invalid query parameter [tenant_domain] passed from Wristband during callback');
+      expect(error.message).toBe('More than one [tenant_domain] query parameter was encountered');
     }
   });
 

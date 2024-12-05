@@ -64,40 +64,35 @@ export function getAndClearLoginStateCookie(req: Request, res: Response): string
   return loginStateCookie;
 }
 
-export function resolveTenantDomainName(
-  req: Request,
-  useTenantSubdomains: boolean,
-  rootDomain: string,
-  defaultTenantDomainName: string = ''
-): string {
+export function resolveTenantDomainName(req: Request, useTenantSubdomains: boolean, rootDomain: string): string {
   if (useTenantSubdomains) {
-    return parseTenantSubdomain(req, rootDomain) || defaultTenantDomainName;
+    return parseTenantSubdomain(req, rootDomain) || '';
   }
 
   const { tenant_domain: tenantDomainParam } = req.query;
 
   if (!!tenantDomainParam && typeof tenantDomainParam !== 'string') {
-    throw new TypeError('More than one [tenant_domain] query parameter was passed to the login endpoint');
+    throw new TypeError('More than one [tenant_domain] query parameter was encountered');
   }
 
-  return tenantDomainParam || defaultTenantDomainName;
+  return tenantDomainParam || '';
 }
 
-export function resolveTenantCustomDomain(req: Request, defaultTenantCustomDomain: string = ''): string {
+export function resolveTenantCustomDomainParam(req: Request): string {
   const { tenant_custom_domain: tenantCustomDomainParam } = req.query;
 
   if (!!tenantCustomDomainParam && typeof tenantCustomDomainParam !== 'string') {
-    throw new TypeError('More than one [tenant_custom_domain] query parameter was passed to the login endpoint');
+    throw new TypeError('More than one [tenant_custom_domain] query parameter was encountered');
   }
 
-  return tenantCustomDomainParam || defaultTenantCustomDomain;
+  return tenantCustomDomainParam || '';
 }
 
 export function createLoginState(req: Request, redirectUri: string, config: LoginStateMapConfig = {}): LoginState {
   const { return_url: returnUrl } = req.query;
 
   if (!!returnUrl && typeof returnUrl !== 'string') {
-    throw new TypeError('More than one [return_url] query parameter was passed to the login endpoint');
+    throw new TypeError('More than one [return_url] query parameter was encountered');
   }
 
   const loginStateData = {
@@ -168,6 +163,8 @@ export function getOAuthAuthorizeUrl(
   config: {
     clientId: string;
     codeVerifier: string;
+    defaultTenantCustomDomain?: string;
+    defaultTenantDomainName?: string;
     redirectUri: string;
     scopes: string[];
     state: string;
@@ -180,7 +177,7 @@ export function getOAuthAuthorizeUrl(
   const { login_hint: loginHint } = req.query;
 
   if (!!loginHint && typeof loginHint !== 'string') {
-    throw new TypeError('More than one [login_hint] query parameter was passed to the login endpoint');
+    throw new TypeError('More than one [login_hint] query parameter was encountered');
   }
 
   const queryParams = new URLSearchParams({
@@ -196,9 +193,23 @@ export function getOAuthAuthorizeUrl(
   });
 
   const separator = config.useCustomDomains ? '.' : '-';
-  const tenantDomainToUse =
-    config.tenantCustomDomain || `${config.tenantDomainName}${separator}${config.wristbandApplicationDomain}`;
-  return `https://${tenantDomainToUse}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+
+  // Domain priority order resolution:
+  // 1)  tenant_custom_domain query param
+  // 2a) tenant subdomain
+  // 2b) tenant_domain query param
+  // 3)  defaultTenantCustomDomain login config
+  // 4)  defaultTenantDomainName login config
+  if (config.tenantCustomDomain) {
+    return `https://${config.tenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+  }
+  if (config.tenantDomainName) {
+    return `https://${config.tenantDomainName}${separator}${config.wristbandApplicationDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+  }
+  if (config.defaultTenantCustomDomain) {
+    return `https://${config.defaultTenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+  }
+  return `https://${config.defaultTenantDomainName}${separator}${config.wristbandApplicationDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
 }
 
 export function isExpired(expiresAt: number): boolean {
