@@ -60,7 +60,7 @@ describe('Refresh Token Errors', () => {
       expect('').fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof WristbandError).toBe(true);
-      expect(error.error).toBe('invalid_refresh_token');
+      expect(error.error).toBe('invalid_grant');
       expect(error.errorDescription).toBe('Invalid refresh token');
     }
 
