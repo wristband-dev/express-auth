@@ -270,117 +270,6 @@ describe('Callback Errors', () => {
     });
   });
 
-  // Added tests from callback.test.ts
-  test('Callback with valid input returns completed result', async () => {
-    // Arrange
-    // Create a valid login state cookie with matching state
-    const loginState: LoginState = {
-      codeVerifier: 'codeVerifier',
-      redirectUri: REDIRECT_URI,
-      state: 'teststate',
-    };
-    const encryptedLoginState = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
-    const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now()}`;
-
-    const mockExpressReq = httpMocks.createRequest({
-      query: {
-        state: 'teststate',
-        code: 'testcode',
-        tenant_domain: 'tenant1',
-      },
-      cookies: {
-        [cookieKey]: encryptedLoginState,
-      },
-    });
-    const mockExpressRes = httpMocks.createResponse();
-
-    // Mock the token response
-    const mockTokens = {
-      access_token: 'test_access_token',
-      expires_in: 3600,
-      id_token: 'test_id_token',
-      refresh_token: 'test_refresh_token',
-      token_type: 'bearer',
-    };
-
-    // Mock the userinfo response
-    const mockUserinfo = {
-      sub: 'user123',
-      email: 'test@example.com',
-      email_verified: true,
-    };
-
-    // Setup nock to intercept the token and userinfo requests
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(200, mockTokens);
-
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).get('/api/v1/oauth2/userinfo').reply(200, mockUserinfo);
-
-    // Act
-    const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-
-    // Assert
-    expect(result.result).toBe(CallbackResultType.COMPLETED);
-    expect(result.callbackData).toBeDefined();
-    expect(result.callbackData?.tenantDomainName).toBe('tenant1');
-    expect(result.callbackData?.userinfo).toBeDefined();
-  });
-
-  test('Callback with custom domain includes in result', async () => {
-    // Arrange
-    const customDomain = 'custom.tenant1.com';
-
-    // Create a valid login state cookie with matching state
-    const loginState: LoginState = {
-      codeVerifier: 'codeVerifier',
-      redirectUri: REDIRECT_URI,
-      state: 'teststate',
-    };
-    const encryptedLoginState = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
-    const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now()}`;
-
-    const mockExpressReq = httpMocks.createRequest({
-      query: {
-        state: 'teststate',
-        code: 'testcode',
-        tenant_domain: 'tenant1',
-        tenant_custom_domain: customDomain,
-      },
-      cookies: {
-        [cookieKey]: encryptedLoginState,
-      },
-    });
-    const mockExpressRes = httpMocks.createResponse();
-
-    // Mock the token response
-    const mockTokens = {
-      access_token: 'test_access_token',
-      expires_in: 3600,
-      id_token: 'test_id_token',
-      refresh_token: 'test_refresh_token',
-      token_type: 'bearer',
-    };
-
-    // Mock the userinfo response
-    const mockUserinfo = {
-      sub: 'user123',
-      email: 'test@example.com',
-      email_verified: true,
-    };
-
-    // Setup nock to intercept the token and userinfo requests
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(200, mockTokens);
-
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).get('/api/v1/oauth2/userinfo').reply(200, mockUserinfo);
-
-    // Act
-    const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-
-    // Assert
-    expect(result.result).toBe(CallbackResultType.COMPLETED);
-    expect(result.callbackData).toBeDefined();
-    expect(result.callbackData?.tenantCustomDomain).toBe(customDomain);
-  });
-
   test('Callback when token exchange fails returns redirect required', async () => {
     // Arrange
     // Create a valid login state cookie with matching state
@@ -405,12 +294,10 @@ describe('Callback Errors', () => {
     const mockExpressRes = httpMocks.createResponse();
 
     // Setup nock to intercept the token request and return an error
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .post('/api/v1/oauth2/token')
-      .reply(400, {
-        error: 'invalid_grant',
-        error_description: 'Token exchange failed'
-      });
+    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(400, {
+      error: 'invalid_grant',
+      error_description: 'Token exchange failed',
+    });
 
     // Act
     const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
@@ -418,7 +305,7 @@ describe('Callback Errors', () => {
     // Assert
     expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
     expect(result.callbackData).toBeFalsy();
-    
+
     // Verify redirect response
     const { statusCode } = mockExpressRes;
     expect(statusCode).toEqual(302);
@@ -431,7 +318,7 @@ describe('Callback Errors', () => {
     const rootDomain = 'example.com';
     const loginUrl = `https://{tenant_domain}.${rootDomain}/login`;
     const redirectUri = `https://{tenant_domain}.${rootDomain}/callback`;
-    
+
     // Create auth service with tenant subdomains config
     const tenantSubdomainAuth = createWristbandAuth({
       clientId: CLIENT_ID,
@@ -443,7 +330,7 @@ describe('Callback Errors', () => {
       useTenantSubdomains: true,
       wristbandApplicationDomain: WRISTBAND_APPLICATION_DOMAIN,
     });
-    
+
     // Create a valid login state cookie with matching state
     const loginState: LoginState = {
       codeVerifier: 'verifier123',
@@ -466,12 +353,10 @@ describe('Callback Errors', () => {
     const mockExpressRes = httpMocks.createResponse();
 
     // Setup nock to intercept the token request and return an error
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .post('/api/v1/oauth2/token')
-      .reply(400, {
-        error: 'invalid_grant',
-        error_description: 'Token exchange failed'
-      });
+    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(400, {
+      error: 'invalid_grant',
+      error_description: 'Token exchange failed',
+    });
 
     // Act
     const result = await tenantSubdomainAuth.callback(mockExpressReq, mockExpressRes);
@@ -479,13 +364,13 @@ describe('Callback Errors', () => {
     // Assert
     expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
     expect(result.callbackData).toBeFalsy();
-    
+
     // Verify redirect response
     const { statusCode } = mockExpressRes;
     expect(statusCode).toEqual(302);
     const location = mockExpressRes._getRedirectUrl();
     expect(location).toBeTruthy();
-    
+
     const locationUrl = new URL(location);
     const { pathname, origin } = locationUrl;
     expect(origin).toEqual(`https://tenant1.${rootDomain}`);
