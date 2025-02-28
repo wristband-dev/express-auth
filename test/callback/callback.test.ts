@@ -21,11 +21,22 @@ describe('Multi Tenant Callback', () => {
   let wristbandApplicationDomain: string;
 
   beforeEach(() => {
+    // Clean up any previous nock interceptors
+    nock.cleanAll();
+
     rootDomain = 'localhost:6001';
     loginUrl = `https://${rootDomain}/api/auth/login`;
     redirectUri = `https://${rootDomain}/api/auth/callback`;
     wristbandApplicationDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
-    nock.cleanAll();
+
+    wristbandAuth = createWristbandAuth({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+      loginUrl,
+      redirectUri,
+      wristbandApplicationDomain,
+    });
   });
 
   describe('Callback Happy Path', () => {
@@ -134,6 +145,7 @@ describe('Multi Tenant Callback', () => {
       rootDomain = 'business.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
+      wristbandApplicationDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
         clientSecret: CLIENT_SECRET,
@@ -154,10 +166,7 @@ describe('Multi Tenant Callback', () => {
       };
       const tokenScope = nock(`https://${wristbandApplicationDomain}`)
         .persist()
-        .post(
-          '/api/v1/oauth2/token',
-          `grant_type=authorization_code&code=code&redirect_uri=${redirectUri}&code_verifier=codeVerifier`
-        )
+        .post('/api/v1/oauth2/token')
         .reply(200, mockTokens);
       // Mock userinfo data
       const mockUserinfo = {
@@ -173,7 +182,11 @@ describe('Multi Tenant Callback', () => {
         .get('/api/v1/oauth2/userinfo')
         .reply(200, mockUserinfo);
       // Mock login state
-      const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'state' };
+      const loginState: LoginState = {
+        codeVerifier: 'codeVerifier',
+        redirectUri: redirectUri,
+        state: 'state',
+      };
       const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
@@ -182,7 +195,6 @@ describe('Multi Tenant Callback', () => {
         cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
-      // Validate callback data contents
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, result } = callbackResult;
       expect(result).toBe(CallbackResultType.COMPLETED);
@@ -211,7 +223,6 @@ describe('Multi Tenant Callback', () => {
         loginUrl,
         redirectUri,
         rootDomain,
-        useCustomDomains: true,
         useTenantSubdomains: true,
         wristbandApplicationDomain,
       });
@@ -225,10 +236,7 @@ describe('Multi Tenant Callback', () => {
       };
       const tokenScope = nock(`https://${wristbandApplicationDomain}`)
         .persist()
-        .post(
-          '/api/v1/oauth2/token',
-          `grant_type=authorization_code&code=code&redirect_uri=${redirectUri}&code_verifier=codeVerifier`
-        )
+        .post('/api/v1/oauth2/token')
         .reply(200, mockTokens);
       // Mock userinfo data
       const mockUserinfo = {
@@ -244,7 +252,11 @@ describe('Multi Tenant Callback', () => {
         .get('/api/v1/oauth2/userinfo')
         .reply(200, mockUserinfo);
       // Mock login state
-      const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'state' };
+      const loginState: LoginState = {
+        codeVerifier: 'codeVerifier',
+        redirectUri: redirectUri,
+        state: 'state',
+      };
       const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
@@ -253,7 +265,6 @@ describe('Multi Tenant Callback', () => {
         cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
-      // Validate callback data contents
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, result } = callbackResult;
       expect(result).toBe(CallbackResultType.COMPLETED);
@@ -283,17 +294,14 @@ describe('Multi Tenant Callback', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        rootDomain,
         useTenantSubdomains: false,
         wristbandApplicationDomain,
       });
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
-        headers: { host: `${rootDomain}` },
         query: { state: 'state', code: 'code', tenant_domain: 'devs4you' },
       });
       const mockExpressRes = httpMocks.createResponse();
-      // login state cookie is missing, which should redirect to app-level login.
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, result } = callbackResult;
       expect(result).toBe(CallbackResultType.REDIRECT_REQUIRED);
@@ -326,7 +334,6 @@ describe('Multi Tenant Callback', () => {
         query: { state: 'state', code: 'code' },
       });
       const mockExpressRes = httpMocks.createResponse();
-      // login state cookie is missing, which should redirect to app-level login.
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, result } = callbackResult;
       expect(result).toBe(CallbackResultType.REDIRECT_REQUIRED);
@@ -353,7 +360,6 @@ describe('Multi Tenant Callback', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        rootDomain,
         useTenantSubdomains: false,
         wristbandApplicationDomain,
       });
@@ -362,13 +368,7 @@ describe('Multi Tenant Callback', () => {
       const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
-        query: {
-          state: 'state',
-          code: 'code',
-          tenant_domain: 'devs4you',
-          error: 'login_required',
-          error_description: 'Login required',
-        },
+        query: { state: 'state', error: 'login_required', tenant_domain: 'devs4you' },
         cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
@@ -409,7 +409,7 @@ describe('Multi Tenant Callback', () => {
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: `devs4you.${rootDomain}` },
-        query: { state: 'state', code: 'code', error: 'login_required', error_description: 'Login required' },
+        query: { state: 'state', error: 'login_required' },
         cookies: { 'login#state#1234567890': encryptedLoginState },
       });
       const mockExpressRes = httpMocks.createResponse();
@@ -439,6 +439,7 @@ describe('Multi Tenant Callback', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
+        useTenantSubdomains: false,
         wristbandApplicationDomain,
       });
       // Mock login state

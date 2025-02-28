@@ -1,3 +1,5 @@
+/* eslint-disable max-classes-per-file */
+
 export class WristbandError extends Error {
   private error: string;
   private errorDescription?: string;
@@ -15,5 +17,11 @@ export class WristbandError extends Error {
 
   getErrorDescription(): string | undefined {
     return this.errorDescription;
+  }
+}
+
+export class InvalidGrantError extends WristbandError {
+  constructor(errorDescription?: string) {
+    super('invalid_grant', errorDescription || '');
   }
 }

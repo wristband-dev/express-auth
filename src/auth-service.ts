@@ -28,7 +28,7 @@ import {
   TokenResponse,
   Userinfo,
 } from './types';
-import { WristbandError } from './error';
+import { InvalidGrantError, WristbandError } from './error';
 
 export class AuthService {
   private wristbandService: WristbandService;
@@ -227,29 +227,37 @@ export class AuthService {
     if (!code) {
       throw new TypeError('Invalid query parameter [code] passed from Wristband during callback');
     }
-    const tokenResponse: TokenResponse = await this.wristbandService.getTokens(code, redirectUri, codeVerifier);
-    const {
-      access_token: accessToken,
-      id_token: idToken,
-      refresh_token: refreshToken,
-      expires_in: expiresIn,
-    } = tokenResponse;
+    try {
+      const tokenResponse: TokenResponse = await this.wristbandService.getTokens(code, redirectUri, codeVerifier);
+      const {
+        access_token: accessToken,
+        id_token: idToken,
+        refresh_token: refreshToken,
+        expires_in: expiresIn,
+      } = tokenResponse;
 
-    // Fetch the userinfo for the user logging in.
-    const userinfo: Userinfo = await this.wristbandService.getUserinfo(accessToken);
+      // Fetch the userinfo for the user logging in.
+      const userinfo: Userinfo = await this.wristbandService.getUserinfo(accessToken);
 
-    const callbackData: CallbackData = {
-      accessToken,
-      ...(!!customState && { customState }),
-      idToken,
-      expiresIn,
-      ...(!!refreshToken && { refreshToken }),
-      ...(!!returnUrl && { returnUrl }),
-      ...(!!tenantCustomDomainParam && { tenantCustomDomain: tenantCustomDomainParam }),
-      tenantDomainName: resolvedTenantDomainName,
-      userinfo,
-    };
-    return { result: CallbackResultType.COMPLETED, callbackData };
+      const callbackData: CallbackData = {
+        accessToken,
+        ...(!!customState && { customState }),
+        idToken,
+        expiresIn,
+        ...(!!refreshToken && { refreshToken }),
+        ...(!!returnUrl && { returnUrl }),
+        ...(!!tenantCustomDomainParam && { tenantCustomDomain: tenantCustomDomainParam }),
+        tenantDomainName: resolvedTenantDomainName,
+        userinfo,
+      };
+      return { result: CallbackResultType.COMPLETED, callbackData };
+    } catch (ex) {
+      if (ex instanceof InvalidGrantError) {
+        res.redirect(tenantLoginUrl);
+        return { result: CallbackResultType.REDIRECT_REQUIRED };
+      }
+      throw ex;
+    }
   }
 
   async logout(req: Request, res: Response, config: LogoutConfig = { tenantCustomDomain: '' }): Promise<void> {
@@ -315,6 +323,11 @@ export class AuthService {
         try {
           tokenResponse = await this.wristbandService.refreshToken(refreshToken);
         } catch (error: unknown) {
+          if (error instanceof InvalidGrantError) {
+            // Specifically handle invalid_grant errors
+            bail(error);
+            return;
+          }
           if (
             error instanceof AxiosError &&
             error.response &&

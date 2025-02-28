@@ -8,7 +8,7 @@ import {
   TokenData,
 } from './types';
 import { WristbandAuth, WristbandAuthImpl } from './wristband-auth';
-import { WristbandError } from './error';
+import { InvalidGrantError, WristbandError } from './error';
 
 /**
  * Wristband SDK function to create an instance of WristbandAuth.
@@ -23,4 +23,4 @@ function createWristbandAuth(authConfig: AuthConfig): WristbandAuth {
  * Exports
  */
 export type { AuthConfig, CallbackData, CallbackResult, LoginConfig, LogoutConfig, TokenData, WristbandAuth };
-export { createWristbandAuth, CallbackResultType, WristbandError };
+export { createWristbandAuth, CallbackResultType, WristbandError, InvalidGrantError };
