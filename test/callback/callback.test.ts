@@ -21,11 +21,13 @@ describe('Multi Tenant Callback', () => {
   let wristbandApplicationDomain: string;
 
   beforeEach(() => {
+    // Clean up any previous nock interceptors
+    nock.cleanAll();
+
     rootDomain = 'localhost:6001';
     loginUrl = `https://${rootDomain}/api/auth/login`;
     redirectUri = `https://${rootDomain}/api/auth/callback`;
     wristbandApplicationDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
-    nock.cleanAll();
   });
 
   describe('Callback Happy Path', () => {
@@ -134,6 +136,7 @@ describe('Multi Tenant Callback', () => {
       rootDomain = 'business.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
+      wristbandApplicationDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
         clientSecret: CLIENT_SECRET,
@@ -173,7 +176,11 @@ describe('Multi Tenant Callback', () => {
         .get('/api/v1/oauth2/userinfo')
         .reply(200, mockUserinfo);
       // Mock login state
-      const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'state' };
+      const loginState: LoginState = {
+        codeVerifier: 'codeVerifier',
+        redirectUri: redirectUri,
+        state: 'state',
+      };
       const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
@@ -244,7 +251,11 @@ describe('Multi Tenant Callback', () => {
         .get('/api/v1/oauth2/userinfo')
         .reply(200, mockUserinfo);
       // Mock login state
-      const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'state' };
+      const loginState: LoginState = {
+        codeVerifier: 'codeVerifier',
+        redirectUri: redirectUri,
+        state: 'state',
+      };
       const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({

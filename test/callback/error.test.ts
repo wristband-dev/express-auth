@@ -4,9 +4,10 @@
 import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 
-import { LoginState } from '../../src/types';
+import { CallbackResultType, LoginState } from '../../src/types';
 import { encryptLoginState } from '../../src/utils';
 import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src/index';
+import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -145,7 +146,7 @@ describe('Callback Errors', () => {
     });
     const mockExpressRes = httpMocks.createResponse();
 
-    // Multiple error query parameters should throw an error.
+    // Multiple tenant_domain query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       expect('').fail('Error expected to be thrown.');
@@ -267,5 +268,112 @@ describe('Callback Errors', () => {
         expect(error.getErrorDescription()).toBe('Callback request URL is missing a tenant subdomain');
       }
     });
+  });
+
+  test('Callback when token exchange fails returns redirect required', async () => {
+    // Arrange
+    // Create a valid login state cookie with matching state
+    const loginState: LoginState = {
+      codeVerifier: 'verifier123',
+      redirectUri: REDIRECT_URI,
+      state: 'teststate',
+    };
+    const encryptedLoginState = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+    const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now()}`;
+
+    const mockExpressReq = httpMocks.createRequest({
+      query: {
+        state: 'teststate',
+        code: 'testcode',
+        tenant_domain: 'tenant1',
+      },
+      cookies: {
+        [cookieKey]: encryptedLoginState,
+      },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    // Setup nock to intercept the token request and return an error
+    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(400, {
+      error: 'invalid_grant',
+      error_description: 'Token exchange failed',
+    });
+
+    // Act
+    const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+
+    // Assert
+    expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
+    expect(result.callbackData).toBeFalsy();
+
+    // Verify redirect response
+    const { statusCode } = mockExpressRes;
+    expect(statusCode).toEqual(302);
+    const location = mockExpressRes._getRedirectUrl();
+    expect(location).toBe(`${LOGIN_URL}?tenant_domain=tenant1`);
+  });
+
+  test('Callback with tenant subdomains constructs correct redirect URL', async () => {
+    // Arrange
+    const rootDomain = 'example.com';
+    const loginUrl = `https://{tenant_domain}.${rootDomain}/login`;
+    const redirectUri = `https://{tenant_domain}.${rootDomain}/callback`;
+
+    // Create auth service with tenant subdomains config
+    const tenantSubdomainAuth = createWristbandAuth({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+      loginUrl,
+      redirectUri,
+      rootDomain,
+      useTenantSubdomains: true,
+      wristbandApplicationDomain: WRISTBAND_APPLICATION_DOMAIN,
+    });
+
+    // Create a valid login state cookie with matching state
+    const loginState: LoginState = {
+      codeVerifier: 'verifier123',
+      redirectUri,
+      state: 'teststate',
+    };
+    const encryptedLoginState = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+    const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now()}`;
+
+    const mockExpressReq = httpMocks.createRequest({
+      headers: { host: `tenant1.${rootDomain}` },
+      query: {
+        state: 'teststate',
+        code: 'testcode',
+      },
+      cookies: {
+        [cookieKey]: encryptedLoginState,
+      },
+    });
+    const mockExpressRes = httpMocks.createResponse();
+
+    // Setup nock to intercept the token request and return an error
+    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(400, {
+      error: 'invalid_grant',
+      error_description: 'Token exchange failed',
+    });
+
+    // Act
+    const result = await tenantSubdomainAuth.callback(mockExpressReq, mockExpressRes);
+
+    // Assert
+    expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
+    expect(result.callbackData).toBeFalsy();
+
+    // Verify redirect response
+    const { statusCode } = mockExpressRes;
+    expect(statusCode).toEqual(302);
+    const location = mockExpressRes._getRedirectUrl();
+    expect(location).toBeTruthy();
+
+    const locationUrl = new URL(location);
+    const { pathname, origin } = locationUrl;
+    expect(origin).toEqual(`https://tenant1.${rootDomain}`);
+    expect(pathname).toEqual('/login');
   });
 });

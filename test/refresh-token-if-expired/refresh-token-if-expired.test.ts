@@ -1,23 +1,27 @@
 /* eslint-disable import/no-extraneous-dependencies */
 
 import nock from 'nock';
+import { WristbandAuth } from '../../src/wristband-auth';
+import { createWristbandAuth, WristbandError } from '../../src/index';
 
-import { createWristbandAuth, WristbandAuth } from '../../src/index';
-
-const CLIENT_ID = 'clientId';
-const CLIENT_SECRET = 'clientSecret';
+const CLIENT_ID = 'test-client-id';
+const CLIENT_SECRET = 'test-client-secret';
 const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
 const LOGIN_URL = 'http://localhost:6001/api/auth/login';
 const REDIRECT_URI = 'http://localhost:6001/api/auth/callback';
 const WRISTBAND_APPLICATION_DOMAIN = 'invotasticb2c-invotastic.dev.wristband.dev';
 
-const wristbandAuth: WristbandAuth = createWristbandAuth({
-  clientId: CLIENT_ID,
-  clientSecret: CLIENT_SECRET,
-  loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
-  loginUrl: LOGIN_URL,
-  redirectUri: REDIRECT_URI,
-  wristbandApplicationDomain: WRISTBAND_APPLICATION_DOMAIN,
+let wristbandAuth: WristbandAuth;
+
+beforeEach(() => {
+  wristbandAuth = createWristbandAuth({
+    clientId: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
+    loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+    loginUrl: LOGIN_URL,
+    redirectUri: REDIRECT_URI,
+    wristbandApplicationDomain: WRISTBAND_APPLICATION_DOMAIN,
+  });
 });
 
 describe('Refresh Token If Expired', () => {
@@ -51,6 +55,31 @@ describe('Refresh Token If Expired', () => {
       idToken: 'idToken',
       refreshToken: 'refreshToken',
     });
+    scope.done();
+  });
+
+  test('Token is expired, but refresh token is invalid', async () => {
+    // Arrange
+    const errorResponse = {
+      error: 'invalid_grant',
+      error_description: 'The refresh token is invalid or has expired',
+    };
+
+    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
+      .persist()
+      .post('/api/v1/oauth2/token', 'grant_type=refresh_token&refresh_token=invalidToken')
+      .reply(400, errorResponse);
+
+    // Act & Assert
+    try {
+      await wristbandAuth.refreshTokenIfExpired('invalidToken', Date.now().valueOf() - 1000);
+      fail('Expected an error to be thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(WristbandError);
+      expect((error as WristbandError).getError()).toBe('invalid_grant');
+      expect((error as WristbandError).getErrorDescription()).toBe(errorResponse.error_description);
+    }
+
     scope.done();
   });
 });
