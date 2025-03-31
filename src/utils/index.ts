@@ -5,7 +5,7 @@ import * as crypto from 'uncrypto';
 
 import { LOGIN_STATE_COOKIE_PREFIX, LOGIN_STATE_COOKIE_SEPARATOR } from './constants';
 import { LoginState, LoginStateMapConfig } from '../types';
-import { WristbandError } from '../error';
+import { clearCookie, parseCookies, setCookie } from './cookies';
 
 export function parseTenantSubdomain(req: Request, rootDomain: string): string {
   const { host } = req.headers;
@@ -37,19 +37,18 @@ export async function decryptLoginState(loginStateCookie: string, loginStateSecr
   return loginState as LoginState;
 }
 
-export function getAndClearLoginStateCookie(req: Request, res: Response): string {
+export function getAndClearLoginStateCookie(
+  req: Request,
+  res: Response,
+  dangerouslyDisableSecureCookies: boolean
+): string {
   const { state } = req.query;
   const paramState = state ? state.toString() : '';
-
-  if (!req.cookies) {
-    throw new WristbandError(
-      'Please verify that your server is configured to handle cookies correctly. In Express, this typically requires the "cookie-parser" middleware.'
-    );
-  }
+  const cookies = parseCookies(req);
 
   // This should always resolve to a single cookie with this prefix, or possibly no cookie at all
   // if it got cleared or expired before the callback was triggered.
-  const matchingLoginCookieNames = Object.keys(req.cookies).filter((cookieName) => {
+  const matchingLoginCookieNames = Object.keys(cookies).filter((cookieName) => {
     return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}${paramState}${LOGIN_STATE_COOKIE_SEPARATOR}`);
   });
 
@@ -57,8 +56,8 @@ export function getAndClearLoginStateCookie(req: Request, res: Response): string
 
   if (matchingLoginCookieNames.length > 0) {
     const cookieName = matchingLoginCookieNames[0];
-    loginStateCookie = req.cookies[cookieName];
-    res.clearCookie(cookieName);
+    loginStateCookie = cookies[cookieName];
+    clearCookie(res, cookieName, dangerouslyDisableSecureCookies);
   }
 
   return loginStateCookie;
@@ -106,16 +105,16 @@ export function createLoginState(req: Request, redirectUri: string, config: Logi
   return config.customState ? { ...loginStateData, customState: config.customState } : loginStateData;
 }
 
-export function clearOldestLoginStateCookie(req: Request, res: Response): void {
-  if (!req.cookies) {
-    throw new WristbandError(
-      'Please verify that your server is configured to handle cookies correctly. In Express, this typically requires the "cookie-parser" middleware.'
-    );
-  }
+export function clearOldestLoginStateCookie(
+  req: Request,
+  res: Response,
+  dangerouslyDisableSecureCookies: boolean
+): void {
+  const cookies = parseCookies(req);
 
   // The max amount of concurrent login state cookies we allow is 3.  If there are already 3 cookies,
   // then we clear the one with the oldest creation timestamp to make room for the new one.
-  const allLoginCookieNames: string[] = Object.keys(req.cookies).filter((cookieName: string) => {
+  const allLoginCookieNames: string[] = Object.keys(cookies).filter((cookieName: string) => {
     return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}`);
   });
 
@@ -132,7 +131,7 @@ export function clearOldestLoginStateCookie(req: Request, res: Response): void {
     allLoginCookieNames.forEach((cookieName: string) => {
       const timestamp: string = cookieName.split(LOGIN_STATE_COOKIE_SEPARATOR)[2];
       if (!mostRecentTimestamps.includes(timestamp)) {
-        res.clearCookie(cookieName);
+        clearCookie(res, cookieName, dangerouslyDisableSecureCookies);
       }
     });
   }
@@ -145,17 +144,8 @@ export function createLoginStateCookie(
   dangerouslyDisableSecureCookies: boolean
 ): void {
   // Add the new login state cookie (1 hour max age).
-  res.cookie(
-    `${LOGIN_STATE_COOKIE_PREFIX}${state}${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now().valueOf()}`,
-    encryptedLoginState,
-    {
-      httpOnly: true,
-      maxAge: 3600000,
-      path: '/',
-      sameSite: 'lax',
-      secure: !dangerouslyDisableSecureCookies,
-    }
-  );
+  const cookieName = `${LOGIN_STATE_COOKIE_PREFIX}${state}${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now().valueOf()}`;
+  setCookie(res, cookieName, encryptedLoginState, { maxAge: 3600000, dangerouslyDisableSecureCookies });
 }
 
 export function getOAuthAuthorizeUrl(

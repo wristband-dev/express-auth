@@ -131,7 +131,7 @@ export class AuthService {
     const loginState: LoginState = createLoginState(req, this.redirectUri, { customState });
 
     // Clear any stale login state cookies and add a new one fo rthe current request.
-    clearOldestLoginStateCookie(req, res);
+    clearOldestLoginStateCookie(req, res, this.dangerouslyDisableSecureCookies);
     const encryptedLoginState: string = await encryptLoginState(loginState, this.loginStateSecret);
     createLoginStateCookie(res, loginState.state, encryptedLoginState, this.dangerouslyDisableSecureCookies);
 
@@ -202,7 +202,7 @@ export class AuthService {
     }
 
     // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
-    const loginStateCookie: string = getAndClearLoginStateCookie(req, res);
+    const loginStateCookie: string = getAndClearLoginStateCookie(req, res, this.dangerouslyDisableSecureCookies);
     if (!loginStateCookie) {
       res.redirect(tenantLoginUrl);
       return { result: CallbackResultType.REDIRECT_REQUIRED };
