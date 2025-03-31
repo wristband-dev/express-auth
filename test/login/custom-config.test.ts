@@ -14,6 +14,59 @@ const CUSTOM_SCOPES = ['openid', 'roles'];
 const CUSTOM_STATE = { test: 'abc' };
 const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
 
+function extractCookiesFromHeaders(headers: Record<string, any>): Array<{
+  name: string;
+  value: string;
+  attributes: {
+    httpOnly: boolean;
+    maxAge: number | undefined;
+    path: string | undefined;
+    sameSite: string | undefined;
+    secure: boolean;
+  };
+}> {
+  const setCookieHeader = headers['set-cookie'];
+  if (!setCookieHeader) {
+    return [];
+  }
+
+  // Convert to array if it's a single string
+  const cookieStrings = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+
+  return cookieStrings.map((cookieString) => {
+    // Extract name and value
+    const [nameValue, ...attributeParts] = cookieString.split('; ');
+    const nameValueParts = nameValue.split('=');
+    const name = nameValueParts[0];
+    const value = nameValueParts.slice(1).join('=');
+
+    // Parse attributes
+    const attributes = {
+      httpOnly: false,
+      secure: false,
+      path: undefined as string | undefined,
+      maxAge: undefined as number | undefined,
+      sameSite: undefined as string | undefined,
+    };
+
+    attributeParts.forEach((attr: string) => {
+      if (attr === 'HttpOnly') {
+        attributes.httpOnly = true;
+      } else if (attr === 'Secure') {
+        attributes.secure = true;
+      } else if (attr.startsWith('Path=')) {
+        attributes.path = attr.substring(5);
+      } else if (attr.startsWith('Max-Age=')) {
+        attributes.maxAge = parseInt(attr.substring(8), 10);
+      } else if (attr.startsWith('SameSite=')) {
+        attributes.sameSite = attr.substring(9).toLowerCase();
+      }
+    });
+
+    return { name, value, attributes };
+  });
+}
+
 describe('Custom Login Configurations', () => {
   let wristbandAuth: WristbandAuth;
   let rootDomain: string;
@@ -51,7 +104,7 @@ describe('Custom Login Configurations', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -64,12 +117,16 @@ describe('Custom Login Configurations', () => {
       expect(searchParams.get('scope')).toEqual(CUSTOM_SCOPES.join(' '));
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeFalsy();
     });
@@ -95,7 +152,7 @@ describe('Custom Login Configurations', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes, { customState: CUSTOM_STATE });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -105,12 +162,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toEqual(CUSTOM_STATE);
     });
@@ -145,7 +206,7 @@ describe('Custom Login Configurations', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -155,12 +216,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -191,7 +256,7 @@ describe('Custom Login Configurations', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -201,12 +266,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -238,7 +307,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -248,12 +317,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -285,7 +358,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -295,12 +368,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -334,7 +411,7 @@ describe('Custom Login Configurations', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -344,12 +421,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -381,7 +462,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -391,12 +472,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -428,7 +513,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -438,12 +523,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -480,7 +569,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -490,12 +579,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -528,7 +621,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -538,12 +631,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -580,7 +677,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -590,12 +687,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -624,7 +725,7 @@ describe('Custom Login Configurations', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes, { defaultTenantCustomDomain: 'tenant.custom.com' });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -634,12 +735,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });
@@ -675,7 +780,7 @@ describe('Custom Login Configurations', () => {
       });
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -685,12 +790,16 @@ describe('Custom Login Configurations', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const loginState: LoginState = await decryptLoginState(cookieValue.value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
     });

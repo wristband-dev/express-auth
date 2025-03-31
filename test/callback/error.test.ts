@@ -74,7 +74,9 @@ describe('Callback Errors', () => {
     // Mock Express objects
     let mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_domain: 'devs4you' },
-      cookies: { 'login#state#1234567890': encryptedLoginState },
+      headers: {
+        cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+      },
     });
     let mockExpressRes = httpMocks.createResponse();
 
@@ -89,7 +91,9 @@ describe('Callback Errors', () => {
 
     mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', code: ['a', 'b'] },
-      cookies: { 'login#state#1234567890': 'blah' },
+      headers: {
+        cookie: `login#state#1234567890=blah`,
+      },
     });
     mockExpressRes = httpMocks.createResponse();
     // Multiple code query parameters should throw an error.
@@ -106,7 +110,9 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', error: ['a', 'b'] },
-      cookies: { 'login#state#1234567890': 'blah' },
+      headers: {
+        cookie: `login#state#1234567890=blah`,
+      },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -124,7 +130,9 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', error_description: ['a', 'b'] },
-      cookies: { 'login#state#1234567890': 'blah' },
+      headers: {
+        cookie: `login#state#1234567890=blah`,
+      },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -142,7 +150,9 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_domain: ['a', 'b'] },
-      cookies: { 'login#state#1234567890': 'blah' },
+      headers: {
+        cookie: `login#state#1234567890=blah`,
+      },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -160,7 +170,9 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_custom_domain: ['a', 'b'] },
-      cookies: { 'login#state#1234567890': 'blah' },
+      headers: {
+        cookie: `login#state#1234567890=blah`,
+      },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -188,7 +200,9 @@ describe('Callback Errors', () => {
     // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_domain: 'devs4you', error: 'BAD', error_description: 'Really bad' },
-      cookies: { 'login#state#1234567890': encryptedLoginState },
+      headers: {
+        cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+      },
     });
     const mockExpressRes = httpMocks.createResponse();
 
@@ -271,7 +285,6 @@ describe('Callback Errors', () => {
   });
 
   test('Callback when token exchange fails returns redirect required', async () => {
-    // Arrange
     // Create a valid login state cookie with matching state
     const loginState: LoginState = {
       codeVerifier: 'verifier123',
@@ -287,8 +300,8 @@ describe('Callback Errors', () => {
         code: 'testcode',
         tenant_domain: 'tenant1',
       },
-      cookies: {
-        [cookieKey]: encryptedLoginState,
+      headers: {
+        cookie: `${cookieKey}=${encodeURIComponent(encryptedLoginState)}`,
       },
     });
     const mockExpressRes = httpMocks.createResponse();
@@ -299,10 +312,7 @@ describe('Callback Errors', () => {
       error_description: 'Token exchange failed',
     });
 
-    // Act
     const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-
-    // Assert
     expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
     expect(result.callbackData).toBeFalsy();
 
@@ -314,7 +324,6 @@ describe('Callback Errors', () => {
   });
 
   test('Callback with tenant subdomains constructs correct redirect URL', async () => {
-    // Arrange
     const rootDomain = 'example.com';
     const loginUrl = `https://{tenant_domain}.${rootDomain}/login`;
     const redirectUri = `https://{tenant_domain}.${rootDomain}/callback`;
@@ -341,13 +350,13 @@ describe('Callback Errors', () => {
     const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now()}`;
 
     const mockExpressReq = httpMocks.createRequest({
-      headers: { host: `tenant1.${rootDomain}` },
       query: {
         state: 'teststate',
         code: 'testcode',
       },
-      cookies: {
-        [cookieKey]: encryptedLoginState,
+      headers: {
+        host: `tenant1.${rootDomain}`,
+        cookie: `${cookieKey}=${encodeURIComponent(encryptedLoginState)}`,
       },
     });
     const mockExpressRes = httpMocks.createResponse();
@@ -358,10 +367,7 @@ describe('Callback Errors', () => {
       error_description: 'Token exchange failed',
     });
 
-    // Act
     const result = await tenantSubdomainAuth.callback(mockExpressReq, mockExpressRes);
-
-    // Assert
     expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
     expect(result.callbackData).toBeFalsy();
 

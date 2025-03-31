@@ -12,6 +12,59 @@ const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
 const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
 
+function extractCookiesFromHeaders(headers: Record<string, any>): Array<{
+  name: string;
+  value: string;
+  attributes: {
+    httpOnly: boolean;
+    maxAge: number | undefined;
+    path: string | undefined;
+    sameSite: string | undefined;
+    secure: boolean;
+  };
+}> {
+  const setCookieHeader = headers['set-cookie'];
+  if (!setCookieHeader) {
+    return [];
+  }
+
+  // Convert to array if it's a single string
+  const cookieStrings = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+
+  return cookieStrings.map((cookieString) => {
+    // Extract name and value
+    const [nameValue, ...attributeParts] = cookieString.split('; ');
+    const nameValueParts = nameValue.split('=');
+    const name = nameValueParts[0];
+    const value = nameValueParts.slice(1).join('=');
+
+    // Parse attributes
+    const attributes = {
+      httpOnly: false,
+      secure: false,
+      path: undefined as string | undefined,
+      maxAge: undefined as number | undefined,
+      sameSite: undefined as string | undefined,
+    };
+
+    attributeParts.forEach((attr: string) => {
+      if (attr === 'HttpOnly') {
+        attributes.httpOnly = true;
+      } else if (attr === 'Secure') {
+        attributes.secure = true;
+      } else if (attr.startsWith('Path=')) {
+        attributes.path = attr.substring(5);
+      } else if (attr.startsWith('Max-Age=')) {
+        attributes.maxAge = parseInt(attr.substring(8), 10);
+      } else if (attr.startsWith('SameSite=')) {
+        attributes.sameSite = attr.substring(9).toLowerCase();
+      }
+    });
+
+    return { name, value, attributes };
+  });
+}
+
 describe('Multi Tenant Login', () => {
   let wristbandAuth: WristbandAuth;
   let rootDomain: string;
@@ -46,7 +99,7 @@ describe('Multi Tenant Login', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -57,7 +110,7 @@ describe('Multi Tenant Login', () => {
 
       // Validate no-cache headers
       const headers = mockExpressRes._getHeaders();
-      expect(Object.keys(headers)).toHaveLength(2);
+      expect(Object.keys(headers)).toHaveLength(3);
       expect(headers['cache-control']).toBe('no-store');
       expect(headers['pragma']).toBe('no-cache');
 
@@ -72,28 +125,27 @@ describe('Multi Tenant Login', () => {
       expect(searchParams.get('nonce')).toBeTruthy();
       expect(searchParams.get('login_hint')).toBeFalsy();
 
+      // Extract and validate cookies
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
       // Validate login state cookie key
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const cookieKey: string = loginStateCookie[0];
-      const keyParts: string[] = cookieKey.split(LOGIN_STATE_COOKIE_SEPARATOR);
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
       expect(keyParts).toHaveLength(3);
       expect(keyParts[0]).toEqual('login');
       expect(keyParts[1]).toBeTruthy();
       expect(parseInt(keyParts[2], 10)).toBeGreaterThan(0);
 
-      // Validate login state cookie value
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const { options, value } = cookieValue;
+      // Validate login state cookie attributes
+      expect(loginCookie.attributes.httpOnly).toBe(true);
+      expect(loginCookie.attributes.maxAge).toBe(3600000);
+      expect(loginCookie.attributes.path).toBe('/');
+      expect(loginCookie.attributes.sameSite).toBe('lax');
+      expect(loginCookie.attributes.secure).toBe(true);
 
-      expect(options.httpOnly).toBe(true);
-      expect(options.maxAge).toBe(3600000);
-      expect(options.path).toBe('/');
-      expect(options.sameSite).toBe('lax');
-      expect(options.secure).toBe(true);
-
-      const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
       expect(loginState.codeVerifier).toBeTruthy();
@@ -122,7 +174,7 @@ describe('Multi Tenant Login', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -133,7 +185,7 @@ describe('Multi Tenant Login', () => {
 
       // Validate no-cache headers
       const headers = mockExpressRes._getHeaders();
-      expect(Object.keys(headers)).toHaveLength(2);
+      expect(Object.keys(headers)).toHaveLength(3);
       expect(headers['cache-control']).toBe('no-store');
       expect(headers['pragma']).toBe('no-cache');
 
@@ -148,28 +200,27 @@ describe('Multi Tenant Login', () => {
       expect(searchParams.get('nonce')).toBeTruthy();
       expect(searchParams.get('login_hint')).toBeFalsy();
 
+      // Extract and validate cookies
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
       // Validate login state cookie key
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const cookieKey: string = loginStateCookie[0];
-      const keyParts: string[] = cookieKey.split(LOGIN_STATE_COOKIE_SEPARATOR);
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
       expect(keyParts).toHaveLength(3);
       expect(keyParts[0]).toEqual('login');
       expect(keyParts[1]).toBeTruthy();
       expect(parseInt(keyParts[2], 10)).toBeGreaterThan(0);
 
-      // Validate login state cookie value
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const { options, value } = cookieValue;
+      // Validate login state cookie attributes
+      expect(loginCookie.attributes.httpOnly).toBe(true);
+      expect(loginCookie.attributes.maxAge).toBe(3600000);
+      expect(loginCookie.attributes.path).toBe('/');
+      expect(loginCookie.attributes.sameSite).toBe('lax');
+      expect(loginCookie.attributes.secure).toBe(false);
 
-      expect(options.httpOnly).toBe(true);
-      expect(options.maxAge).toBe(3600000);
-      expect(options.path).toBe('/');
-      expect(options.sameSite).toBe('lax');
-      expect(options.secure).toBe(false);
-
-      const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
       expect(loginState.codeVerifier).toBeTruthy();
@@ -202,7 +253,7 @@ describe('Multi Tenant Login', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -212,10 +263,16 @@ describe('Multi Tenant Login', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
     });
@@ -246,7 +303,7 @@ describe('Multi Tenant Login', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -256,10 +313,16 @@ describe('Multi Tenant Login', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
     });
@@ -291,7 +354,7 @@ describe('Multi Tenant Login', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -301,10 +364,16 @@ describe('Multi Tenant Login', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
     });
@@ -336,7 +405,7 @@ describe('Multi Tenant Login', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -346,10 +415,16 @@ describe('Multi Tenant Login', () => {
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
     });
@@ -384,7 +459,7 @@ describe('Multi Tenant Login', () => {
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -397,10 +472,16 @@ describe('Multi Tenant Login', () => {
       expect(searchParams.get('login_hint')).toBe('test@wristband.dev');
 
       // Validate login state cookie
-      expect(Object.keys(cookies)).toHaveLength(1);
-      const loginStateCookie = Object.entries(cookies)[0];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const loginState: LoginState = await decryptLoginState(loginStateCookie[1].value, LOGIN_STATE_COOKIE_SECRET);
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginCookie = cookies[0];
+
+      // Validate login state cookie key
+      const keyParts: string[] = loginCookie.name.split(LOGIN_STATE_COOKIE_SEPARATOR);
+
+      // Validate login state
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.returnUrl).toBe(`https://devs4you.${rootDomain}/settings`);
     });
@@ -433,19 +514,21 @@ describe('Multi Tenant Login', () => {
 
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
-        cookies: {
-          'login#++state01#1111111111': encryptedLoginState01,
-          'login#state02#2222222222': encryptedLoginState02,
-          'login#state03#3333333333': encryptedLoginState03,
+        headers: {
+          host: `devs4you.${rootDomain}`,
+          cookie: [
+            `login#++state01#1111111111=${encryptedLoginState01}`,
+            `login#state02#2222222222=${encryptedLoginState02}`,
+            `login#state03#3333333333=${encryptedLoginState03}`,
+          ].join('; '),
         },
-        headers: { host: `devs4you.${rootDomain}` },
       });
       const mockExpressRes = httpMocks.createResponse();
 
       await wristbandAuth.login(mockExpressReq, mockExpressRes);
 
       // Validate Redirect response
-      const { cookies, statusCode } = mockExpressRes;
+      const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
@@ -454,27 +537,60 @@ describe('Multi Tenant Login', () => {
       expect(origin).toEqual(`https://devs4you.${wristbandApplicationDomain}`);
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
+      // Get all Set-Cookie headers
+      const headers = mockExpressRes._getHeaders();
+      const setCookieHeaders = headers['set-cookie'];
+      expect(setCookieHeaders).toBeTruthy();
+      expect(Array.isArray(setCookieHeaders)).toBe(true);
+      expect(setCookieHeaders?.length).toBe(2);
+
       // Validate old login state cookie is getting cleared
-      expect(Object.keys(cookies)).toHaveLength(2);
-      const oldLoginStateCookie = Object.entries(cookies)[0];
-      const oldCookieName = oldLoginStateCookie[0];
-      expect(oldCookieName).toBe('login#++state01#1111111111');
-      const oldCookieValue = oldLoginStateCookie[1];
-      expect(Object.keys(oldCookieValue)).toHaveLength(2);
-      expect(oldCookieValue.options.expires?.valueOf()).toBeLessThan(Date.now().valueOf());
-      expect(oldCookieValue.options.path).toBe('/');
-      expect(oldCookieValue.value).toBeFalsy();
+      const oldCookieHeader = setCookieHeaders?.find((header) => {
+        return header.startsWith('login#++state01#1111111111=');
+      });
+      expect(oldCookieHeader).toBeTruthy();
+      expect(oldCookieHeader?.startsWith(`login#++state01#1111111111=;`)).toBe(true);
+      expect(oldCookieHeader).toContain('Max-Age=0');
+      expect(oldCookieHeader).toContain('Path=/');
+      expect(oldCookieHeader).toContain('HttpOnly');
+
+      // // Validate old login state cookie is getting cleared
+      // expect(Object.keys(cookies)).toHaveLength(2);
+      // const oldLoginStateCookie = Object.entries(cookies)[0];
+      // const oldCookieName = oldLoginStateCookie[0];
+      // expect(oldCookieName).toBe('login#++state01#1111111111');
+      // const oldCookieValue = oldLoginStateCookie[1];
+      // expect(Object.keys(oldCookieValue)).toHaveLength(2);
+      // expect(oldCookieValue.options.expires?.valueOf()).toBeLessThan(Date.now().valueOf());
+      // expect(oldCookieValue.options.path).toBe('/');
+      // expect(oldCookieValue.value).toBeFalsy();
 
       // Validate new login state cookie
-      const loginStateCookie = Object.entries(cookies)[1];
-      const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      const cookieValue = loginStateCookie[1];
-      expect(Object.keys(cookieValue)).toHaveLength(2);
-      const { value } = cookieValue;
-
-      const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
+      const newCookieHeader = setCookieHeaders?.find((header) => {
+        return !header.startsWith('login#++state01#1111111111=');
+      });
+      expect(newCookieHeader).toBeTruthy();
+      const newCookieMatch = newCookieHeader?.match(/^([^=]+)=([^;]+)/);
+      expect(newCookieMatch).toBeTruthy();
+      const newCookieName = newCookieMatch ? newCookieMatch[1] : '';
+      const newCookieValue = newCookieMatch ? newCookieMatch[2] : '';
+      const keyParts: string[] = newCookieName.split(LOGIN_STATE_COOKIE_SEPARATOR);
+      expect(keyParts.length).toBeGreaterThanOrEqual(2);
+      expect(keyParts[0]).toEqual('login');
+      const loginState: LoginState = await decryptLoginState(newCookieValue, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
+
+      // Validate new login state cookie
+      // const loginStateCookie = Object.entries(cookies)[1];
+      // const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
+      // const cookieValue = loginStateCookie[1];
+      // expect(Object.keys(cookieValue)).toHaveLength(2);
+      // const { value } = cookieValue;
+
+      // const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
+      // expect(loginState.state).toEqual(keyParts[1]);
+      // expect(searchParams.get('state')).toEqual(keyParts[1]);
     });
   });
 

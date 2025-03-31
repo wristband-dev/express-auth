@@ -57,9 +57,6 @@ or
 yarn add @wristband/express-auth
 ```
 
-> [!NOTE]
-> Ensure your Express server is configured to deal with cookies. This SDK expects the `req.cookies` object to be present on requests, which the <ins>[cookie-parser](https://github.com/expressjs/cookie-parser)</ins> middleware can handle.
-
 ## Usage
 
 ### 1) Initialize the SDK
