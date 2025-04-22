@@ -101,7 +101,6 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
@@ -303,9 +302,11 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantCustomDomain: 'tenant.custom.com',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantCustomDomain: 'tenant.custom.com',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -354,9 +355,11 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantDomainName: 'tenant',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantDomainName: 'tenant',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -458,9 +461,11 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantCustomDomain: 'default.tenant.com',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantCustomDomain: 'default.tenant.com',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -509,9 +514,11 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantDomainName: 'default',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantDomainName: 'default',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -565,9 +572,11 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantCustomDomain: 'global.tenant.com',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantCustomDomain: 'global.tenant.com',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -617,9 +626,11 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantDomainName: 'global',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantDomainName: 'global',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -672,10 +683,12 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantDomainName: 'global',
-        defaultTenantCustomDomain: 'global.tenant.com',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantDomainName: 'global',
+          defaultTenantCustomDomain: 'global.tenant.com',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -723,7 +736,9 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, { defaultTenantCustomDomain: 'tenant.custom.com' }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, { defaultTenantCustomDomain: 'tenant.custom.com' })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -776,9 +791,11 @@ describe('Custom Login Configurations', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, {
-        defaultTenantDomainName: 'global',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+          defaultTenantDomainName: 'global',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;

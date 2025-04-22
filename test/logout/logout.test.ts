@@ -46,11 +46,13 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-        tenantDomainName: 'devs4you',
-        refreshToken: 'refreshToken',
-        redirectUrl: 'https://google.com',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          tenantDomainName: 'devs4you',
+          refreshToken: 'refreshToken',
+          redirectUrl: 'https://google.com',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -101,9 +103,11 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-        refreshToken: 'refreshToken',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          refreshToken: 'refreshToken',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -156,9 +160,11 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-        refreshToken: 'refreshToken',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          refreshToken: 'refreshToken',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -211,10 +217,12 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-        tenantCustomDomain: 'tenant.custom.com',
-        refreshToken: 'refreshToken',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          tenantCustomDomain: 'tenant.custom.com',
+          refreshToken: 'refreshToken',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -267,11 +275,13 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-        tenantCustomDomain: 'tenant.custom.com',
-        tenantDomainName: 'global',
-        refreshToken: 'refreshToken',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          tenantCustomDomain: 'tenant.custom.com',
+          tenantDomainName: 'global',
+          refreshToken: 'refreshToken',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -324,10 +334,12 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-        tenantCustomDomain: 'tenant.custom.com',
-        refreshToken: 'refreshToken',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          tenantCustomDomain: 'tenant.custom.com',
+          refreshToken: 'refreshToken',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -380,11 +392,13 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-        tenantCustomDomain: 'tenant.custom.com',
-        tenantDomainName: 'global',
-        refreshToken: 'refreshToken',
-      }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          tenantCustomDomain: 'tenant.custom.com',
+          tenantDomainName: 'global',
+          refreshToken: 'refreshToken',
+        })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -425,7 +439,9 @@ describe('Multi Tenant Logout', () => {
         });
         const mockExpressRes = httpMocks.createResponse();
 
-        mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you' }));
+        mockExpressRes.redirect(
+          await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you' })
+        );
 
         // Validate Redirect response
         const { statusCode } = mockExpressRes;
@@ -468,10 +484,12 @@ describe('Multi Tenant Logout', () => {
 
         const mockExpressRes = httpMocks.createResponse();
 
-        mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-          refreshToken: 'refreshToken',
-          tenantDomainName: 'devs4you',
-        }));
+        mockExpressRes.redirect(
+          await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+            refreshToken: 'refreshToken',
+            tenantDomainName: 'devs4you',
+          })
+        );
 
         // Validate Redirect response
         const { statusCode } = mockExpressRes;
@@ -621,7 +639,9 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, { redirectUrl: 'https://yahoo.com' }));
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { redirectUrl: 'https://yahoo.com' })
+      );
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
