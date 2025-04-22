@@ -16,7 +16,7 @@
  * @property {string[]} [scopes] The scopes required for authentication.
  * @property {boolean} [useCustomDomains] Indicates whether custom domains are used for authentication.
  * @property {boolean} [useTenantSubdomains] Indicates whether tenant subdomains are used for authentication.
- * @property {string} wristbandApplicationDomain The vanity domain of the Wristband application.
+ * @property {string} wristbandApplicationVanityDomain The vanity domain of the Wristband application.
  */
 export type AuthConfig = {
   clientId: string;
@@ -30,7 +30,7 @@ export type AuthConfig = {
   scopes?: string[];
   useCustomDomains?: boolean;
   useTenantSubdomains?: boolean;
-  wristbandApplicationDomain: string;
+  wristbandApplicationVanityDomain: string;
 };
 
 /**
@@ -68,11 +68,11 @@ export enum CallbackResultType {
  * data necessary for creating an authenticated session in the event a redirect is not required.
  * @typedef {Object} CallbackResult
  * @property {CallbackData} [callbackData] The callback data received after authentication (COMPLETED only).
- * @property {CallbackResultType} [result] Enum representing the end result of callback execution.
+ * @property {CallbackResultType} [type] Enum representing the end result of callback execution.
  */
 export type CallbackResult = {
   callbackData?: CallbackData;
-  result: CallbackResultType;
+  type: CallbackResultType;
 };
 
 /**

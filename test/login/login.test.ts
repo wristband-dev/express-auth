@@ -70,13 +70,13 @@ describe('Multi Tenant Login', () => {
   let rootDomain: string;
   let loginUrl: string;
   let redirectUri: string;
-  let wristbandApplicationDomain: string;
+  let wristbandApplicationVanityDomain: string;
 
   beforeEach(() => {
     rootDomain = 'localhost:6001';
     loginUrl = `https://${rootDomain}/api/auth/login`;
     redirectUri = `https://${rootDomain}/api/auth/callback`;
-    wristbandApplicationDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+    wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
   });
 
   describe('Successful Redirect to Authorize Endpoint', () => {
@@ -87,7 +87,7 @@ describe('Multi Tenant Login', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -96,7 +96,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -105,7 +105,7 @@ describe('Multi Tenant Login', () => {
       expect(location).toBeTruthy();
       const locationUrl: URL = new URL(location);
       const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://devs4you-${wristbandApplicationDomain}`);
+      expect(origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate no-cache headers
@@ -162,7 +162,7 @@ describe('Multi Tenant Login', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -171,7 +171,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -180,7 +180,7 @@ describe('Multi Tenant Login', () => {
       expect(location).toBeTruthy();
       const locationUrl: URL = new URL(location);
       const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://devs4you-${wristbandApplicationDomain}`);
+      expect(origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate no-cache headers
@@ -242,7 +242,7 @@ describe('Multi Tenant Login', () => {
         redirectUri,
         rootDomain,
         useTenantSubdomains: true,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -250,7 +250,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -259,7 +259,7 @@ describe('Multi Tenant Login', () => {
       expect(location).toBeTruthy();
       const locationUrl: URL = new URL(location);
       const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://devs4you-${wristbandApplicationDomain}`);
+      expect(origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
@@ -279,7 +279,7 @@ describe('Multi Tenant Login', () => {
 
     test('Custom Domains and Tenant Subdomains Configuration', async () => {
       rootDomain = 'business.invotastic.com';
-      wristbandApplicationDomain = 'auth.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
 
@@ -292,7 +292,7 @@ describe('Multi Tenant Login', () => {
         rootDomain,
         useCustomDomains: true,
         useTenantSubdomains: true,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -300,7 +300,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -309,7 +309,7 @@ describe('Multi Tenant Login', () => {
       expect(location).toBeTruthy();
       const locationUrl: URL = new URL(location);
       const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://devs4you.${wristbandApplicationDomain}`);
+      expect(origin).toEqual(`https://devs4you.${wristbandApplicationVanityDomain}`);
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate login state cookie
@@ -329,7 +329,7 @@ describe('Multi Tenant Login', () => {
 
     test('Custom Domains with Tenant Custom Domain', async () => {
       rootDomain = 'business.invotastic.com';
-      wristbandApplicationDomain = 'auth.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
 
@@ -342,7 +342,7 @@ describe('Multi Tenant Login', () => {
         rootDomain,
         useCustomDomains: true,
         useTenantSubdomains: true,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -351,7 +351,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -380,7 +380,7 @@ describe('Multi Tenant Login', () => {
 
     test('Custom Domains with All Domain Params', async () => {
       rootDomain = 'business.invotastic.com';
-      wristbandApplicationDomain = 'auth.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://${rootDomain}/api/auth/login`;
       redirectUri = `https://${rootDomain}/api/auth/callback`;
 
@@ -393,7 +393,7 @@ describe('Multi Tenant Login', () => {
         rootDomain,
         useCustomDomains: true,
         useTenantSubdomains: false,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -402,7 +402,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -431,7 +431,7 @@ describe('Multi Tenant Login', () => {
 
     test('With login_hint and return_url query params', async () => {
       rootDomain = 'business.invotastic.com';
-      wristbandApplicationDomain = 'auth.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
 
@@ -444,7 +444,7 @@ describe('Multi Tenant Login', () => {
         rootDomain,
         useCustomDomains: true,
         useTenantSubdomains: true,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -456,7 +456,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -465,7 +465,7 @@ describe('Multi Tenant Login', () => {
       expect(location).toBeTruthy();
       const locationUrl: URL = new URL(location);
       const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://devs4you.${wristbandApplicationDomain}`);
+      expect(origin).toEqual(`https://devs4you.${wristbandApplicationVanityDomain}`);
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Validate query params of Authorize URL
@@ -488,7 +488,7 @@ describe('Multi Tenant Login', () => {
 
     test('Clear old login state cookie', async () => {
       rootDomain = 'business.invotastic.com';
-      wristbandApplicationDomain = 'auth.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
 
@@ -501,7 +501,7 @@ describe('Multi Tenant Login', () => {
         rootDomain,
         useCustomDomains: true,
         useTenantSubdomains: true,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       // Mock login states
@@ -525,7 +525,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
@@ -534,7 +534,7 @@ describe('Multi Tenant Login', () => {
       expect(location).toBeTruthy();
       const locationUrl: URL = new URL(location);
       const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://devs4you.${wristbandApplicationDomain}`);
+      expect(origin).toEqual(`https://devs4you.${wristbandApplicationVanityDomain}`);
       expect(pathname).toEqual('/api/v1/oauth2/authorize');
 
       // Get all Set-Cookie headers
@@ -602,7 +602,7 @@ describe('Multi Tenant Login', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       // tenant_domain and tenant_custom_domain query param is missing, which should redirect to app-level login.
@@ -611,19 +611,19 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      expect(location).toBe(`https://${wristbandApplicationDomain}/login?client_id=${CLIENT_ID}`);
+      expect(location).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
     });
 
     test('Unresolved tenant subdomain', async () => {
       rootDomain = 'business.invotastic.com';
-      wristbandApplicationDomain = 'auth.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
 
@@ -636,7 +636,7 @@ describe('Multi Tenant Login', () => {
         rootDomain,
         useCustomDomains: true,
         useTenantSubdomains: true,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
       });
 
       // Subdomain is missing from host, which should redirect to app-level login.
@@ -645,19 +645,19 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;
       expect(statusCode).toEqual(302);
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeTruthy();
-      expect(location).toBe(`https://${wristbandApplicationDomain}/login?client_id=${CLIENT_ID}`);
+      expect(location).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
     });
 
     test('Custom application login URL redirect', async () => {
       rootDomain = 'business.invotastic.com';
-      wristbandApplicationDomain = 'auth.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
 
@@ -670,7 +670,7 @@ describe('Multi Tenant Login', () => {
         rootDomain,
         useCustomDomains: true,
         useTenantSubdomains: true,
-        wristbandApplicationDomain,
+        wristbandApplicationVanityDomain,
         customApplicationLoginPageUrl: 'https://google.com',
       });
 
@@ -680,7 +680,7 @@ describe('Multi Tenant Login', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
       const { statusCode } = mockExpressRes;

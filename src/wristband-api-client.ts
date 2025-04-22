@@ -7,9 +7,9 @@ import { FORM_URLENCODED_MEDIA_TYPE, JSON_MEDIA_TYPE } from './utils/constants';
 export class WristbandApiClient {
   public axiosInstance: AxiosInstance;
 
-  constructor(wristbandApplicationDomain: string) {
+  constructor(wristbandApplicationVanityDomain: string) {
     this.axiosInstance = axios.create({
-      baseURL: `https://${wristbandApplicationDomain}/api/v1`,
+      baseURL: `https://${wristbandApplicationVanityDomain}/api/v1`,
       httpAgent: new http.Agent({
         keepAlive: true,
         maxSockets: 100,

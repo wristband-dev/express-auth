@@ -77,7 +77,7 @@ const wristbandAuth = createWristbandAuth({
   rootDomain: "yourapp.io",
   useCustomDomains: true,
   useTenantSubdomains: true,
-  wristbandApplicationDomain: "auth.yourapp.io",
+  wristbandApplicationVanityDomain: "auth.yourapp.io",
 });
 
 // ESModules
@@ -143,7 +143,7 @@ import { wristbandAuth } from './wristband-auth.js';
 // Login Endpoint - Route path can be whatever you prefer
 app.get('/auth/login', async (req, res) => {
   try {
-    await wristbandAuth.login(req, res, { /* Optional login configs */ });
+    res.redirect(await wristbandAuth.login(req, res, { /* Optional login configs */ }));
   } catch (error) {
     // Handle error
     console.error(error);
@@ -164,10 +164,10 @@ import { wristbandAuth } from './wristband-auth.js';
 app.get('/auth/callback', async (req, res) => {
   try {
     const callbackResult = await wristbandAuth.callback(req, res);
-    const { callbackData, result } = callbackResult;
+    const { callbackData, type } = callbackResult;
     
     // The SDK will have already invoked the redirect() function, so we just stop execution here.
-    if (result === CallbackResultType.REDIRECT_REQUIRED) {
+    if (type === CallbackResultType.REDIRECT_REQUIRED) {
       return;
     }
 
@@ -212,7 +212,7 @@ app.get('/auth/logout', async (req, res) => {
   req.session.destroy();
 
   try {
-    await wristbandAuth.logout(req, res, { tenantDomainName, refreshToken });
+    res.redirect(await wristbandAuth.logout(req, res, { tenantDomainName, refreshToken }));
   } catch (error) {
     // Handle error
     console.error(error);
@@ -330,12 +330,12 @@ function createWristbandAuth(authConfig: AuthConfig): WristbandAuth {}
 | scopes | string[] | No | The scopes required for authentication. Refer to the docs for [currently supported scopes](https://docs.wristband.dev/docs/oauth2-and-openid-connect-oidc#supported-openid-scopes). The default value is `[openid, offline_access, email]`.                                                                                                                                                                  |
 | useCustomDomains | boolean | No | Indicates whether your Wristband application is configured to use custom domains. Defaults to `false`.                                                                                                                                                                                                                                                                                                       |
 | useTenantSubdomains | boolean | No | Indicates whether tenant subdomains are used for your application's authentication endpoints (e.g. login and callback). Defaults to `false`.                                                                                                                                                                                                                                                                 |
-| wristbandApplicationDomain | string | Yes | The vanity domain of the Wristband application.                                                                                                                                                                                                                                                                                                                                                              |
+| wristbandApplicationVanityDomain | string | Yes | The vanity domain of the Wristband application.                                                                                                                                                                                                                                                                                                                                                              |
 
 
 ## API
 
-### `login(req: Request, res: Response, config?: LoginConfig): Promise<void>`
+### `login(req: Request, res: Response, config?: LoginConfig): Promise<string>`
 
 ```ts
 await login(req, res);
@@ -379,7 +379,7 @@ const wristbandAuth = createWristbandAuth({
   loginStateSecret: '7ffdbecc-ab7d-4134-9307-2dfcc52f7475',
   loginUrl: "https://yourapp.io/auth/login",
   redirectUri: "https://yourapp.io/auth/callback",
-  wristbandApplicationDomain: "yourapp-yourcompany.us.wristband.dev",
+  wristbandApplicationVanityDomain: "yourapp-yourcompany.us.wristband.dev",
 });
 ```
 
@@ -402,7 +402,7 @@ const wristbandAuth = createWristbandAuth({
   redirectUri: "https://{tenant_domain}.yourapp.io/auth/callback",
   rootDomain: "yourapp.io",
   useTenantSubdomains: true,
-  wristbandApplicationDomain: "yourapp-yourcompany.us.wristband.dev",
+  wristbandApplicationVanityDomain: "yourapp-yourcompany.us.wristband.dev",
 });
 ```
 
@@ -411,7 +411,7 @@ const wristbandAuth = createWristbandAuth({
 For certain use cases, it may be useful to specify a default tenant domain in the event that the `login()` function cannot find a tenant domain in either the query parameters or in the URL subdomain. You can specify a fallback default tenant domain via a `LoginConfig` object:
 
 ```ts
-await wristbandAuth.login(req, res, { defaultTenantDomainName: 'default' });
+res.redirect(await wristbandAuth.login(req, res, { defaultTenantDomainName: 'default' }));
 ```
 
 #### Tenant Custom Domain Query Param
@@ -429,7 +429,7 @@ The tenant custom domain takes precedence over all other possible domains else w
 For certain use cases, it may be useful to specify a default tenant custom domain in the event that the `login()` function cannot find a tenant custom domain in the query parameters. You can specify a fallback default tenant custom domain via a `LoginConfig` object:
 
 ```ts
-await wristbandAuth.login(req, res, { defaultTenantCustomDomain: 'mytenant.com' });
+res.redirect(await wristbandAuth.login(req, res, { defaultTenantCustomDomain: 'mytenant.com' }));
 ```
 
 The default tenant custom domain takes precedence over all other possible domains else when present except when the `tenant_custom_domain` query parameter exists in the request.
@@ -439,7 +439,7 @@ The default tenant custom domain takes precedence over all other possible domain
 Before your Login Endpoint redirects to Wristband, it will create a Login State Cookie to cache all necessary data required in the Callback Endpoint to complete any auth requests. You can inject additional state into that cookie via a `LoginConfig` object:
 
 ```ts
-await wristbandAuth.login(req, res, { customState: { test: 'abc' } });
+res.redirect(await wristbandAuth.login(req, res, { customState: { test: 'abc' } }));
 ```
 
 > [!WARNING]
@@ -482,7 +482,7 @@ The SDK will validate that the incoming state matches the Login State Cookie, an
 | CallbackResult Field | Type | Description |
 | -------------------- | ---- | ----------- |
 | callbackData | CallbackData or undefined | The callback data received after authentication (`COMPLETED` result only). |
-| result | CallbackResultType  | Enum representing the end result of callback execution. |
+| type | CallbackResultType  | Enum representing the end result of callback execution. |
 
 The following are the possible `CallbackResultType` enum values that can be returned from the callback execution:
 
