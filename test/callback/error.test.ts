@@ -313,11 +313,7 @@ describe('Callback Errors', () => {
     });
 
     const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-<<<<<<< Updated upstream
-    expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
-=======
     expect(result.type).toBe(CallbackResultType.REDIRECT_REQUIRED);
->>>>>>> Stashed changes
     expect(result.callbackData).toBeFalsy();
 
     // Verify redirect response
@@ -372,11 +368,7 @@ describe('Callback Errors', () => {
     });
 
     const result = await tenantSubdomainAuth.callback(mockExpressReq, mockExpressRes);
-<<<<<<< Updated upstream
-    expect(result.result).toBe(CallbackResultType.REDIRECT_REQUIRED);
-=======
     expect(result.type).toBe(CallbackResultType.REDIRECT_REQUIRED);
->>>>>>> Stashed changes
     expect(result.callbackData).toBeFalsy();
 
     // Verify redirect response
