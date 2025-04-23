@@ -303,7 +303,7 @@ export class AuthService {
     } else if (tenantDomainParam) {
       tenantDomainToUse = `${tenantDomainParam}${separator}${this.wristbandApplicationVanityDomain}`;
     } else {
-      // Construct the appropriate Logout Endpoint URL that the user will get redirected to.
+      // Construct the appropriate fallback URL that the user will get redirected to.
       const appLoginUrl: string =
         this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationVanityDomain}/login`;
       return config.redirectUrl || `${appLoginUrl}?client_id=${this.clientId}`;

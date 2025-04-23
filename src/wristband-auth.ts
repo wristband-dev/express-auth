@@ -29,7 +29,7 @@ export interface WristbandAuth {
    * @param {Request} req The Express request object.
    * @param {Response} res The Express response object.
    * @param {LoginConfig} [config] Additional configuration for creating an auth request to Wristband.
-   * @returns {Promise<string>} A Promise as a result of a redirect URL to Wristband.
+   * @returns {Promise<string>} A Promise containing a redirect URL to Wristband's Authorize Endpoint.
    * @throws {Error} If an error occurs during the login process.
    */
   login(req: Request, res: Response, config?: LoginConfig): Promise<string>;
@@ -60,13 +60,12 @@ export interface WristbandAuth {
   callback(req: Request, res: Response): Promise<CallbackResult>;
 
   /**
-   * Revokes the user's refresh token and return the Wristband logout endpoint to destroy
-   * their authenticated session in Wristband.
+   * Revokes the user's refresh token and returns a redirect URL to Wristband's Logout Endpoint.
    *
    * @param {Request} req The Express request object.
    * @param {Response} res The Express response object.
    * @param {LogoutConfig} [config] Additional configuration for logging out the user.
-   * @returns {Promise<string>} A Promise of type string as a result of a redirect URL to Wristband.
+   * @returns {Promise<string>} A Promise of type string containing a redirect URL to Wristband's Logout Endpoint.
    * @throws {Error} If an error occurs during the logout process.
    */
   logout(req: Request, res: Response, config?: LogoutConfig): Promise<string>;

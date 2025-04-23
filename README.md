@@ -482,7 +482,7 @@ The SDK will validate that the incoming state matches the Login State Cookie, an
 | CallbackResult Field | Type | Description |
 | -------------------- | ---- | ----------- |
 | callbackData | CallbackData or undefined | The callback data received after authentication (`COMPLETED` result only). |
-| type | CallbackResultType  | Enum representing the end result of callback execution. |
+| type | CallbackResultType  | Enum representing the type of the callback result. |
 
 The following are the possible `CallbackResultType` enum values that can be returned from the callback execution:
 
