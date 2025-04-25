@@ -136,8 +136,8 @@ export class AuthService {
     const encryptedLoginState: string = await encryptLoginState(loginState, this.loginStateSecret);
     createLoginStateCookie(res, loginState.state, encryptedLoginState, this.dangerouslyDisableSecureCookies);
 
-    // Create the Wristband Authorize Endpoint URL which the user will get redirectd to.
-    const authorizeUrl: string = getOAuthAuthorizeUrl(req, {
+    // Return the Wristband Authorize Endpoint URL which the user will get redirectd to.
+    return getOAuthAuthorizeUrl(req, {
       wristbandApplicationVanityDomain: this.wristbandApplicationVanityDomain,
       useCustomDomains: this.useCustomDomains,
       clientId: this.clientId,
@@ -150,9 +150,6 @@ export class AuthService {
       defaultTenantDomainName,
       defaultTenantCustomDomain,
     });
-
-    // Perform the redirect to Wristband's Authorize Endpoint.
-    return authorizeUrl;
   }
 
   async callback(req: Request, res: Response): Promise<CallbackResult> {
@@ -288,9 +285,15 @@ export class AuthService {
     // The client ID is always required by the Wristband Logout Endpoint.
     const redirectUrl = config.redirectUrl ? `&redirect_url=${config.redirectUrl}` : '';
     const query = `client_id=${this.clientId}${redirectUrl}`;
-
-    let tenantDomainToUse = '';
     const separator = this.useCustomDomains ? '.' : '-';
+
+    // Domain priority order resolution:
+    // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
+    // 2) If the LogoutConfig has a tenant domain defined, then use that.
+    // 3) If the tenant_custom_domain query param exists, then use that.
+    // 4a) If tenant subdomains are enabled, get the tenant domain from the host.
+    // 4b) Otherwise, if tenant subdomains are not enabled, then look for it in the tenant_domain query param.
+    let tenantDomainToUse = '';
     if (config.tenantCustomDomain) {
       tenantDomainToUse = config.tenantCustomDomain;
     } else if (config.tenantDomainName) {
