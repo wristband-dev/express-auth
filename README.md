@@ -45,6 +45,28 @@ You can learn more about how authentication works in Wristband in our documentat
 
 ---
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+  - [1) Initialize the SDK](#1-initialize-the-sdk)
+  - [2) Choose Your Session Storage](#2-choose-your-session-storage)
+  - [3) Add Auth Endpoints](#3-add-auth-endpoints)
+    - [Login Endpoint](#login-endpoint)
+    - [Callback Endpoint](#callback-endpoint)
+    - [Logout Endpoint](#logout-endpoint)
+  - [4) Guard Your Non-Auth APIs and Handle Token Refresh](#4-guard-your-non-auth-apis-and-handle-token-refresh)
+  - [5) Pass Your Access Token to Downstream APIs](#5-pass-your-access-token-to-downstream-apis)
+- [Wristband Auth Configuration Options](#wristband-auth-configuration-options)
+- [API](#api)
+  - [Login](#loginreq-request-res-response-config-loginconfig-promisestring)
+  - [Callback](#callbackreq-request-res-response-promisecallbackresult)
+  - [Logout](#logoutreq-request-res-response-config-logoutconfig-promisestring)
+  - [RefreshTokenIfExpired](#refreshtokenifexpiredrefreshtoken-string-expiresat-number-promisetokendata--null)
+- [Questions](#questions)
+
+<br/>
+
 ## Installation
 
 ```sh
