@@ -48,6 +48,7 @@ You can learn more about how authentication works in Wristband in our documentat
 ## Table of Contents
 
 - [Installation](#installation)
+- [Migration instruction for version below v3.0.0](migration/README.md)
 - [Usage](#usage)
   - [1) Initialize the SDK](#1-initialize-the-sdk)
   - [2) Choose Your Session Storage](#2-choose-your-session-storage)

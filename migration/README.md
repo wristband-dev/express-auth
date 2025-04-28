@@ -35,7 +35,7 @@ Key changes for v3.0.0 comparing to older versions:
 
 ### 1) Initialize the SDK
 
-```typescript
+```diff
 // ESModules
 import { createWristbandAuth } from '@wristband/express-auth';
 // CommonJS
@@ -63,7 +63,7 @@ export default wristbandAuth;
 
 #### [Login Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#login-endpoint)
 
-```typescript
+```diff
 import { wristbandAuth } from './wristband-auth.js';
 
 // Login Endpoint - Route path can be whatever you prefer
@@ -84,7 +84,7 @@ app.get('/auth/login', async (req, res) => {
 #### [Logout Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#logout-endpoint-1)
 
 
-```typescript
+```diff
 import { wristbandAuth } from './wristband-auth.js';
 
 // Logout Endpoint - Route path can be whatever you prefer
@@ -108,7 +108,7 @@ app.get('/auth/logout', async (req, res) => {
 
 #### [Callback Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#callback-endpoint)
 
-```typescript
+```diff
 
 const callbackResult = await wristbandAuth.callback(req, res);
     - const { callbackData, result } = callbackResult;
