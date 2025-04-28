@@ -78,6 +78,7 @@ or
 ```sh
 yarn add @wristband/express-auth
 ```
+## [Migration instruction for version below v3.0.0](migration/README.md)
 
 ## Usage
 
