@@ -21,19 +21,10 @@
 
 <br/>
 
-# Migration instruction for version below v3.0.0
+# Migration instruction for version v3.0.0 comparing to older versions: 
+(-) indiate the older version need to be changed to the (+) new changes
 
-
-
-Key changes for v3.0.0 comparing to older versions:
-
-- Login and Logout now returns a URL instead redirecting to that url directly.
-- The client code calling login & logout will be responsible to redirect with the returned url
-- wristbandApplicationDomain got renamed to wristbandApplicationVanityDomain 
-- CallbackResult.result got renamed to CallbackResult.type (Enum: CallbackResultType)
-
-
-### 1) Initialize the SDK
+### During the initialization of the SDK, wristbandApplicationDomain param got renamed to wristbandApplicationVanityDomain 
 
 ```typescript
 // ESModules
@@ -61,7 +52,7 @@ export default wristbandAuth;
 ```
 
 
-#### [Login Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#login-endpoint)
+#### Login and Logout now returns a URL instead redirecting to that url directly. The client code calling login & logout will be responsible to redirect with the returned url.
 
 ```typescript
 import { wristbandAuth } from './wristband-auth.js';
@@ -80,9 +71,6 @@ app.get('/auth/login', async (req, res) => {
 
 
 ```
-
-#### [Logout Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#logout-endpoint-1)
-
 
 ```typescript
 import { wristbandAuth } from './wristband-auth.js';
@@ -106,7 +94,7 @@ app.get('/auth/logout', async (req, res) => {
 });
 ```
 
-#### [Callback Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#callback-endpoint)
+#### [Callback Endpoint](https://docs.wristband.dev/docs/auth-flows-and-diagrams#callback-endpoint) : CallbackResult.result got renamed to CallbackResult.type (Enum: CallbackResultType)
 
 ```typescript
 
@@ -120,10 +108,5 @@ const callbackResult = await wristbandAuth.callback(req, res);
       return;
     }
 ```
-
-You can learn more about how authentication works in Wristband in our documentation:
-
-- [Auth Flows Walkthrough](https://docs.wristband.dev/docs/auth-flows-and-diagrams)
-- [Login Workflow In Depth](https://docs.wristband.dev/docs/login-workflow)
 
 ---
