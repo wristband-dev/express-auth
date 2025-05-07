@@ -47,8 +47,8 @@ You can learn more about how authentication works in Wristband in our documentat
 
 ## Table of Contents
 
+- [Migrating From Older SDK Versions](#migrating-from-older-sdk-versions)
 - [Installation](#installation)
-- [Migration instruction for version below v3.0.0](migration/README.md)
 - [Usage](#usage)
   - [1) Initialize the SDK](#1-initialize-the-sdk)
   - [2) Choose Your Session Storage](#2-choose-your-session-storage)
@@ -68,6 +68,14 @@ You can learn more about how authentication works in Wristband in our documentat
 
 <br/>
 
+## Migrating From Older SDK Versions
+
+On an older version of our SDK? Check out our migration guide:
+
+- [Instructions for migrating to Version 3.x](migration/v3/README.md)
+
+<br>
+
 ## Installation
 
 ```sh
@@ -79,7 +87,6 @@ or
 ```sh
 yarn add @wristband/express-auth
 ```
-## [Migration instruction for version below v3.0.0](migration/README.md)
 
 ## Usage
 
