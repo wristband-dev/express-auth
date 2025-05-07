@@ -77,7 +77,7 @@ export function setCookie(
   } = {}
 ): void {
   // Fallback to default options if not provided
-  const { maxAge = 3600000, dangerouslyDisableSecureCookies = false } = options;
+  const { maxAge = 3600, dangerouslyDisableSecureCookies = false } = options;
   const cookieString = `${name}=${encodeURIComponent(value)}; HttpOnly; Path=/; Max-Age=${maxAge}; SameSite=Lax${
     dangerouslyDisableSecureCookies ? '' : '; Secure'
   }`;

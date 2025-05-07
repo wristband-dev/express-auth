@@ -139,7 +139,7 @@ describe('Multi Tenant Login', () => {
 
       // Validate login state cookie attributes
       expect(loginCookie.attributes.httpOnly).toBe(true);
-      expect(loginCookie.attributes.maxAge).toBe(3600000);
+      expect(loginCookie.attributes.maxAge).toBe(3600);
       expect(loginCookie.attributes.path).toBe('/');
       expect(loginCookie.attributes.sameSite).toBe('lax');
       expect(loginCookie.attributes.secure).toBe(true);
@@ -214,7 +214,7 @@ describe('Multi Tenant Login', () => {
 
       // Validate login state cookie attributes
       expect(loginCookie.attributes.httpOnly).toBe(true);
-      expect(loginCookie.attributes.maxAge).toBe(3600000);
+      expect(loginCookie.attributes.maxAge).toBe(3600);
       expect(loginCookie.attributes.path).toBe('/');
       expect(loginCookie.attributes.sameSite).toBe('lax');
       expect(loginCookie.attributes.secure).toBe(false);

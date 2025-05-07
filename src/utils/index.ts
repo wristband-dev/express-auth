@@ -145,7 +145,7 @@ export function createLoginStateCookie(
 ): void {
   // Add the new login state cookie (1 hour max age).
   const cookieName = `${LOGIN_STATE_COOKIE_PREFIX}${state}${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now().valueOf()}`;
-  setCookie(res, cookieName, encryptedLoginState, { maxAge: 3600000, dangerouslyDisableSecureCookies });
+  setCookie(res, cookieName, encryptedLoginState, { maxAge: 3600, dangerouslyDisableSecureCookies });
 }
 
 export function getOAuthAuthorizeUrl(
