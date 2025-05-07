@@ -11,8 +11,8 @@ export class WristbandService {
   private clientSecret: string;
   private basicAuthConfig: object;
 
-  constructor(wristbandApplicationDomain: string, clientId: string, clientSecret: string) {
-    if (!wristbandApplicationDomain || !wristbandApplicationDomain.trim()) {
+  constructor(wristbandApplicationVanityDomain: string, clientId: string, clientSecret: string) {
+    if (!wristbandApplicationVanityDomain || !wristbandApplicationVanityDomain.trim()) {
       throw new Error('Wristband application domain is required');
     }
 
@@ -24,7 +24,7 @@ export class WristbandService {
       throw new Error('Client secret is required');
     }
 
-    this.wristbandApiClient = new WristbandApiClient(wristbandApplicationDomain);
+    this.wristbandApiClient = new WristbandApiClient(wristbandApplicationVanityDomain);
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.basicAuthConfig = {

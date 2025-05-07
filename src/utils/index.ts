@@ -161,7 +161,7 @@ export function getOAuthAuthorizeUrl(
     tenantCustomDomain?: string;
     tenantDomainName?: string;
     useCustomDomains?: boolean;
-    wristbandApplicationDomain: string;
+    wristbandApplicationVanityDomain: string;
   }
 ): string {
   const { login_hint: loginHint } = req.query;
@@ -194,12 +194,12 @@ export function getOAuthAuthorizeUrl(
     return `https://${config.tenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
   }
   if (config.tenantDomainName) {
-    return `https://${config.tenantDomainName}${separator}${config.wristbandApplicationDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+    return `https://${config.tenantDomainName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
   }
   if (config.defaultTenantCustomDomain) {
     return `https://${config.defaultTenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
   }
-  return `https://${config.defaultTenantDomainName}${separator}${config.wristbandApplicationDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+  return `https://${config.defaultTenantDomainName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
 }
 
 export function isExpired(expiresAt: number): boolean {

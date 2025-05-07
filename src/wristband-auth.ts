@@ -29,10 +29,10 @@ export interface WristbandAuth {
    * @param {Request} req The Express request object.
    * @param {Response} res The Express response object.
    * @param {LoginConfig} [config] Additional configuration for creating an auth request to Wristband.
-   * @returns {Promise<void>} A Promise as a result of a URL redirect to Wristband.
+   * @returns {Promise<string>} A Promise containing a redirect URL to Wristband's Authorize Endpoint.
    * @throws {Error} If an error occurs during the login process.
    */
-  login(req: Request, res: Response, config?: LoginConfig): Promise<void>;
+  login(req: Request, res: Response, config?: LoginConfig): Promise<string>;
 
   /**
    * Receives incoming requests from Wristband with an authorization code. It will then proceed to exchange the auth
@@ -60,16 +60,15 @@ export interface WristbandAuth {
   callback(req: Request, res: Response): Promise<CallbackResult>;
 
   /**
-   * Revokes the user's refresh token and redirects them to the Wristband logout endpoint to destroy
-   * their authenticated session in Wristband.
+   * Revokes the user's refresh token and returns a redirect URL to Wristband's Logout Endpoint.
    *
    * @param {Request} req The Express request object.
    * @param {Response} res The Express response object.
    * @param {LogoutConfig} [config] Additional configuration for logging out the user.
-   * @returns {Promise<void>} A Promise of type void as a result of a URL redirect to Wristband.
+   * @returns {Promise<string>} A Promise of type string containing a redirect URL to Wristband's Logout Endpoint.
    * @throws {Error} If an error occurs during the logout process.
    */
-  logout(req: Request, res: Response, config?: LogoutConfig): Promise<void>;
+  logout(req: Request, res: Response, config?: LogoutConfig): Promise<string>;
 
   /**
    * Checks if the user's access token is expired and refreshed the token, if necessary.
@@ -99,7 +98,7 @@ export class WristbandAuthImpl implements WristbandAuth {
     this.authService = new AuthService(authConfig);
   }
 
-  login(req: Request, res: Response, config?: LoginConfig): Promise<void> {
+  login(req: Request, res: Response, config?: LoginConfig): Promise<string> {
     return this.authService.login(req, res, config);
   }
 
@@ -107,7 +106,7 @@ export class WristbandAuthImpl implements WristbandAuth {
     return this.authService.callback(req, res);
   }
 
-  logout(req: Request, res: Response, config?: LogoutConfig): Promise<void> {
+  logout(req: Request, res: Response, config?: LogoutConfig): Promise<string> {
     return this.authService.logout(req, res, config);
   }
 

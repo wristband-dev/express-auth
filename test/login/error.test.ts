@@ -22,7 +22,7 @@ describe('Login Errors', () => {
       loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
       loginUrl,
       redirectUri,
-      wristbandApplicationDomain: WRISTBAND_APPLICATION_DOMAIN,
+      wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
     });
   });
 
@@ -33,7 +33,7 @@ describe('Login Errors', () => {
     const mockExpressRes = httpMocks.createResponse();
 
     try {
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
       expect.fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
@@ -48,7 +48,7 @@ describe('Login Errors', () => {
     const mockExpressRes = httpMocks.createResponse();
 
     try {
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
       expect.fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
@@ -63,7 +63,7 @@ describe('Login Errors', () => {
     const mockExpressRes = httpMocks.createResponse();
 
     try {
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
       expect('').fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
@@ -78,7 +78,7 @@ describe('Login Errors', () => {
     const mockExpressRes = httpMocks.createResponse();
 
     try {
-      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
       expect('').fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
@@ -97,7 +97,7 @@ describe('Login Errors', () => {
     };
 
     try {
-      await wristbandAuth.login(mockExpressReq, mockExpressRes, { customState });
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, { customState }));
       expect('').fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
