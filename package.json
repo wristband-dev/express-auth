@@ -2,7 +2,7 @@
   "name": "@wristband/express-auth",
   "description": "SDK for integrating your ExpressJS application with Wristband. Handles user authentication and token management.",
   "author": "Wristband",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "license": "MIT",
   "private": false,
   "homepage": "https://wristband.dev",
