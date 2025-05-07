@@ -68,10 +68,12 @@ export enum CallbackResultType {
  * data necessary for creating an authenticated session in the event a redirect is not required.
  * @typedef {Object} CallbackResult
  * @property {CallbackData} [callbackData] The callback data received after authentication (COMPLETED only).
+ * @property {string} [redirectUrl] The URL to redirect to (REDIRECT_REQUIRED only).
  * @property {CallbackResultType} [type] Enum representing the end result of callback execution.
  */
 export type CallbackResult = {
   callbackData?: CallbackData;
+  redirectUrl?: string;
   type: CallbackResultType;
 };
 

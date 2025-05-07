@@ -314,13 +314,8 @@ describe('Callback Errors', () => {
 
     const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
     expect(result.type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+    expect(result.redirectUrl).toBe(`${LOGIN_URL}?tenant_domain=tenant1`);
     expect(result.callbackData).toBeFalsy();
-
-    // Verify redirect response
-    const { statusCode } = mockExpressRes;
-    expect(statusCode).toEqual(302);
-    const location = mockExpressRes._getRedirectUrl();
-    expect(location).toBe(`${LOGIN_URL}?tenant_domain=tenant1`);
   });
 
   test('Callback with tenant subdomains constructs correct redirect URL', async () => {
@@ -369,17 +364,7 @@ describe('Callback Errors', () => {
 
     const result = await tenantSubdomainAuth.callback(mockExpressReq, mockExpressRes);
     expect(result.type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+    expect(result.redirectUrl).toBe(`https://tenant1.${rootDomain}/login`);
     expect(result.callbackData).toBeFalsy();
-
-    // Verify redirect response
-    const { statusCode } = mockExpressRes;
-    expect(statusCode).toEqual(302);
-    const location = mockExpressRes._getRedirectUrl();
-    expect(location).toBeTruthy();
-
-    const locationUrl = new URL(location);
-    const { pathname, origin } = locationUrl;
-    expect(origin).toEqual(`https://tenant1.${rootDomain}`);
-    expect(pathname).toEqual('/login');
   });
 });

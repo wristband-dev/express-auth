@@ -316,14 +316,10 @@ describe('Multi Tenant Callback', () => {
       const mockExpressRes = httpMocks.createResponse();
       // login state cookie is missing, which should redirect to app-level login.
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
+      const { callbackData, redirectUrl, type } = callbackResult;
       expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+      expect(redirectUrl).toBe(`https://${rootDomain}/api/auth/login?tenant_domain=devs4you`);
       expect(callbackData).toBeFalsy();
-      // Validate Redirect response
-      const { statusCode } = mockExpressRes;
-      expect(statusCode).toEqual(302);
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBe(`https://${rootDomain}/api/auth/login?tenant_domain=devs4you`);
     });
 
     test('Missing login state cookie, with tenant subdomains', async () => {
@@ -349,18 +345,10 @@ describe('Multi Tenant Callback', () => {
       const mockExpressRes = httpMocks.createResponse();
       // login state cookie is missing, which should redirect to app-level login.
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
+      const { callbackData, redirectUrl, type } = callbackResult;
       expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+      expect(redirectUrl).toBe(`https://devs4you.${rootDomain}/api/auth/login`);
       expect(callbackData).toBeFalsy();
-      // Validate Redirect response
-      const { statusCode } = mockExpressRes;
-      expect(statusCode).toEqual(302);
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://devs4you.${rootDomain}`);
-      expect(pathname).toEqual('/api/auth/login');
     });
 
     test('Default Configuration for login_required error', async () => {
@@ -396,19 +384,10 @@ describe('Multi Tenant Callback', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
+      const { callbackData, redirectUrl, type } = callbackResult;
       expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+      expect(redirectUrl).toBe(`https://${rootDomain}/api/auth/login?tenant_domain=devs4you`);
       expect(callbackData).toBeFalsy();
-      // Validate Redirect response
-      const { statusCode } = mockExpressRes;
-      expect(statusCode).toEqual(302);
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://${rootDomain}`);
-      expect(pathname).toEqual('/api/auth/login');
-      expect(searchParams.get('tenant_domain')).toBe('devs4you');
     });
 
     test('Tenant Subdomain Configuration for login_required error', async () => {
@@ -439,18 +418,10 @@ describe('Multi Tenant Callback', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
+      const { callbackData, redirectUrl, type } = callbackResult;
       expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+      expect(redirectUrl).toBe(`https://devs4you.${rootDomain}/api/auth/login`);
       expect(callbackData).toBeFalsy();
-      // Validate Redirect response
-      const { statusCode } = mockExpressRes;
-      expect(statusCode).toEqual(302);
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://devs4you.${rootDomain}`);
-      expect(pathname).toEqual('/api/auth/login');
     });
 
     test('Cookie login state not matching query param state, without subdomains', async () => {
@@ -478,19 +449,10 @@ describe('Multi Tenant Callback', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
+      const { callbackData, redirectUrl, type } = callbackResult;
       expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+      expect(redirectUrl).toBe(`https://${rootDomain}/api/auth/login?tenant_domain=devs4you`);
       expect(callbackData).toBeFalsy();
-      // Validate Redirect response
-      const { statusCode } = mockExpressRes;
-      expect(statusCode).toEqual(302);
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin, searchParams } = locationUrl;
-      expect(origin).toEqual(`https://${rootDomain}`);
-      expect(pathname).toEqual('/api/auth/login');
-      expect(searchParams.get('tenant_domain')).toBe('devs4you');
     });
 
     test('Cookie login state not matching query param state, with tenant subdomains', async () => {
@@ -521,18 +483,10 @@ describe('Multi Tenant Callback', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
+      const { callbackData, redirectUrl, type } = callbackResult;
       expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
+      expect(redirectUrl).toBe(`https://devs4you.${rootDomain}/api/auth/login`);
       expect(callbackData).toBeFalsy();
-      // Validate Redirect response
-      const { statusCode } = mockExpressRes;
-      expect(statusCode).toEqual(302);
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBeTruthy();
-      const locationUrl: URL = new URL(location);
-      const { pathname, origin } = locationUrl;
-      expect(origin).toEqual(`https://devs4you.${rootDomain}`);
-      expect(pathname).toEqual('/api/auth/login');
     });
   });
 });

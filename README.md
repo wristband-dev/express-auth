@@ -189,14 +189,14 @@ import { wristbandAuth } from './wristband-auth.js';
 app.get('/auth/callback', async (req, res) => {
   try {
     const callbackResult = await wristbandAuth.callback(req, res);
-    const { callbackData, type } = callbackResult;
+    const { callbackData, redirectUrl, type } = callbackResult;
     
-    // The SDK will have already invoked the redirect() function, so we just stop execution here.
+    // For certain edge cases, the SDK will require you to redirect back to login.
     if (type === CallbackResultType.REDIRECT_REQUIRED) {
-      return;
+      return res.redirect(redirectUrl);
     }
 
-    // If the SDK does not need to return a redirect response, then we can save any necessary fields for the user's app session into a session cookie.
+    // If the SDK determines no redirect is required, then we can save any necessary fields for the user's app session into a session cookie.
     // Store a simple flag to indicate the user has successfully authenticated.
     req.session.isAuthenticated = true;
     req.session.accessToken = callbackData.accessToken;
@@ -211,11 +211,11 @@ app.get('/auth/callback', async (req, res) => {
     await req.session.save();
 
     // Send the user back to the application.
-    res.redirect(callbackData.returnUrl || `https://${callbackData.tenantDomainName}.yourapp.io/`);
+    return res.redirect(callbackData.returnUrl || `https://${callbackData.tenantDomainName}.yourapp.io/`);
   } catch (error) {
     // Handle error
     console.error(error);
-    res.status(500).send('Internal Server Error');
+    return res.status(500).send('Internal Server Error');
   }
 });
 ```
@@ -509,15 +509,16 @@ The SDK will validate that the incoming state matches the Login State Cookie, an
 
 | CallbackResult Field | Type | Description |
 | -------------------- | ---- | ----------- |
-| callbackData | CallbackData or undefined | The callback data received after authentication (`COMPLETED` result only). |
-| type | CallbackResultType  | Enum representing the type of the callback result. |
+| callbackData | `CallbackData` | The callback data received after authentication (`COMPLETED` result only). |
+| redirectUrl | string | A URL that you need to redirect to (`REDIRECT_REQUIRED` result only). For some edge cases, the SDK will require a redirect to restart the login flow. |
+| type | `CallbackResultType`  | Enum representing the type of the callback result. |
 
 The following are the possible `CallbackResultType` enum values that can be returned from the callback execution:
 
 | CallbackResultType  | Description |
 | ------------------- | ----------- |
-| COMPLETED  | Indicates that the callback is successfully completed and data is available for creating a session. |
-| REDIRECT_REQUIRED  | Indicates that a redirect to the login endpoint is required. |
+| `COMPLETED`  | Indicates that the callback is successfully completed and data is available for creating a session. |
+| `REDIRECT_REQUIRED`  | Indicates that a redirect to the login endpoint is required. |
 
 When the callback returns a `COMPLETED` result, all of the token and userinfo data also gets returned. This enables your application to create an application session for the user and then redirect them back into your application. The `CallbackData` is defined as follows:
 
@@ -537,7 +538,7 @@ When the callback returns a `COMPLETED` result, all of the token and userinfo da
 
 #### Redirect Responses
 
-There are certain scenarios where instead of callback data being returned by the SDK, a redirect response occurs during execution instead.  The following are edge cases where this occurs:
+There are certain scenarios where a redirect URL is returned by the SDK. The following are edge cases where this occurs:
 
 - The Login State Cookie is missing by the time Wristband redirects back to the Callback Endpoint.
 - The `state` query parameter sent from Wristband to your Callback Endpoint does not match the Login State Cookie.

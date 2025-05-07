@@ -202,21 +202,18 @@ export class AuthService {
     // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
     const loginStateCookie: string = getAndClearLoginStateCookie(req, res, this.dangerouslyDisableSecureCookies);
     if (!loginStateCookie) {
-      res.redirect(tenantLoginUrl);
-      return { type: CallbackResultType.REDIRECT_REQUIRED };
+      return { type: CallbackResultType.REDIRECT_REQUIRED, redirectUrl: tenantLoginUrl };
     }
     const loginState: LoginState = await decryptLoginState(loginStateCookie, this.loginStateSecret);
     const { codeVerifier, customState, redirectUri, returnUrl, state: cookieState } = loginState;
 
     // Check for any potential error conditions
     if (paramState !== cookieState) {
-      res.redirect(tenantLoginUrl);
-      return { type: CallbackResultType.REDIRECT_REQUIRED };
+      return { type: CallbackResultType.REDIRECT_REQUIRED, redirectUrl: tenantLoginUrl };
     }
     if (error) {
       if (error.toLowerCase() === LOGIN_REQUIRED_ERROR) {
-        res.redirect(tenantLoginUrl);
-        return { type: CallbackResultType.REDIRECT_REQUIRED };
+        return { type: CallbackResultType.REDIRECT_REQUIRED, redirectUrl: tenantLoginUrl };
       }
       throw new WristbandError(error, errorDescription);
     }
@@ -251,8 +248,7 @@ export class AuthService {
       return { type: CallbackResultType.COMPLETED, callbackData };
     } catch (ex) {
       if (ex instanceof InvalidGrantError) {
-        res.redirect(tenantLoginUrl);
-        return { type: CallbackResultType.REDIRECT_REQUIRED };
+        return { type: CallbackResultType.REDIRECT_REQUIRED, redirectUrl: tenantLoginUrl };
       }
       throw ex;
     }
