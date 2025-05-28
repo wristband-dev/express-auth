@@ -7,9 +7,11 @@ import { LOGIN_STATE_COOKIE_PREFIX, LOGIN_STATE_COOKIE_SEPARATOR } from './const
 import { LoginState, LoginStateMapConfig } from '../types';
 import { clearCookie, parseCookies, setCookie } from './cookies';
 
-export function parseTenantSubdomain(req: Request, rootDomain: string): string {
+export function parseTenantSubdomain(req: Request, parseTenantFromRootDomain: string): string {
   const { host } = req.headers;
-  return host!.substring(host!.indexOf('.') + 1) === rootDomain ? host!.substring(0, host!.indexOf('.')) : '';
+  return host!.substring(host!.indexOf('.') + 1) === parseTenantFromRootDomain
+    ? host!.substring(0, host!.indexOf('.'))
+    : '';
 }
 
 export function generateRandomString(length: number): string {
@@ -63,9 +65,9 @@ export function getAndClearLoginStateCookie(
   return loginStateCookie;
 }
 
-export function resolveTenantDomainName(req: Request, useTenantSubdomains: boolean, rootDomain: string): string {
-  if (useTenantSubdomains) {
-    return parseTenantSubdomain(req, rootDomain) || '';
+export function resolveTenantDomainName(req: Request, parseTenantFromRootDomain: string): string {
+  if (parseTenantFromRootDomain) {
+    return parseTenantSubdomain(req, parseTenantFromRootDomain) || '';
   }
 
   const { tenant_domain: tenantDomainParam } = req.query;
@@ -160,7 +162,7 @@ export function getOAuthAuthorizeUrl(
     state: string;
     tenantCustomDomain?: string;
     tenantDomainName?: string;
-    useCustomDomains?: boolean;
+    isApplicationCustomDomainActive?: boolean;
     wristbandApplicationVanityDomain: string;
   }
 ): string {
@@ -182,7 +184,7 @@ export function getOAuthAuthorizeUrl(
     ...(!!loginHint && typeof loginHint === 'string' ? { login_hint: loginHint } : {}),
   });
 
-  const separator = config.useCustomDomains ? '.' : '-';
+  const separator = config.isApplicationCustomDomainActive ? '.' : '-';
 
   // Domain priority order resolution:
   // 1)  tenant_custom_domain query param
