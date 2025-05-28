@@ -53,8 +53,9 @@ const wristbandAuth = createWristbandAuth({
   loginStateSecret: '7ffdbecc-ab7d-4134-9307-2dfcc52f7475',
   loginUrl: "https://{tenant_domain}.yourapp.io/auth/login",
   redirectUri: "https://{tenant_domain}.yourapp.io/auth/callback",
-  parseTenantFromRootDomain: "yourapp.io",
-  isApplicationCustomDomainActive: true,
+  rootDomain: "yourapp.io",
+  useTenantSubdomains: true,
+  useCustomDomains: true,
   // New name for app vanity domain
   - wristbandApplicationDomain: "auth.yourapp.io",  
   + wristbandApplicationVanityDomain: "auth.yourapp.io",   
