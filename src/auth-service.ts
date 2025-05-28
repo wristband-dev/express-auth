@@ -35,13 +35,12 @@ export class AuthService {
   private clientId: string;
   private customApplicationLoginPageUrl?: string;
   private dangerouslyDisableSecureCookies: boolean;
+  private isApplicationCustomDomainActive: boolean;
   private loginStateSecret: string;
   private loginUrl: string;
+  private parseTenantFromRootDomain: string;
   private redirectUri: string;
-  private rootDomain: string;
   private scopes: string[];
-  private useCustomDomains: boolean;
-  private useTenantSubdomains: boolean;
   private wristbandApplicationVanityDomain: string;
 
   constructor(authConfig: AuthConfig) {
@@ -63,25 +62,26 @@ export class AuthService {
     if (!authConfig.wristbandApplicationVanityDomain) {
       throw new TypeError('The [wristbandApplicationVanityDomain] config must have a value.');
     }
-    if (authConfig.useTenantSubdomains) {
-      if (!authConfig.rootDomain) {
-        throw new TypeError('The [rootDomain] config must have a value when using tenant subdomains.');
-      }
+    if (authConfig.parseTenantFromRootDomain) {
       if (!authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError('The [loginUrl] must contain the "{tenant_domain}" token when using tenant subdomains.');
+        throw new TypeError(
+          'The [loginUrl] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+        );
       }
       if (!authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError('The [redirectUri] must contain the "{tenant_domain}" token when using tenant subdomains.');
+        throw new TypeError(
+          'The [redirectUri] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+        );
       }
     } else {
       if (authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
         throw new TypeError(
-          'The [loginUrl] cannot contain the "{tenant_domain}" token when tenant subdomains are not used.'
+          'The [loginUrl] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
         );
       }
       if (authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
         throw new TypeError(
-          'The [redirectUri] cannot contain the "{tenant_domain}" token when tenant subdomains are not used.'
+          'The [redirectUri] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
         );
       }
     }
@@ -100,12 +100,13 @@ export class AuthService {
     this.loginStateSecret = authConfig.loginStateSecret;
     this.loginUrl = authConfig.loginUrl;
     this.redirectUri = authConfig.redirectUri;
-    this.rootDomain = authConfig.rootDomain || '';
+    this.parseTenantFromRootDomain = authConfig.parseTenantFromRootDomain || '';
     this.scopes =
       !!authConfig.scopes && !!authConfig.scopes.length ? authConfig.scopes : ['openid', 'offline_access', 'email'];
-    this.useCustomDomains = typeof authConfig.useCustomDomains !== 'undefined' ? authConfig.useCustomDomains : false;
-    this.useTenantSubdomains =
-      typeof authConfig.useTenantSubdomains !== 'undefined' ? authConfig.useTenantSubdomains : false;
+    this.isApplicationCustomDomainActive =
+      typeof authConfig.isApplicationCustomDomainActive !== 'undefined'
+        ? authConfig.isApplicationCustomDomainActive
+        : false;
     this.wristbandApplicationVanityDomain = authConfig.wristbandApplicationVanityDomain;
   }
 
@@ -115,7 +116,7 @@ export class AuthService {
 
     // Determine which domain-related values are present as it will be needed for the authorize URL.
     const tenantCustomDomain: string = resolveTenantCustomDomainParam(req);
-    const tenantDomainName: string = resolveTenantDomainName(req, this.useTenantSubdomains, this.rootDomain);
+    const tenantDomainName: string = resolveTenantDomainName(req, this.parseTenantFromRootDomain);
     const defaultTenantCustomDomain: string = config.defaultTenantCustomDomain || '';
     const defaultTenantDomainName: string = config.defaultTenantDomainName || '';
 
@@ -139,7 +140,7 @@ export class AuthService {
     // Return the Wristband Authorize Endpoint URL which the user will get redirectd to.
     return getOAuthAuthorizeUrl(req, {
       wristbandApplicationVanityDomain: this.wristbandApplicationVanityDomain,
-      useCustomDomains: this.useCustomDomains,
+      isApplicationCustomDomainActive: this.isApplicationCustomDomainActive,
       clientId: this.clientId,
       redirectUri: this.redirectUri,
       state: loginState.state,
@@ -181,22 +182,22 @@ export class AuthService {
     }
 
     // Resolve and validate the tenant domain name
-    const resolvedTenantDomainName: string = resolveTenantDomainName(req, this.useTenantSubdomains, this.rootDomain);
+    const resolvedTenantDomainName: string = resolveTenantDomainName(req, this.parseTenantFromRootDomain);
     if (!resolvedTenantDomainName) {
       throw new WristbandError(
-        this.useTenantSubdomains ? 'missing_tenant_subdomain' : 'missing_tenant_domain',
-        this.useTenantSubdomains
+        this.parseTenantFromRootDomain ? 'missing_tenant_subdomain' : 'missing_tenant_domain',
+        this.parseTenantFromRootDomain
           ? 'Callback request URL is missing a tenant subdomain'
           : 'Callback request is missing the [tenant_domain] query parameter from Wristband'
       );
     }
 
     // Construct the tenant login URL in the event we have to redirect to the login endpoint
-    let tenantLoginUrl: string = this.useTenantSubdomains
+    let tenantLoginUrl: string = this.parseTenantFromRootDomain
       ? this.loginUrl.replace(TENANT_DOMAIN_TOKEN, resolvedTenantDomainName)
       : `${this.loginUrl}?tenant_domain=${resolvedTenantDomainName}`;
     if (tenantCustomDomainParam) {
-      tenantLoginUrl = `${tenantLoginUrl}${this.useTenantSubdomains ? '?' : '&'}tenant_custom_domain=${tenantCustomDomainParam}`;
+      tenantLoginUrl = `${tenantLoginUrl}${this.parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomainParam}`;
     }
 
     // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
@@ -262,10 +263,10 @@ export class AuthService {
     const { tenant_custom_domain: tenantCustomDomainParam, tenant_domain: tenantDomainParam } = req.query;
 
     if (!!tenantCustomDomainParam && typeof tenantCustomDomainParam !== 'string') {
-      throw new TypeError('Invalid query parameter [tenant_custom_domain] passed from Wristband during logout');
+      throw new TypeError('More than one [tenant_custom_domain] query parameter was encountered during logout');
     }
     if (!!tenantDomainParam && typeof tenantDomainParam !== 'string') {
-      throw new TypeError('Invalid query parameter [tenant_domain] passed from Wristband during logout');
+      throw new TypeError('More than one [tenant_domain] query parameter was encountered during logout');
     }
 
     // Revoke the refresh token only if present.
@@ -281,7 +282,7 @@ export class AuthService {
     // The client ID is always required by the Wristband Logout Endpoint.
     const redirectUrl = config.redirectUrl ? `&redirect_url=${config.redirectUrl}` : '';
     const query = `client_id=${this.clientId}${redirectUrl}`;
-    const separator = this.useCustomDomains ? '.' : '-';
+    const separator = this.isApplicationCustomDomainActive ? '.' : '-';
 
     // Domain priority order resolution:
     // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
@@ -296,7 +297,11 @@ export class AuthService {
       tenantDomainToUse = `${config.tenantDomainName}${separator}${this.wristbandApplicationVanityDomain}`;
     } else if (tenantCustomDomainParam) {
       tenantDomainToUse = tenantCustomDomainParam;
-    } else if (this.useTenantSubdomains && host && host!.substring(host!.indexOf('.') + 1) === this.rootDomain) {
+    } else if (
+      this.parseTenantFromRootDomain &&
+      host &&
+      host!.substring(host!.indexOf('.') + 1) === this.parseTenantFromRootDomain
+    ) {
       const tenantDomainNameFromHost = host!.substring(0, host!.indexOf('.'));
       tenantDomainToUse = `${tenantDomainNameFromHost}${separator}${this.wristbandApplicationVanityDomain}`;
     } else if (tenantDomainParam) {

@@ -9,13 +9,12 @@
  * @property {string} clientSecret The client secret for the application.
  * @property {string} customApplicationLoginPageUrl Custom application login (tenant discovery) page URL if you are self-hosting the application login/tenant discovery UI.
  * @property {string} dangerouslyDisableSecureCookies If set to true, the "Secure" attribute will not be included in any cookie settings. This should only be done when testing in local development (if necessary).
+ * @property {boolean} [isApplicationCustomDomainActive] Indicates whether an application-level custom domain is active in your Wristband application.
  * @property {string} loginStateSecret A secret (32 or more characters in length) used for encryption and decryption of login state cookies.
  * @property {string} loginUrl The URL for initiating the login request.
+ * @property {string} [parseTenantFromRootDomain] The root domain for your application from which to parse out the tenant domain name. Indicates whether tenant subdomains are used for authentication.
  * @property {string} redirectUri The redirect URI for callback after authentication.
- * @property {string} [rootDomain] The root domain for your application.
  * @property {string[]} [scopes] The scopes required for authentication.
- * @property {boolean} [useCustomDomains] Indicates whether custom domains are used for authentication.
- * @property {boolean} [useTenantSubdomains] Indicates whether tenant subdomains are used for authentication.
  * @property {string} wristbandApplicationVanityDomain The vanity domain of the Wristband application.
  */
 export type AuthConfig = {
@@ -23,13 +22,12 @@ export type AuthConfig = {
   clientSecret: string;
   customApplicationLoginPageUrl?: string;
   dangerouslyDisableSecureCookies?: boolean;
+  isApplicationCustomDomainActive?: boolean;
   loginStateSecret: string;
   loginUrl: string;
+  parseTenantFromRootDomain?: string;
   redirectUri: string;
-  rootDomain?: string;
   scopes?: string[];
-  useCustomDomains?: boolean;
-  useTenantSubdomains?: boolean;
   wristbandApplicationVanityDomain: string;
 };
 

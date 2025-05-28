@@ -219,9 +219,9 @@ describe('Callback Errors', () => {
 
   describe('Redirect to Application-level Login', () => {
     test('Missing login state cookie, without subdomains, without tenant domain query param', async () => {
-      const rootDomain = 'business.invotastic.com';
-      const loginUrl = `https://${rootDomain}/api/auth/login`;
-      const redirectUri = `https://${rootDomain}/api/auth/callback`;
+      const parseTenantFromRootDomain = 'business.invotastic.com';
+      const loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
+      const redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
       const wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -229,7 +229,6 @@ describe('Callback Errors', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        useTenantSubdomains: false,
         wristbandApplicationVanityDomain,
       });
       // Mock Express objects
@@ -251,9 +250,9 @@ describe('Callback Errors', () => {
     });
 
     test('Missing login state cookie, with subdomains, and without URL subdomain', async () => {
-      const rootDomain = 'business.invotastic.com';
-      const loginUrl = `https://{tenant_domain}.${rootDomain}/api/auth/login`;
-      const redirectUri = `https://{tenant_domain}.${rootDomain}/api/auth/callback`;
+      const parseTenantFromRootDomain = 'business.invotastic.com';
+      const loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
+      const redirectUri = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/callback`;
       const wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -262,14 +261,13 @@ describe('Callback Errors', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        rootDomain,
-        useTenantSubdomains: true,
+        parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
       });
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
         query: { state: 'state', code: 'code' },
-        headers: { host: rootDomain },
+        headers: { host: parseTenantFromRootDomain },
       });
       const mockExpressRes = httpMocks.createResponse();
 
@@ -319,9 +317,9 @@ describe('Callback Errors', () => {
   });
 
   test('Callback with tenant subdomains constructs correct redirect URL', async () => {
-    const rootDomain = 'example.com';
-    const loginUrl = `https://{tenant_domain}.${rootDomain}/login`;
-    const redirectUri = `https://{tenant_domain}.${rootDomain}/callback`;
+    const parseTenantFromRootDomain = 'example.com';
+    const loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/login`;
+    const redirectUri = `https://{tenant_domain}.${parseTenantFromRootDomain}/callback`;
 
     // Create auth service with tenant subdomains config
     const tenantSubdomainAuth = createWristbandAuth({
@@ -330,8 +328,7 @@ describe('Callback Errors', () => {
       loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
       loginUrl,
       redirectUri,
-      rootDomain,
-      useTenantSubdomains: true,
+      parseTenantFromRootDomain,
       wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
     });
 
@@ -350,7 +347,7 @@ describe('Callback Errors', () => {
         code: 'testcode',
       },
       headers: {
-        host: `tenant1.${rootDomain}`,
+        host: `tenant1.${parseTenantFromRootDomain}`,
         cookie: `${cookieKey}=${encodeURIComponent(encryptedLoginState)}`,
       },
     });
@@ -364,7 +361,7 @@ describe('Callback Errors', () => {
 
     const result = await tenantSubdomainAuth.callback(mockExpressReq, mockExpressRes);
     expect(result.type).toBe(CallbackResultType.REDIRECT_REQUIRED);
-    expect(result.redirectUrl).toBe(`https://tenant1.${rootDomain}/login`);
+    expect(result.redirectUrl).toBe(`https://tenant1.${parseTenantFromRootDomain}/login`);
     expect(result.callbackData).toBeFalsy();
   });
 });
