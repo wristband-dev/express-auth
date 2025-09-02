@@ -606,8 +606,8 @@ When the callback returns a `COMPLETED` result, all of the token and userinfo da
 | ------------------ | ---- | ----------- |
 | accessToken | string | The access token that can be used for accessing Wristband APIs as well as protecting your application's backend APIs. |
 | customState | JSON or `undefined` | If you injected custom state into the Login State Cookie during the Login Endpoint for the current auth request, then that same custom state will be returned in this field. |
-| expiresAt | int | The absolute expiration time of the access token in milliseconds since the Unix epoch. The `tokenExpirationBuffer` SDK configuration is accounted for in this value. |
-| expiresIn | int | The durtaion from the current time until the access token is expired (in seconds). The `tokenExpirationBuffer` SDK configuration is accounted for in this value. |
+| expiresAt | number | The absolute expiration time of the access token in milliseconds since the Unix epoch. The `tokenExpirationBuffer` SDK configuration is accounted for in this value. |
+| expiresIn | number | The durtaion from the current time until the access token is expired (in seconds). The `tokenExpirationBuffer` SDK configuration is accounted for in this value. |
 | idToken | string | The ID token uniquely identifies the user that is authenticating and contains claim data about the user. |
 | refreshToken | string or `undefined` | The refresh token that renews expired access tokens with Wristband, maintaining continuous access to services. |
 | returnUrl | string or `undefined` | The URL to return to after authentication is completed. |
@@ -821,7 +821,7 @@ The `TokenData` is defined as follows:
 
 ## Wristband Multi-Tenant Express Demo App
 
-You can check out the [Wristband B2B Express demo app](https://github.com/wristband-dev/b2b-expressjs-demo-app) to see this SDK in action. Refer to that GitHub repository for more information.
+You can check out the [Wristband Express demo app](https://github.com/wristband-dev/expressjs-demo-app) to see this SDK in action. Refer to that GitHub repository for more information.
 
 <br/>
 
