@@ -1,15 +1,20 @@
 // The Wristband Service contains all code for REST API calls to the Wristband platform.
-import { AxiosError } from 'axios';
+import { AxiosError, AxiosRequestConfig } from 'axios';
 import { WristbandApiClient } from './wristband-api-client';
 import { JSON_MEDIA_TYPE } from './utils/constants';
-import { TokenResponse, Userinfo } from './types';
+import { SdkConfiguration, TokenResponse, Userinfo } from './types';
 import { InvalidGrantError } from './error';
+
+const SDK_CONFIGS_AXIOS_REQUEST_CONFIG: AxiosRequestConfig = {
+  auth: undefined,
+  headers: { 'Content-Type': JSON_MEDIA_TYPE, Accept: JSON_MEDIA_TYPE },
+};
 
 export class WristbandService {
   private wristbandApiClient: WristbandApiClient;
   private clientId: string;
   private clientSecret: string;
-  private basicAuthConfig: object;
+  private basicAuthConfig: AxiosRequestConfig;
 
   constructor(wristbandApplicationVanityDomain: string, clientId: string, clientSecret: string) {
     if (!wristbandApplicationVanityDomain || !wristbandApplicationVanityDomain.trim()) {
@@ -28,11 +33,16 @@ export class WristbandService {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.basicAuthConfig = {
-      auth: {
-        username: this.clientId,
-        password: this.clientSecret,
-      },
+      auth: { username: this.clientId, password: this.clientSecret },
     };
+  }
+
+  async getSdkConfiguration(): Promise<SdkConfiguration> {
+    const response = await this.wristbandApiClient.axiosInstance.get(
+      `/clients/${this.clientId}/sdk-configuration`,
+      SDK_CONFIGS_AXIOS_REQUEST_CONFIG
+    );
+    return response.data;
   }
 
   async getTokens(code: string, redirectUri: string, codeVerifier: string): Promise<TokenResponse> {

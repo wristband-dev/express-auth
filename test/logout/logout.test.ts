@@ -39,6 +39,7 @@ describe('Multi Tenant Logout', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -95,6 +96,7 @@ describe('Multi Tenant Logout', () => {
         redirectUri,
         parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -151,6 +153,7 @@ describe('Multi Tenant Logout', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -206,6 +209,7 @@ describe('Multi Tenant Logout', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -262,6 +266,7 @@ describe('Multi Tenant Logout', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -320,6 +325,7 @@ describe('Multi Tenant Logout', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -377,6 +383,7 @@ describe('Multi Tenant Logout', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -435,6 +442,7 @@ describe('Multi Tenant Logout', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       // Query param "tenant_custom_domain" takes precedence over "tenant_domain"
@@ -490,6 +498,7 @@ describe('Multi Tenant Logout', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -526,6 +535,16 @@ describe('Multi Tenant Logout', () => {
     });
 
     describe('Refresh Token Edge Cases', () => {
+      let consoleLogSpy: jest.SpyInstance;
+
+      beforeAll(() => {
+        consoleLogSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+      });
+
+      afterAll(() => {
+        consoleLogSpy.mockRestore();
+      });
+
       test('No Token to Revoke', async () => {
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -534,6 +553,7 @@ describe('Multi Tenant Logout', () => {
           loginUrl,
           redirectUri,
           wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -578,6 +598,7 @@ describe('Multi Tenant Logout', () => {
           loginUrl,
           redirectUri,
           wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -626,6 +647,7 @@ describe('Multi Tenant Logout', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -659,6 +681,7 @@ describe('Multi Tenant Logout', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       // Subdomain is missing from host, which should redirect to app-level login.
@@ -693,6 +716,7 @@ describe('Multi Tenant Logout', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         customApplicationLoginPageUrl: 'https://google.com',
+        autoConfigureEnabled: false,
       });
 
       // Subdomain is missing from host, which should redirect to custom app-level login.
@@ -730,6 +754,7 @@ describe('Multi Tenant Logout', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         customApplicationLoginPageUrl: 'https://google.com',
+        autoConfigureEnabled: false,
       });
 
       // Subdomain is missing from host, which should redirect to logout redirectUrl.
@@ -751,6 +776,201 @@ describe('Multi Tenant Logout', () => {
       const { pathname, origin } = locationUrl;
       expect(origin).toEqual('https://yahoo.com');
       expect(pathname).toEqual('/');
+    });
+  });
+
+  describe('State Configuration Tests', () => {
+    test('Logout with state parameter', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          tenantDomainName: 'devs4you',
+          state: 'custom-logout-state-123',
+        })
+      );
+
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { searchParams } = locationUrl;
+
+      expect(searchParams.get('state')).toEqual('custom-logout-state-123');
+      expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
+    });
+
+    test('Logout with state and redirectUrl parameters', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          tenantDomainName: 'devs4you',
+          state: 'logout-state-with-redirect',
+          redirectUrl: 'https://example.com/logged-out',
+        })
+      );
+
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { searchParams } = locationUrl;
+
+      expect(searchParams.get('state')).toEqual('logout-state-with-redirect');
+      expect(searchParams.get('redirect_url')).toEqual('https://example.com/logged-out');
+      expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
+    });
+
+    test('Logout with empty state parameter (should not include state in query)', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you', state: '' })
+      );
+
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { searchParams } = locationUrl;
+
+      expect(searchParams.get('state')).toBeNull();
+      expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
+    });
+
+    test('Logout with state parameter at maximum length (512 characters)', async () => {
+      const maxState = 'a'.repeat(512);
+
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you', state: maxState })
+      );
+
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { searchParams } = locationUrl;
+
+      expect(searchParams.get('state')).toEqual(maxState);
+      expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
+    });
+
+    test('Logout throws error when state exceeds 512 characters', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await expect(
+        wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you', state: 'a'.repeat(513) })
+      ).rejects.toThrow('The [state] logout config cannot exceed 512 characters.');
+    });
+
+    test('Logout with state parameter in fallback scenario (app-level login)', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      // No tenant domain resolution - should fallback but state validation still applies
+      const location = await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+        state: 'fallback-state',
+      });
+
+      // Should still return fallback URL (state doesn't affect fallback behavior)
+      expect(location).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
+    });
+
+    test('Logout throws error when state exceeds limit in fallback scenario', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      await expect(wristbandAuth.logout(mockExpressReq, mockExpressRes, { state: 'a'.repeat(513) })).rejects.toThrow(
+        'The [state] logout config cannot exceed 512 characters.'
+      );
     });
   });
 });

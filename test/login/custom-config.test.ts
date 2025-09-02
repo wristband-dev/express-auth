@@ -93,6 +93,7 @@ describe('Custom Login Configurations', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         scopes: CUSTOM_SCOPES,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -140,6 +141,7 @@ describe('Custom Login Configurations', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -192,6 +194,7 @@ describe('Custom Login Configurations', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -240,6 +243,7 @@ describe('Custom Login Configurations', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -287,6 +291,7 @@ describe('Custom Login Configurations', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -338,6 +343,7 @@ describe('Custom Login Configurations', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -395,6 +401,7 @@ describe('Custom Login Configurations', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -443,6 +450,7 @@ describe('Custom Login Configurations', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -495,6 +503,7 @@ describe('Custom Login Configurations', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -550,6 +559,7 @@ describe('Custom Login Configurations', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -602,6 +612,7 @@ describe('Custom Login Configurations', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -658,6 +669,7 @@ describe('Custom Login Configurations', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -709,6 +721,7 @@ describe('Custom Login Configurations', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -762,6 +775,7 @@ describe('Custom Login Configurations', () => {
         redirectUri: `https://${parseTenantFromRootDomain}/api/auth/callback`,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({

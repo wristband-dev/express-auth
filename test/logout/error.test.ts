@@ -30,6 +30,7 @@ describe('Logout Errors', () => {
       loginUrl,
       redirectUri,
       wristbandApplicationVanityDomain,
+      autoConfigureEnabled: false,
     });
 
     nock.cleanAll();

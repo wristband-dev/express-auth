@@ -23,6 +23,7 @@ describe('Login Errors', () => {
       loginUrl,
       redirectUri,
       wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
+      autoConfigureEnabled: false,
     });
   });
 

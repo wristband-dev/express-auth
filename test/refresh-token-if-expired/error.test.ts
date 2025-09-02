@@ -18,6 +18,7 @@ const wristbandAuth: WristbandAuth = createWristbandAuth({
   loginUrl: LOGIN_URL,
   redirectUri: REDIRECT_URI,
   wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
+  autoConfigureEnabled: false,
 });
 
 describe('Refresh Token Errors', () => {

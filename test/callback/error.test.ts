@@ -27,6 +27,7 @@ describe('Callback Errors', () => {
       loginUrl: LOGIN_URL,
       redirectUri: REDIRECT_URI,
       wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
+      autoConfigureEnabled: false,
     });
     nock.cleanAll();
   });
@@ -230,6 +231,7 @@ describe('Callback Errors', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
@@ -263,6 +265,7 @@ describe('Callback Errors', () => {
         redirectUri,
         parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
@@ -330,6 +333,7 @@ describe('Callback Errors', () => {
       redirectUri,
       parseTenantFromRootDomain,
       wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
+      autoConfigureEnabled: false,
     });
 
     // Create a valid login state cookie with matching state

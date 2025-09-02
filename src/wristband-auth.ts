@@ -98,6 +98,16 @@ export class WristbandAuthImpl implements WristbandAuth {
     this.authService = new AuthService(authConfig);
   }
 
+  private async discover(): Promise<void> {
+    await this.authService.preloadConfig();
+  }
+
+  static async createWithDiscovery(authConfig: AuthConfig): Promise<WristbandAuthImpl> {
+    const auth = new WristbandAuthImpl(authConfig);
+    await auth.discover();
+    return auth;
+  }
+
   login(req: Request, res: Response, config?: LoginConfig): Promise<string> {
     return this.authService.login(req, res, config);
   }
