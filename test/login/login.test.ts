@@ -88,6 +88,7 @@ describe('Multi Tenant Login', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -163,6 +164,7 @@ describe('Multi Tenant Login', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -242,6 +244,7 @@ describe('Multi Tenant Login', () => {
         redirectUri,
         parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -291,6 +294,7 @@ describe('Multi Tenant Login', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -340,6 +344,7 @@ describe('Multi Tenant Login', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -389,6 +394,7 @@ describe('Multi Tenant Login', () => {
         redirectUri,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -439,6 +445,7 @@ describe('Multi Tenant Login', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -480,6 +487,142 @@ describe('Multi Tenant Login', () => {
       expect(loginState.returnUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/settings`);
     });
 
+    test('With returnUrl in LoginConfig', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${parseTenantFromRootDomain}` },
+        query: { tenant_domain: 'devs4you' },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      const loginConfig = {
+        returnUrl: 'https://example.com/dashboard',
+      };
+
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, loginConfig));
+
+      // Validate login state cookie contains return URL from config
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      const loginCookie = cookies[0];
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
+
+      expect(loginState.returnUrl).toBe('https://example.com/dashboard');
+    });
+
+    test('LoginConfig returnUrl takes precedence over query parameter return_url', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${parseTenantFromRootDomain}` },
+        query: {
+          tenant_domain: 'devs4you',
+          return_url: 'https://example.com/from-query', // This should be overridden
+        },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      const loginConfig = {
+        returnUrl: 'https://example.com/from-config', // This should take precedence
+      };
+
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, loginConfig));
+
+      // Validate login state cookie contains return URL from config, not query
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      const loginCookie = cookies[0];
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
+
+      expect(loginState.returnUrl).toBe('https://example.com/from-config');
+    });
+
+    test('With both returnUrl and customState in LoginConfig', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${parseTenantFromRootDomain}` },
+        query: { tenant_domain: 'devs4you' },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      const loginConfig = {
+        returnUrl: 'https://example.com/dashboard',
+        customState: { userId: '123', feature: 'premium' },
+      };
+
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, loginConfig));
+
+      // Validate login state cookie contains both return URL and custom state
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      const loginCookie = cookies[0];
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
+
+      expect(loginState.returnUrl).toBe('https://example.com/dashboard');
+      expect(loginState.customState).toEqual({ userId: '123', feature: 'premium' });
+    });
+
+    test('Empty returnUrl in LoginConfig is ignored (no returnUrl in state)', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${parseTenantFromRootDomain}` },
+        query: {
+          tenant_domain: 'devs4you',
+          return_url: 'https://example.com/from-query',
+        },
+      });
+      const mockExpressRes = httpMocks.createResponse();
+
+      const loginConfig = {
+        returnUrl: '', // Empty string gets filtered out by !!returnUrl check
+      };
+
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, loginConfig));
+
+      // Validate login state cookie has no returnUrl (empty string was filtered out)
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      const loginCookie = cookies[0];
+      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
+
+      expect(loginState.returnUrl).toBeUndefined();
+    });
+
     test('Clear old login state cookie', async () => {
       parseTenantFromRootDomain = 'business.invotastic.com';
       wristbandApplicationVanityDomain = 'auth.invotastic.com';
@@ -495,6 +638,7 @@ describe('Multi Tenant Login', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       // Mock login states
@@ -547,17 +691,6 @@ describe('Multi Tenant Login', () => {
       expect(oldCookieHeader).toContain('Path=/');
       expect(oldCookieHeader).toContain('HttpOnly');
 
-      // // Validate old login state cookie is getting cleared
-      // expect(Object.keys(cookies)).toHaveLength(2);
-      // const oldLoginStateCookie = Object.entries(cookies)[0];
-      // const oldCookieName = oldLoginStateCookie[0];
-      // expect(oldCookieName).toBe('login#++state01#1111111111');
-      // const oldCookieValue = oldLoginStateCookie[1];
-      // expect(Object.keys(oldCookieValue)).toHaveLength(2);
-      // expect(oldCookieValue.options.expires?.valueOf()).toBeLessThan(Date.now().valueOf());
-      // expect(oldCookieValue.options.path).toBe('/');
-      // expect(oldCookieValue.value).toBeFalsy();
-
       // Validate new login state cookie
       const newCookieHeader = setCookieHeaders?.find((header) => {
         return !header.startsWith('login#++state01#1111111111=');
@@ -573,17 +706,6 @@ describe('Multi Tenant Login', () => {
       const loginState: LoginState = await decryptLoginState(newCookieValue, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
-
-      // Validate new login state cookie
-      // const loginStateCookie = Object.entries(cookies)[1];
-      // const keyParts: string[] = loginStateCookie[0].split(LOGIN_STATE_COOKIE_SEPARATOR);
-      // const cookieValue = loginStateCookie[1];
-      // expect(Object.keys(cookieValue)).toHaveLength(2);
-      // const { value } = cookieValue;
-
-      // const loginState: LoginState = await decryptLoginState(value, LOGIN_STATE_COOKIE_SECRET);
-      // expect(loginState.state).toEqual(keyParts[1]);
-      // expect(searchParams.get('state')).toEqual(keyParts[1]);
     });
   });
 
@@ -596,6 +718,7 @@ describe('Multi Tenant Login', () => {
         loginUrl,
         redirectUri,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       // tenant_domain and tenant_custom_domain query param is missing, which should redirect to app-level login.
@@ -629,6 +752,7 @@ describe('Multi Tenant Login', () => {
         parseTenantFromRootDomain,
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
       });
 
       // Subdomain is missing from host, which should redirect to app-level login.
@@ -663,6 +787,7 @@ describe('Multi Tenant Login', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         customApplicationLoginPageUrl: 'https://google.com',
+        autoConfigureEnabled: false,
       });
 
       // Subdomain is missing from host, which should redirect to app-level login.

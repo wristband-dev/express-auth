@@ -90,11 +90,13 @@ export function resolveTenantCustomDomainParam(req: Request): string {
 }
 
 export function createLoginState(req: Request, redirectUri: string, config: LoginStateMapConfig = {}): LoginState {
-  const { return_url: returnUrl } = req.query;
+  const { return_url: returnUrlParam } = req.query;
 
-  if (!!returnUrl && typeof returnUrl !== 'string') {
+  if (!!returnUrlParam && typeof returnUrlParam !== 'string') {
     throw new TypeError('More than one [return_url] query parameter was encountered');
   }
+
+  const returnUrl = config.returnUrl ?? returnUrlParam;
 
   const loginStateData = {
     state: generateRandomString(32),

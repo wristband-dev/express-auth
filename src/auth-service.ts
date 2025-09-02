@@ -29,123 +29,80 @@ import {
   Userinfo,
 } from './types';
 import { InvalidGrantError, WristbandError } from './error';
+import { ConfigResolver } from './config-resolver';
 
 export class AuthService {
   private wristbandService: WristbandService;
-  private clientId: string;
-  private customApplicationLoginPageUrl?: string;
-  private dangerouslyDisableSecureCookies: boolean;
-  private isApplicationCustomDomainActive: boolean;
-  private loginStateSecret: string;
-  private loginUrl: string;
-  private parseTenantFromRootDomain: string;
-  private redirectUri: string;
-  private scopes: string[];
-  private wristbandApplicationVanityDomain: string;
+  private configResolver: ConfigResolver;
 
   constructor(authConfig: AuthConfig) {
-    if (!authConfig.clientId) {
-      throw new TypeError('The [clientId] config must have a value.');
-    }
-    if (!authConfig.clientSecret) {
-      throw new TypeError('The [clientSecret] config must have a value.');
-    }
-    if (!authConfig.loginStateSecret || authConfig.loginStateSecret.length < 32) {
-      throw new TypeError('The [loginStateSecret] config must have a value of at least 32 characters.');
-    }
-    if (!authConfig.loginUrl) {
-      throw new TypeError('The [loginUrl] config must have a value.');
-    }
-    if (!authConfig.redirectUri) {
-      throw new TypeError('The [redirectUri] config must have a value.');
-    }
-    if (!authConfig.wristbandApplicationVanityDomain) {
-      throw new TypeError('The [wristbandApplicationVanityDomain] config must have a value.');
-    }
-    if (authConfig.parseTenantFromRootDomain) {
-      if (!authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError(
-          'The [loginUrl] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
-        );
-      }
-      if (!authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError(
-          'The [redirectUri] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
-        );
-      }
-    } else {
-      if (authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError(
-          'The [loginUrl] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
-        );
-      }
-      if (authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
-        throw new TypeError(
-          'The [redirectUri] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
-        );
-      }
-    }
-
+    this.configResolver = new ConfigResolver(authConfig);
     this.wristbandService = new WristbandService(
-      authConfig.wristbandApplicationVanityDomain,
-      authConfig.clientId,
-      authConfig.clientSecret
+      this.configResolver.getWristbandApplicationVanityDomain(),
+      this.configResolver.getClientId(),
+      this.configResolver.getClientSecret()
     );
-    this.clientId = authConfig.clientId;
-    this.customApplicationLoginPageUrl = authConfig.customApplicationLoginPageUrl || '';
-    this.dangerouslyDisableSecureCookies =
-      typeof authConfig.dangerouslyDisableSecureCookies !== 'undefined'
-        ? authConfig.dangerouslyDisableSecureCookies
-        : false;
-    this.loginStateSecret = authConfig.loginStateSecret;
-    this.loginUrl = authConfig.loginUrl;
-    this.redirectUri = authConfig.redirectUri;
-    this.parseTenantFromRootDomain = authConfig.parseTenantFromRootDomain || '';
-    this.scopes =
-      !!authConfig.scopes && !!authConfig.scopes.length ? authConfig.scopes : ['openid', 'offline_access', 'email'];
-    this.isApplicationCustomDomainActive =
-      typeof authConfig.isApplicationCustomDomainActive !== 'undefined'
-        ? authConfig.isApplicationCustomDomainActive
-        : false;
-    this.wristbandApplicationVanityDomain = authConfig.wristbandApplicationVanityDomain;
+  }
+
+  /**
+   * Force load all auto-configurable fields to cache them. This will trigger the API call
+   * and cache the results. Any validation errors will be thrown here (fail-fast)
+   */
+  async preloadConfig(): Promise<void> {
+    if (!this.configResolver.getAutoConfigureEnabled()) {
+      throw new WristbandError(
+        'Cannot preload configs when autoConfigureEnabled is false. Use createWristbandAuth() instead.'
+      );
+    }
+    await this.configResolver.preloadSdkConfig();
   }
 
   async login(req: Request, res: Response, config: LoginConfig = {}): Promise<string> {
     res.header('Cache-Control', 'no-store');
     res.header('Pragma', 'no-cache');
 
+    // Fetch our SDK configs
+    const clientId = this.configResolver.getClientId();
+    const customApplicationLoginPageUrl = await this.configResolver.getCustomApplicationLoginPageUrl();
+    const dangerouslyDisableSecureCookies = this.configResolver.getDangerouslyDisableSecureCookies();
+    const isApplicationCustomDomainActive = await this.configResolver.getIsApplicationCustomDomainActive();
+    const loginStateSecret = this.configResolver.getLoginStateSecret();
+    const parseTenantFromRootDomain = await this.configResolver.getParseTenantFromRootDomain();
+    const redirectUri = await this.configResolver.getRedirectUri();
+    const scopes = this.configResolver.getScopes();
+    const wristbandApplicationVanityDomain = this.configResolver.getWristbandApplicationVanityDomain();
+
     // Determine which domain-related values are present as it will be needed for the authorize URL.
     const tenantCustomDomain: string = resolveTenantCustomDomainParam(req);
-    const tenantDomainName: string = resolveTenantDomainName(req, this.parseTenantFromRootDomain);
+    const tenantDomainName: string = resolveTenantDomainName(req, parseTenantFromRootDomain);
     const defaultTenantCustomDomain: string = config.defaultTenantCustomDomain || '';
     const defaultTenantDomainName: string = config.defaultTenantDomainName || '';
 
     // In the event we cannot determine either a tenant custom domain or subdomain, send the user to app-level login.
     if (!tenantCustomDomain && !tenantDomainName && !defaultTenantCustomDomain && !defaultTenantDomainName) {
-      const apploginUrl =
-        this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationVanityDomain}/login`;
-      return `${apploginUrl}?client_id=${this.clientId}`;
+      const apploginUrl = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
+      return `${apploginUrl}?client_id=${clientId}`;
     }
 
     // Create the login state which will be cached in a cookie so that it can be accessed in the callback.
     const customState =
       !!config.customState && !!Object.keys(config.customState).length ? config.customState : undefined;
-    const loginState: LoginState = createLoginState(req, this.redirectUri, { customState });
+    const loginState: LoginState = createLoginState(req, redirectUri, { customState, returnUrl: config.returnUrl });
 
     // Clear any stale login state cookies and add a new one fo rthe current request.
-    clearOldestLoginStateCookie(req, res, this.dangerouslyDisableSecureCookies);
-    const encryptedLoginState: string = await encryptLoginState(loginState, this.loginStateSecret);
-    createLoginStateCookie(res, loginState.state, encryptedLoginState, this.dangerouslyDisableSecureCookies);
+    clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies);
+    const encryptedLoginState: string = await encryptLoginState(loginState, loginStateSecret);
+    createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies);
 
     // Return the Wristband Authorize Endpoint URL which the user will get redirectd to.
     return getOAuthAuthorizeUrl(req, {
-      wristbandApplicationVanityDomain: this.wristbandApplicationVanityDomain,
-      isApplicationCustomDomainActive: this.isApplicationCustomDomainActive,
-      clientId: this.clientId,
-      redirectUri: this.redirectUri,
+      wristbandApplicationVanityDomain,
+      isApplicationCustomDomainActive,
+      clientId,
+      redirectUri,
       state: loginState.state,
       codeVerifier: loginState.codeVerifier,
-      scopes: this.scopes,
+      scopes,
       tenantCustomDomain,
       tenantDomainName,
       defaultTenantDomainName,
@@ -156,6 +113,13 @@ export class AuthService {
   async callback(req: Request, res: Response): Promise<CallbackResult> {
     res.header('Cache-Control', 'no-store');
     res.header('Pragma', 'no-cache');
+
+    // Fetch our SDK configs
+    const dangerouslyDisableSecureCookies = this.configResolver.getDangerouslyDisableSecureCookies();
+    const loginStateSecret = this.configResolver.getLoginStateSecret();
+    const loginUrl = await this.configResolver.getLoginUrl();
+    const parseTenantFromRootDomain = await this.configResolver.getParseTenantFromRootDomain();
+    const tokenExpirationBuffer = this.configResolver.getTokenExpirationBuffer();
 
     // Safety checks -- Wristband backend should never send bad query params
     const {
@@ -182,30 +146,30 @@ export class AuthService {
     }
 
     // Resolve and validate the tenant domain name
-    const resolvedTenantDomainName: string = resolveTenantDomainName(req, this.parseTenantFromRootDomain);
+    const resolvedTenantDomainName: string = resolveTenantDomainName(req, parseTenantFromRootDomain);
     if (!resolvedTenantDomainName) {
       throw new WristbandError(
-        this.parseTenantFromRootDomain ? 'missing_tenant_subdomain' : 'missing_tenant_domain',
-        this.parseTenantFromRootDomain
+        parseTenantFromRootDomain ? 'missing_tenant_subdomain' : 'missing_tenant_domain',
+        parseTenantFromRootDomain
           ? 'Callback request URL is missing a tenant subdomain'
           : 'Callback request is missing the [tenant_domain] query parameter from Wristband'
       );
     }
 
     // Construct the tenant login URL in the event we have to redirect to the login endpoint
-    let tenantLoginUrl: string = this.parseTenantFromRootDomain
-      ? this.loginUrl.replace(TENANT_DOMAIN_TOKEN, resolvedTenantDomainName)
-      : `${this.loginUrl}?tenant_domain=${resolvedTenantDomainName}`;
+    let tenantLoginUrl: string = parseTenantFromRootDomain
+      ? loginUrl.replace(TENANT_DOMAIN_TOKEN, resolvedTenantDomainName)
+      : `${loginUrl}?tenant_domain=${resolvedTenantDomainName}`;
     if (tenantCustomDomainParam) {
-      tenantLoginUrl = `${tenantLoginUrl}${this.parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomainParam}`;
+      tenantLoginUrl = `${tenantLoginUrl}${parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomainParam}`;
     }
 
     // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
-    const loginStateCookie: string = getAndClearLoginStateCookie(req, res, this.dangerouslyDisableSecureCookies);
+    const loginStateCookie: string = getAndClearLoginStateCookie(req, res, dangerouslyDisableSecureCookies);
     if (!loginStateCookie) {
       return { type: CallbackResultType.REDIRECT_REQUIRED, redirectUrl: tenantLoginUrl };
     }
-    const loginState: LoginState = await decryptLoginState(loginStateCookie, this.loginStateSecret);
+    const loginState: LoginState = await decryptLoginState(loginStateCookie, loginStateSecret);
     const { codeVerifier, customState, redirectUri, returnUrl, state: cookieState } = loginState;
 
     // Check for any potential error conditions
@@ -235,11 +199,15 @@ export class AuthService {
       // Fetch the userinfo for the user logging in.
       const userinfo: Userinfo = await this.wristbandService.getUserinfo(accessToken);
 
+      const resolvedExpiresIn = expiresIn - (tokenExpirationBuffer || 0);
+      const resolvedExpiresAt = Date.now() + resolvedExpiresIn * 1000;
+
       const callbackData: CallbackData = {
         accessToken,
         ...(!!customState && { customState }),
+        expiresAt: resolvedExpiresAt,
+        expiresIn: resolvedExpiresIn,
         idToken,
-        expiresIn,
         ...(!!refreshToken && { refreshToken }),
         ...(!!returnUrl && { returnUrl }),
         ...(!!tenantCustomDomainParam && { tenantCustomDomain: tenantCustomDomainParam }),
@@ -258,6 +226,13 @@ export class AuthService {
   async logout(req: Request, res: Response, config: LogoutConfig = { tenantCustomDomain: '' }): Promise<string> {
     res.header('Cache-Control', 'no-store');
     res.header('Pragma', 'no-cache');
+
+    // Fetch our SDK configs
+    const clientId = this.configResolver.getClientId();
+    const customApplicationLoginPageUrl = await this.configResolver.getCustomApplicationLoginPageUrl();
+    const isApplicationCustomDomainActive = await this.configResolver.getIsApplicationCustomDomainActive();
+    const parseTenantFromRootDomain = await this.configResolver.getParseTenantFromRootDomain();
+    const wristbandApplicationVanityDomain = this.configResolver.getWristbandApplicationVanityDomain();
 
     const { host } = req.headers;
     const { tenant_custom_domain: tenantCustomDomainParam, tenant_domain: tenantDomainParam } = req.query;
@@ -279,10 +254,15 @@ export class AuthService {
       }
     }
 
+    if (config.state && config.state.length > 512) {
+      throw new TypeError('The [state] logout config cannot exceed 512 characters.');
+    }
+
     // The client ID is always required by the Wristband Logout Endpoint.
     const redirectUrl = config.redirectUrl ? `&redirect_url=${config.redirectUrl}` : '';
-    const query = `client_id=${this.clientId}${redirectUrl}`;
-    const separator = this.isApplicationCustomDomainActive ? '.' : '-';
+    const state = config.state ? `&state=${config.state}` : '';
+    const query = `client_id=${clientId}${redirectUrl}${state}`;
+    const separator = isApplicationCustomDomainActive ? '.' : '-';
 
     // Domain priority order resolution:
     // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
@@ -294,29 +274,31 @@ export class AuthService {
     if (config.tenantCustomDomain) {
       tenantDomainToUse = config.tenantCustomDomain;
     } else if (config.tenantDomainName) {
-      tenantDomainToUse = `${config.tenantDomainName}${separator}${this.wristbandApplicationVanityDomain}`;
+      tenantDomainToUse = `${config.tenantDomainName}${separator}${wristbandApplicationVanityDomain}`;
     } else if (tenantCustomDomainParam) {
       tenantDomainToUse = tenantCustomDomainParam;
     } else if (
-      this.parseTenantFromRootDomain &&
+      parseTenantFromRootDomain &&
       host &&
-      host!.substring(host!.indexOf('.') + 1) === this.parseTenantFromRootDomain
+      host!.substring(host!.indexOf('.') + 1) === parseTenantFromRootDomain
     ) {
       const tenantDomainNameFromHost = host!.substring(0, host!.indexOf('.'));
-      tenantDomainToUse = `${tenantDomainNameFromHost}${separator}${this.wristbandApplicationVanityDomain}`;
+      tenantDomainToUse = `${tenantDomainNameFromHost}${separator}${wristbandApplicationVanityDomain}`;
     } else if (tenantDomainParam) {
-      tenantDomainToUse = `${tenantDomainParam}${separator}${this.wristbandApplicationVanityDomain}`;
+      tenantDomainToUse = `${tenantDomainParam}${separator}${wristbandApplicationVanityDomain}`;
     } else {
       // Construct the appropriate fallback URL that the user will get redirected to.
-      const appLoginUrl: string =
-        this.customApplicationLoginPageUrl || `https://${this.wristbandApplicationVanityDomain}/login`;
-      return config.redirectUrl || `${appLoginUrl}?client_id=${this.clientId}`;
+      const appLoginUrl: string = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
+      return config.redirectUrl || `${appLoginUrl}?client_id=${clientId}`;
     }
 
     return `https://${tenantDomainToUse}/api/v1/logout?${query}`;
   }
 
   async refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null> {
+    // Fetch our SDK configs
+    const tokenExpirationBuffer = this.configResolver.getTokenExpirationBuffer();
+
     // Safety checks
     if (!refreshToken) {
       throw new TypeError('Refresh token must be a valid string');
@@ -371,7 +353,17 @@ export class AuthService {
         expires_in: expiresIn,
         refresh_token: responseRefreshToken,
       } = tokenResponse;
-      return { accessToken, idToken, refreshToken: responseRefreshToken, expiresIn };
+
+      const resolvedExpiresIn = expiresIn - (tokenExpirationBuffer || 0);
+      const resolvedExpiresAt = Date.now() + resolvedExpiresIn * 1000;
+
+      return {
+        accessToken,
+        idToken,
+        refreshToken: responseRefreshToken,
+        expiresAt: resolvedExpiresAt,
+        expiresIn: resolvedExpiresIn,
+      };
     }
 
     // This is merely a safety check, but this should never happen.
