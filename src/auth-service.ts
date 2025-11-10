@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import retry from 'async-retry';
 import { AxiosError } from 'axios';
 
-import { LOGIN_REQUIRED_ERROR, TENANT_DOMAIN_TOKEN } from './utils/constants';
+import { LOGIN_REQUIRED_ERROR, TENANT_DOMAIN_PLACEHOLDER } from './utils/constants';
 import {
   clearOldestLoginStateCookie,
   createLoginState,
@@ -193,7 +193,7 @@ export class AuthService {
 
     // Construct the tenant login URL in the event we have to redirect to the login endpoint
     let tenantLoginUrl: string = parseTenantFromRootDomain
-      ? loginUrl.replace(TENANT_DOMAIN_TOKEN, resolvedTenantName)
+      ? loginUrl.replace(TENANT_DOMAIN_PLACEHOLDER, resolvedTenantName)
       : `${loginUrl}?tenant_domain=${resolvedTenantName}`;
     if (tenantCustomDomainParam) {
       tenantLoginUrl = `${tenantLoginUrl}${parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomainParam}`;
