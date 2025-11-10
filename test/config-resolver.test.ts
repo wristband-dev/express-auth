@@ -117,7 +117,7 @@ describe('ConfigResolver', () => {
       }).toThrow('The [redirectUri] config must have a value when auto-configure is disabled.');
     });
 
-    it('should validate tenant domain token when parseTenantFromRootDomain is provided', () => {
+    it('should validate tenant domain placeholder when parseTenantFromRootDomain is provided', () => {
       const config = {
         ...disabledConfig,
         loginUrl: 'https://test.com/login',
@@ -127,11 +127,11 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [loginUrl] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+        'The [loginUrl] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
       );
     });
 
-    it('should validate redirectUri has tenant domain token when parseTenantFromRootDomain is provided', () => {
+    it('should validate redirectUri has tenant domain placeholder when parseTenantFromRootDomain is provided', () => {
       const config = {
         ...disabledConfig,
         loginUrl: `https://{tenant_domain}.test.com/login`,
@@ -141,11 +141,11 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [redirectUri] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+        'The [redirectUri] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
       );
     });
 
-    it('should validate loginUrl does not have tenant domain token when parseTenantFromRootDomain absent', () => {
+    it('should validate loginUrl does not have tenant domain placeholder when parseTenantFromRootDomain absent', () => {
       const config = {
         ...disabledConfig,
         loginUrl: `https://{tenant_domain}.test.com/login`,
@@ -154,11 +154,11 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [loginUrl] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+        'The [loginUrl] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
       );
     });
 
-    it('should validate redirectUri does not have tenant domain token when parseTenantFromRootDomain absent', () => {
+    it('should validate redirectUri does not have tenant domain placeholder when parseTenantFromRootDomain absent', () => {
       const config = {
         ...disabledConfig,
         loginUrl: 'https://test.com/login',
@@ -167,7 +167,7 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [redirectUri] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+        'The [redirectUri] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
       );
     });
 
@@ -190,7 +190,7 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [loginUrl] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+        'The [loginUrl] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
       );
     });
 
@@ -203,7 +203,7 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [redirectUri] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+        'The [redirectUri] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
       );
     });
 
@@ -212,7 +212,7 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [loginUrl] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+        'The [loginUrl] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
       );
     });
 
@@ -221,7 +221,7 @@ describe('ConfigResolver', () => {
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
-        'The [redirectUri] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+        'The [redirectUri] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
       );
     });
 
@@ -508,9 +508,9 @@ describe('ConfigResolver', () => {
       try {
         await resolver.getLoginUrl();
         fail('Expected WristbandError to be thrown');
-      } catch (error) {
+      } catch (error: any) {
         expect(error).toBeInstanceOf(WristbandError);
-        expect(error.message).toBe('SDK configuration response missing required field: loginUrl');
+        expect(error?.message).toBe('SDK configuration response missing required field: loginUrl');
       }
     });
 
@@ -522,9 +522,9 @@ describe('ConfigResolver', () => {
       try {
         await resolver.getLoginUrl();
         fail('Expected WristbandError to be thrown');
-      } catch (error) {
+      } catch (error: any) {
         expect(error).toBeInstanceOf(WristbandError);
-        expect(error.message).toBe('SDK configuration response missing required field: redirectUri');
+        expect(error?.message).toBe('SDK configuration response missing required field: redirectUri');
       }
     });
   });
@@ -594,7 +594,7 @@ describe('ConfigResolver', () => {
       await resolver.getLoginUrl();
       const endTime = Date.now();
 
-      // Account for time drift in CI/CD env
+      // Account for time drift in CI/CD env (normally take 200ms)
       expect(endTime - startTime).toBeGreaterThanOrEqual(101);
     });
 
@@ -637,8 +637,8 @@ describe('ConfigResolver', () => {
       resolver = new ConfigResolver(manualConfig);
 
       const invalidSdkConfig: SdkConfiguration = {
-        loginUrl: 'https://test.com/login', // Missing token
-        redirectUri: 'https://test.com/callback', // Missing token
+        loginUrl: 'https://test.com/login', // Missing tenant placeholder
+        redirectUri: 'https://test.com/callback', // Missing tenant placeholder
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: null,
@@ -647,7 +647,7 @@ describe('ConfigResolver', () => {
       expect(() => {
         return resolver['validateAllDynamicConfigs'](invalidSdkConfig);
       }).toThrow(
-        'The resolved [loginUrl] must contain the "{tenant_domain}" token when using [parseTenantFromRootDomain].'
+        'The resolved [loginUrl] must contain the "{tenant_domain}" placeholder when using [parseTenantFromRootDomain].'
       );
     });
 
@@ -657,7 +657,7 @@ describe('ConfigResolver', () => {
 
       const invalidSdkConfig: SdkConfiguration = {
         loginUrl: `https://{tenant_domain}.test.com/login`,
-        redirectUri: 'https://test.com/callback', // Missing token
+        redirectUri: 'https://test.com/callback', // Missing tenant placeholder
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: null,
@@ -666,13 +666,13 @@ describe('ConfigResolver', () => {
       expect(() => {
         return resolver['validateAllDynamicConfigs'](invalidSdkConfig);
       }).toThrow(
-        'The resolved [redirectUri] must contain the "{tenant_domain}" token when using [parseTenantFromRootDomain].'
+        'The resolved [redirectUri] must contain the "{tenant_domain}" placeholder when using [parseTenantFromRootDomain].'
       );
     });
 
     it('should validate resolved loginUrl config without parseTenantFromRootDomain', async () => {
       const invalidSdkConfig: SdkConfiguration = {
-        loginUrl: `https://{tenant_domain}.test.com/login`, // Has token but shouldn't
+        loginUrl: `https://{tenant_domain}.test.com/login`, // Has tenant placeholder but shouldn't
         redirectUri: 'https://test.com/callback',
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
@@ -682,14 +682,14 @@ describe('ConfigResolver', () => {
       expect(() => {
         return resolver['validateAllDynamicConfigs'](invalidSdkConfig);
       }).toThrow(
-        'The resolved [loginUrl] cannot contain the "{tenant_domain}" token when [parseTenantFromRootDomain] is absent.'
+        'The resolved [loginUrl] cannot contain the "{tenant_domain}" placeholder when [parseTenantFromRootDomain] is absent.'
       );
     });
 
     it('should validate resolved redirectUri without parseTenantFromRootDomain', async () => {
       const invalidSdkConfig: SdkConfiguration = {
         loginUrl: 'https://test.com/login',
-        redirectUri: `https://{tenant_domain}.test.com/callback`, // Has token but shouldn't
+        redirectUri: `https://{tenant_domain}.test.com/callback`, // Has tenant placeholder but shouldn't
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: null,
@@ -698,7 +698,7 @@ describe('ConfigResolver', () => {
       expect(() => {
         return resolver['validateAllDynamicConfigs'](invalidSdkConfig);
       }).toThrow(
-        'The resolved [redirectUri] cannot contain the "{tenant_domain}" token when [parseTenantFromRootDomain] is absent.'
+        'The resolved [redirectUri] cannot contain the "{tenant_domain}" placeholder when [parseTenantFromRootDomain] is absent.'
       );
     });
 

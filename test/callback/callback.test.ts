@@ -98,14 +98,14 @@ describe('Multi Tenant Callback', () => {
         expect(callbackData.refreshToken).toBe('refreshToken');
         expect(callbackData.customState).toEqual({ test: 'abc' });
         expect(callbackData.returnUrl).toBe('https://reddit.com');
-        expect(callbackData.tenantDomainName).toBe('devs4you');
+        expect(callbackData.tenantName).toBe('devs4you');
         expect(callbackData.userinfo).toBeTruthy();
-        expect(callbackData.userinfo['sub']).toBe('5q6j4qe2cva3dm3cbdvjoxvuze');
-        expect(callbackData.userinfo['tnt_id']).toBe('fr2vishnqjdvfbcijxa3a4adhe');
-        expect(callbackData.userinfo['app_id']).toBe('dy42gabu5jebreq6jajskk2n34');
-        expect(callbackData.userinfo['idp_name']).toBe('wristband');
-        expect(callbackData.userinfo['email']).toBe('test@wristband.dev');
-        expect(callbackData.userinfo['email_verified']).toBe(true);
+        expect(callbackData.userinfo.userId).toBe('5q6j4qe2cva3dm3cbdvjoxvuze');
+        expect(callbackData.userinfo.tenantId).toBe('fr2vishnqjdvfbcijxa3a4adhe');
+        expect(callbackData.userinfo.applicationId).toBe('dy42gabu5jebreq6jajskk2n34');
+        expect(callbackData.userinfo.identityProviderName).toBe('wristband');
+        expect(callbackData.userinfo.email).toBe('test@wristband.dev');
+        expect(callbackData.userinfo.emailVerified).toBe(true);
       }
       // Validate response is not redirecting the user
       const location: string = mockExpressRes._getRedirectUrl();
@@ -204,7 +204,7 @@ describe('Multi Tenant Callback', () => {
       expect(type).toBe(CallbackResultType.COMPLETED);
       expect(callbackData).toBeTruthy();
       if (callbackData) {
-        expect(callbackData.tenantDomainName).toBe('devs4you');
+        expect(callbackData.tenantName).toBe('devs4you');
         expect(callbackData.customState).toBeFalsy();
         expect(callbackData.returnUrl).toBeFalsy();
       }
@@ -281,7 +281,7 @@ describe('Multi Tenant Callback', () => {
       expect(type).toBe(CallbackResultType.COMPLETED);
       expect(callbackData).toBeTruthy();
       if (callbackData) {
-        expect(callbackData.tenantDomainName).toBe('devs4you');
+        expect(callbackData.tenantName).toBe('devs4you');
         expect(callbackData.customState).toBeFalsy();
         expect(callbackData.returnUrl).toBeFalsy();
       }

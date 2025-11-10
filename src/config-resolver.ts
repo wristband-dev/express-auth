@@ -1,6 +1,6 @@
 import { WristbandError } from './error';
 import { AuthConfig, SdkConfiguration } from './types';
-import { TENANT_DOMAIN_TOKEN } from './utils/constants';
+import { TENANT_DOMAIN_PLACEHOLDER } from './utils/constants';
 import { WristbandService } from './wristband-service';
 
 const DEFAULT_SCOPES = ['openid', 'offline_access', 'email'];
@@ -125,25 +125,25 @@ export class ConfigResolver {
     }
 
     if (this.authConfig.parseTenantFromRootDomain) {
-      if (!this.authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
+      if (!this.authConfig.loginUrl.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new TypeError(
-          'The [loginUrl] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+          'The [loginUrl] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
         );
       }
-      if (!this.authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
+      if (!this.authConfig.redirectUri.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new TypeError(
-          'The [redirectUri] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+          'The [redirectUri] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
         );
       }
     } else {
-      if (this.authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
+      if (this.authConfig.loginUrl.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new TypeError(
-          'The [loginUrl] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+          'The [loginUrl] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
         );
       }
-      if (this.authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
+      if (this.authConfig.redirectUri.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new TypeError(
-          'The [redirectUri] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+          'The [redirectUri] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
         );
       }
     }
@@ -151,27 +151,33 @@ export class ConfigResolver {
 
   private validatePartialUrlAuthConfigs(): void {
     if (this.authConfig.loginUrl) {
-      if (this.authConfig.parseTenantFromRootDomain && !this.authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
+      if (this.authConfig.parseTenantFromRootDomain && !this.authConfig.loginUrl.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new TypeError(
-          'The [loginUrl] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+          'The [loginUrl] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
         );
       }
-      if (!this.authConfig.parseTenantFromRootDomain && this.authConfig.loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
+      if (!this.authConfig.parseTenantFromRootDomain && this.authConfig.loginUrl.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new TypeError(
-          'The [loginUrl] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+          'The [loginUrl] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
         );
       }
     }
 
     if (this.authConfig.redirectUri) {
-      if (this.authConfig.parseTenantFromRootDomain && !this.authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
+      if (
+        this.authConfig.parseTenantFromRootDomain &&
+        !this.authConfig.redirectUri.includes(TENANT_DOMAIN_PLACEHOLDER)
+      ) {
         throw new TypeError(
-          'The [redirectUri] must contain the "{tenant_domain}" token when using the [parseTenantFromRootDomain] config.'
+          'The [redirectUri] must contain the "{tenant_domain}" placeholder when using the [parseTenantFromRootDomain] config.'
         );
       }
-      if (!this.authConfig.parseTenantFromRootDomain && this.authConfig.redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
+      if (
+        !this.authConfig.parseTenantFromRootDomain &&
+        this.authConfig.redirectUri.includes(TENANT_DOMAIN_PLACEHOLDER)
+      ) {
         throw new TypeError(
-          'The [redirectUri] cannot contain the "{tenant_domain}" token when the [parseTenantFromRootDomain] is absent.'
+          'The [redirectUri] cannot contain the "{tenant_domain}" placeholder when the [parseTenantFromRootDomain] is absent.'
         );
       }
     }
@@ -193,27 +199,27 @@ export class ConfigResolver {
     const parseTenantFromRootDomain =
       this.authConfig.parseTenantFromRootDomain || sdkConfiguration.loginUrlTenantDomainSuffix || '';
 
-    // Validate the tenant domain token logic with final resolved values
+    // Validate the tenant domain placeholder logic with final resolved values
     if (parseTenantFromRootDomain) {
-      if (!loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
+      if (!loginUrl.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new WristbandError(
-          'The resolved [loginUrl] must contain the "{tenant_domain}" token when using [parseTenantFromRootDomain].'
+          'The resolved [loginUrl] must contain the "{tenant_domain}" placeholder when using [parseTenantFromRootDomain].'
         );
       }
-      if (!redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
+      if (!redirectUri.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new WristbandError(
-          'The resolved [redirectUri] must contain the "{tenant_domain}" token when using [parseTenantFromRootDomain].'
+          'The resolved [redirectUri] must contain the "{tenant_domain}" placeholder when using [parseTenantFromRootDomain].'
         );
       }
     } else {
-      if (loginUrl.includes(TENANT_DOMAIN_TOKEN)) {
+      if (loginUrl.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new WristbandError(
-          'The resolved [loginUrl] cannot contain the "{tenant_domain}" token when [parseTenantFromRootDomain] is absent.'
+          'The resolved [loginUrl] cannot contain the "{tenant_domain}" placeholder when [parseTenantFromRootDomain] is absent.'
         );
       }
-      if (redirectUri.includes(TENANT_DOMAIN_TOKEN)) {
+      if (redirectUri.includes(TENANT_DOMAIN_PLACEHOLDER)) {
         throw new WristbandError(
-          'The resolved [redirectUri] cannot contain the "{tenant_domain}" token when [parseTenantFromRootDomain] is absent.'
+          'The resolved [redirectUri] cannot contain the "{tenant_domain}" placeholder when [parseTenantFromRootDomain] is absent.'
         );
       }
     }

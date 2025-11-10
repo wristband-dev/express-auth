@@ -1,8 +1,8 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import retry from 'async-retry';
 import { AxiosError } from 'axios';
 
-import { LOGIN_REQUIRED_ERROR, TENANT_DOMAIN_TOKEN } from './utils/constants';
+import { LOGIN_REQUIRED_ERROR, TENANT_DOMAIN_PLACEHOLDER } from './utils/constants';
 import {
   clearOldestLoginStateCookie,
   createLoginState,
@@ -13,7 +13,7 @@ import {
   getOAuthAuthorizeUrl,
   isExpired,
   resolveTenantCustomDomainParam,
-  resolveTenantDomainName,
+  resolveTenantName,
 } from './utils';
 import { WristbandService } from './wristband-service';
 import {
@@ -24,17 +24,30 @@ import {
   LoginConfig,
   LoginState,
   LogoutConfig,
+  RequireSessionAuthConfig,
   TokenData,
   TokenResponse,
-  Userinfo,
+  UserInfo,
 } from './types';
 import { InvalidGrantError, WristbandError } from './error';
 import { ConfigResolver } from './config-resolver';
 
+const DEFAULT_ENABLE_CSRF_PROTECTION = false;
+const DEFAULT_CSRF_HEADER_NAME = 'x-csrf-token';
+
+/**
+ * Core service class that handles Wristband authentication operations.
+ * Manages login flows, token exchanges, session validation, and logout functionality.
+ */
 export class AuthService {
   private wristbandService: WristbandService;
   private configResolver: ConfigResolver;
 
+  /**
+   * Creates an instance of AuthService.
+   *
+   * @param {AuthConfig} authConfig - Configuration for Wristband authentication.
+   */
   constructor(authConfig: AuthConfig) {
     this.configResolver = new ConfigResolver(authConfig);
     this.wristbandService = new WristbandService(
@@ -46,7 +59,10 @@ export class AuthService {
 
   /**
    * Force load all auto-configurable fields to cache them. This will trigger the API call
-   * and cache the results. Any validation errors will be thrown here (fail-fast)
+   * and cache the results. Any validation errors will be thrown here (fail-fast).
+   *
+   * @returns {Promise<void>} A Promise that resolves when configuration is preloaded.
+   * @throws {WristbandError} When autoConfigureEnabled is false or auto-configuration fails.
    */
   async preloadConfig(): Promise<void> {
     if (!this.configResolver.getAutoConfigureEnabled()) {
@@ -57,6 +73,14 @@ export class AuthService {
     await this.configResolver.preloadSdkConfig();
   }
 
+  /**
+   * Initiates a login request by constructing a redirect URL to Wristband's authorization endpoint.
+   *
+   * @param {Request} req - The Express request object.
+   * @param {Response} res - The Express response object.
+   * @param {LoginConfig} [config={}] - Optional configuration for the login flow.
+   * @returns {Promise<string>} A Promise containing the redirect URL to Wristband's Authorize Endpoint.
+   */
   async login(req: Request, res: Response, config: LoginConfig = {}): Promise<string> {
     res.header('Cache-Control', 'no-store');
     res.header('Pragma', 'no-cache');
@@ -74,12 +98,12 @@ export class AuthService {
 
     // Determine which domain-related values are present as it will be needed for the authorize URL.
     const tenantCustomDomain: string = resolveTenantCustomDomainParam(req);
-    const tenantDomainName: string = resolveTenantDomainName(req, parseTenantFromRootDomain);
+    const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
     const defaultTenantCustomDomain: string = config.defaultTenantCustomDomain || '';
-    const defaultTenantDomainName: string = config.defaultTenantDomainName || '';
+    const defaultTenantName: string = config.defaultTenantName || '';
 
     // In the event we cannot determine either a tenant custom domain or subdomain, send the user to app-level login.
-    if (!tenantCustomDomain && !tenantDomainName && !defaultTenantCustomDomain && !defaultTenantDomainName) {
+    if (!tenantCustomDomain && !tenantName && !defaultTenantCustomDomain && !defaultTenantName) {
       const apploginUrl = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
       return `${apploginUrl}?client_id=${clientId}`;
     }
@@ -104,12 +128,23 @@ export class AuthService {
       codeVerifier: loginState.codeVerifier,
       scopes,
       tenantCustomDomain,
-      tenantDomainName,
-      defaultTenantDomainName,
+      tenantName,
       defaultTenantCustomDomain,
+      defaultTenantName,
     });
   }
 
+  /**
+   * Handles the OAuth callback from Wristband, exchanging the authorization code for tokens
+   * and retrieving user information.
+   *
+   * @param {Request} req - The Express request object containing query parameters from Wristband.
+   * @param {Response} res - The Express response object.
+   * @returns {Promise<CallbackResult>} A Promise containing the callback result with token data and userinfo,
+   *   or a redirect URL if re-authentication is required.
+   * @throws {TypeError} When required query parameters are invalid or missing.
+   * @throws {WristbandError} When an error occurs during the OAuth flow.
+   */
   async callback(req: Request, res: Response): Promise<CallbackResult> {
     res.header('Cache-Control', 'no-store');
     res.header('Pragma', 'no-cache');
@@ -145,9 +180,9 @@ export class AuthService {
       throw new TypeError('Invalid query parameter [tenant_custom_domain] passed from Wristband during callback');
     }
 
-    // Resolve and validate the tenant domain name
-    const resolvedTenantDomainName: string = resolveTenantDomainName(req, parseTenantFromRootDomain);
-    if (!resolvedTenantDomainName) {
+    // Resolve and validate the tenant name
+    const resolvedTenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
+    if (!resolvedTenantName) {
       throw new WristbandError(
         parseTenantFromRootDomain ? 'missing_tenant_subdomain' : 'missing_tenant_domain',
         parseTenantFromRootDomain
@@ -158,8 +193,8 @@ export class AuthService {
 
     // Construct the tenant login URL in the event we have to redirect to the login endpoint
     let tenantLoginUrl: string = parseTenantFromRootDomain
-      ? loginUrl.replace(TENANT_DOMAIN_TOKEN, resolvedTenantDomainName)
-      : `${loginUrl}?tenant_domain=${resolvedTenantDomainName}`;
+      ? loginUrl.replace(TENANT_DOMAIN_PLACEHOLDER, resolvedTenantName)
+      : `${loginUrl}?tenant_domain=${resolvedTenantName}`;
     if (tenantCustomDomainParam) {
       tenantLoginUrl = `${tenantLoginUrl}${parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomainParam}`;
     }
@@ -197,7 +232,7 @@ export class AuthService {
       } = tokenResponse;
 
       // Fetch the userinfo for the user logging in.
-      const userinfo: Userinfo = await this.wristbandService.getUserinfo(accessToken);
+      const userinfo: UserInfo = await this.wristbandService.getUserInfo(accessToken);
 
       const resolvedExpiresIn = expiresIn - (tokenExpirationBuffer || 0);
       const resolvedExpiresAt = Date.now() + resolvedExpiresIn * 1000;
@@ -211,7 +246,7 @@ export class AuthService {
         ...(!!refreshToken && { refreshToken }),
         ...(!!returnUrl && { returnUrl }),
         ...(!!tenantCustomDomainParam && { tenantCustomDomain: tenantCustomDomainParam }),
-        tenantDomainName: resolvedTenantDomainName,
+        tenantName: resolvedTenantName,
         userinfo,
       };
       return { type: CallbackResultType.COMPLETED, callbackData };
@@ -223,6 +258,16 @@ export class AuthService {
     }
   }
 
+  /**
+   * Initiates logout by revoking the refresh token and constructing a redirect URL
+   * to Wristband's logout endpoint.
+   *
+   * @param {Request} req - The Express request object.
+   * @param {Response} res - The Express response object.
+   * @param {LogoutConfig} [config={ tenantCustomDomain: '' }] - Optional configuration for logout.
+   * @returns {Promise<string>} A Promise containing the redirect URL to Wristband's Logout Endpoint.
+   * @throws {TypeError} When query parameters are invalid or state exceeds 512 characters.
+   */
   async logout(req: Request, res: Response, config: LogoutConfig = { tenantCustomDomain: '' }): Promise<string> {
     res.header('Cache-Control', 'no-store');
     res.header('Pragma', 'no-cache');
@@ -266,15 +311,15 @@ export class AuthService {
 
     // Domain priority order resolution:
     // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
-    // 2) If the LogoutConfig has a tenant domain defined, then use that.
+    // 2) If the LogoutConfig has a tenant name defined, then use that.
     // 3) If the tenant_custom_domain query param exists, then use that.
-    // 4a) If tenant subdomains are enabled, get the tenant domain from the host.
+    // 4a) If tenant subdomains are enabled, get the tenant name from the host.
     // 4b) Otherwise, if tenant subdomains are not enabled, then look for it in the tenant_domain query param.
     let tenantDomainToUse = '';
     if (config.tenantCustomDomain) {
       tenantDomainToUse = config.tenantCustomDomain;
-    } else if (config.tenantDomainName) {
-      tenantDomainToUse = `${config.tenantDomainName}${separator}${wristbandApplicationVanityDomain}`;
+    } else if (config.tenantName) {
+      tenantDomainToUse = `${config.tenantName}${separator}${wristbandApplicationVanityDomain}`;
     } else if (tenantCustomDomainParam) {
       tenantDomainToUse = tenantCustomDomainParam;
     } else if (
@@ -282,8 +327,8 @@ export class AuthService {
       host &&
       host!.substring(host!.indexOf('.') + 1) === parseTenantFromRootDomain
     ) {
-      const tenantDomainNameFromHost = host!.substring(0, host!.indexOf('.'));
-      tenantDomainToUse = `${tenantDomainNameFromHost}${separator}${wristbandApplicationVanityDomain}`;
+      const tenantNameFromHost = host!.substring(0, host!.indexOf('.'));
+      tenantDomainToUse = `${tenantNameFromHost}${separator}${wristbandApplicationVanityDomain}`;
     } else if (tenantDomainParam) {
       tenantDomainToUse = `${tenantDomainParam}${separator}${wristbandApplicationVanityDomain}`;
     } else {
@@ -295,6 +340,16 @@ export class AuthService {
     return `https://${tenantDomainToUse}/api/v1/logout?${query}`;
   }
 
+  /**
+   * Checks if the access token is expired and refreshes it if necessary.
+   * Implements retry logic for transient failures.
+   *
+   * @param {string} refreshToken - The refresh token to use for obtaining a new access token.
+   * @param {number} expiresAt - Unix timestamp in milliseconds when the current token expires.
+   * @returns {Promise<TokenData | null>} A Promise with new token data if refresh occurred, or null if token is still valid.
+   * @throws {TypeError} When refreshToken is invalid or expiresAt is not a positive integer.
+   * @throws {WristbandError} When token refresh fails due to invalid credentials or unexpected errors.
+   */
   async refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null> {
     // Fetch our SDK configs
     const tokenExpirationBuffer = this.configResolver.getTokenExpirationBuffer();
@@ -368,5 +423,77 @@ export class AuthService {
 
     // This is merely a safety check, but this should never happen.
     throw new WristbandError('unexpected_error', 'Unexpected Error');
+  }
+
+  /**
+   * Create middleware that ensures authenticated session and optionally validates CSRF tokens.
+   * Automatically refreshes access token, if expired, using the refresh token.
+   *
+   * NOTE: Token refresh only occurs when both `refreshToken` and `expiresAt` are present in the session.
+   *
+   * @param {RequireSessionAuthConfig} [config] - Optional configuration for the session auth middleware.
+   * @returns {Function} Express middleware function that validates session authentication.
+   *
+   * @example
+   * ```typescript
+   * // Basic usage - no CSRF protection
+   * app.use('/api/protected', authService.createRequireSessionAuth());
+   *
+   * // With CSRF protection enabled
+   * app.use('/api/protected', authService.createRequireSessionAuth({
+   *   enableCsrfProtection: true,
+   *   csrfTokenHeaderName: 'custom-csrf-name'
+   * }));
+   * ```
+   */
+  createRequireSessionAuth(
+    config?: RequireSessionAuthConfig
+  ): (req: Request, res: Response, next: NextFunction) => Promise<void> {
+    const enableCsrfProtection = config?.enableCsrfProtection ?? DEFAULT_ENABLE_CSRF_PROTECTION;
+    const csrfTokenHeaderName = config?.csrfTokenHeaderName ?? DEFAULT_CSRF_HEADER_NAME;
+
+    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      // Check if session middleware is configured
+      if (!req.session || typeof req.session.save !== 'function') {
+        const error = new WristbandError(
+          'SESSION_NOT_CONFIGURED',
+          'Ensure you have added the Wristband session middleware before this auth middleware.'
+        );
+        next(error);
+        return;
+      }
+
+      const { csrfToken, expiresAt, isAuthenticated, refreshToken } = req.session;
+
+      // Check if user has an authenticated session
+      if (!isAuthenticated) {
+        res.status(401).send();
+        return;
+      }
+
+      // Validate CSRF token if protection is enabled
+      if (enableCsrfProtection && (!csrfToken || csrfToken !== req.headers[csrfTokenHeaderName])) {
+        res.status(403).send();
+        return;
+      }
+
+      try {
+        // Only attempt a token refresh if they actually have a refresh token in the session.
+        if (refreshToken && expiresAt !== undefined) {
+          const tokenData = await this.refreshTokenIfExpired(refreshToken, expiresAt);
+          if (tokenData) {
+            req.session.accessToken = tokenData.accessToken;
+            req.session.expiresAt = tokenData.expiresAt;
+            req.session.refreshToken = tokenData.refreshToken;
+          }
+        }
+
+        // "Touch" the session for rolling session expiration.
+        await req.session.save();
+        next();
+      } catch (error) {
+        res.status(401).send();
+      }
+    };
   }
 }

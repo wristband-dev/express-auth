@@ -2,7 +2,7 @@
 
 import nock from 'nock';
 import { WristbandService } from '../../src/wristband-service';
-import { TokenResponse, SdkConfiguration, Userinfo } from '../../src/types';
+import { TokenResponse, SdkConfiguration, WristbandUserinfoResponse, UserInfo } from '../../src/types';
 
 const DOMAIN = 'your-wristband-domain';
 const CLIENT_ID = 'test-client-id';
@@ -152,41 +152,60 @@ describe('WristbandService - Basic Functionality', () => {
   });
 
   describe('User Information', () => {
-    test('getUserinfo with valid token returns userinfo', async () => {
+    test('getUserInfo with valid token returns userinfo', async () => {
       const accessToken = 'valid-access-token';
-      const userInfoData: Userinfo = {
+      const userInfoResponse: WristbandUserinfoResponse = {
         sub: 'user123',
+        app_id: 'devApp',
+        tnt_id: 'tenantA',
+        idp_name: 'wristband',
         email: 'test@example.com',
         email_verified: true,
         name: 'Test User',
       };
-
-      const scope = nock(`https://${DOMAIN}`).get('/api/v1/oauth2/userinfo').reply(200, userInfoData);
-
-      const result = await wristbandService.getUserinfo(accessToken);
-
-      expect(result).toEqual(userInfoData);
+      const userinfo: UserInfo = {
+        userId: 'user123',
+        applicationId: 'devApp',
+        tenantId: 'tenantA',
+        identityProviderName: 'wristband',
+        email: 'test@example.com',
+        emailVerified: true,
+        fullName: 'Test User',
+      };
+      const scope = nock(`https://${DOMAIN}`).get('/api/v1/oauth2/userinfo').reply(200, userInfoResponse);
+      const result = await wristbandService.getUserInfo(accessToken);
+      expect(result).toEqual(userinfo);
       scope.done();
     });
 
-    test('getUserinfo sends correct authorization header', async () => {
+    test('getUserInfo sends correct authorization header', async () => {
       const accessToken = 'test-access-token';
-      const userInfoData: Userinfo = {
+      const userInfoResponse: WristbandUserinfoResponse = {
         sub: 'user123',
+        app_id: 'devApp',
+        tnt_id: 'tenantA',
+        idp_name: 'wristband',
         email: 'test@example.com',
         email_verified: true,
         name: 'Test User',
       };
-
+      const userinfo: UserInfo = {
+        userId: 'user123',
+        applicationId: 'devApp',
+        tenantId: 'tenantA',
+        identityProviderName: 'wristband',
+        email: 'test@example.com',
+        emailVerified: true,
+        fullName: 'Test User',
+      };
       const scope = nock(`https://${DOMAIN}`)
         .get('/api/v1/oauth2/userinfo')
         .matchHeader('Authorization', `Bearer ${accessToken}`)
         .matchHeader('Content-Type', /^application\/json/)
         .matchHeader('Accept', /^application\/json/)
-        .reply(200, userInfoData);
-
-      const result = await wristbandService.getUserinfo(accessToken);
-      expect(result).toEqual(userInfoData);
+        .reply(200, userInfoResponse);
+      const result = await wristbandService.getUserInfo(accessToken);
+      expect(result).toEqual(userinfo);
       scope.done();
     });
   });

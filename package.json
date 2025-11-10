@@ -1,8 +1,8 @@
 {
   "name": "@wristband/express-auth",
-  "description": "SDK for integrating your ExpressJS application with Wristband. Handles user authentication and token management.",
+  "description": "SDK for integrating your ExpressJS application with Wristband. Handles user authentication, session management, and token management.",
   "author": "Wristband",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "license": "MIT",
   "private": false,
   "homepage": "https://wristband.dev",
@@ -14,18 +14,31 @@
     "email": "support@wristband.dev"
   },
   "engines": {
-    "node": ">=18.12.1",
-    "npm": ">=8.19.2"
+    "node": ">=20.0.0",
+    "npm": ">=9.6.0"
   },
   "source": "./src/index.ts",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
-  "types": "./dist/types/index.d.js",
+  "types": "./dist/types/index.d.ts",
   "exports": {
-    "require": "./dist/cjs/index.js",
-    "types": "./dist/types/index.d.ts",
-    "default": "./dist/esm/index.js",
-    "import": "./dist/esm/index.js"
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/cjs/index.js",
+      "import": "./dist/esm/index.js",
+      "default": "./dist/esm/index.js"
+    },
+    "./session": {
+      "types": "./dist/types/session.d.ts",
+      "require": "./dist/cjs/session.js",
+      "import": "./dist/esm/session.js",
+      "default": "./dist/esm/session.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "session": ["./dist/types/session.d.ts"]
+    }
   },
   "files": [
     "dist",
@@ -65,7 +78,7 @@
     "postinstall": "husky install",
     "postpublish": "pinst --enable",
     "test": "jest --no-cache --runInBand",
-    "test:cov": "jest --coverage --no-cache --runInBand"
+    "test:coverage": "jest --coverage --no-cache --runInBand"
   },
   "peerDependencies": {
     "express": ">=4.0.0"
@@ -96,8 +109,9 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@wristband/typescript-session": "^0.1.0",
     "async-retry": "^1.3.3",
-    "axios": "^1.8.4",
+    "axios": "^1.13.1",
     "iron-webcrypto": "^1.2.1",
     "uncrypto": "^0.1.3"
   }

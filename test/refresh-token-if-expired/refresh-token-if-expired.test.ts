@@ -60,18 +60,12 @@ describe('Refresh Token If Expired', () => {
   });
 
   test('Token is expired, but refresh token is invalid', async () => {
-    // Arrange
-    const errorResponse = {
-      error: 'invalid_grant',
-      error_description: 'The refresh token is invalid or has expired',
-    };
-
+    const errorResponse = { error: 'invalid_grant', error_description: 'The refresh token is invalid or has expired' };
     const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
       .persist()
       .post('/api/v1/oauth2/token', 'grant_type=refresh_token&refresh_token=invalidToken')
       .reply(400, errorResponse);
 
-    // Act & Assert
     try {
       await wristbandAuth.refreshTokenIfExpired('invalidToken', Date.now().valueOf() - 1000);
       fail('Expected an error to be thrown');
