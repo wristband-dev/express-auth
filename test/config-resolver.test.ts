@@ -594,7 +594,7 @@ describe('ConfigResolver', () => {
       await resolver.getLoginUrl();
       const endTime = Date.now();
 
-      // Account for time drift in CI/CD env
+      // Account for time drift in CI/CD env (normally take 200ms)
       expect(endTime - startTime).toBeGreaterThanOrEqual(101);
     });
 

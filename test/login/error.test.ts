@@ -1,5 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
-
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
@@ -35,7 +33,7 @@ describe('Login Errors', () => {
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
-      expect.fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('More than one [tenant_domain] query parameter was encountered');
@@ -50,7 +48,7 @@ describe('Login Errors', () => {
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
-      expect.fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('More than one [tenant_custom_domain] query parameter was encountered');
@@ -65,7 +63,7 @@ describe('Login Errors', () => {
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('More than one [return_url] query parameter was encountered');
@@ -80,7 +78,7 @@ describe('Login Errors', () => {
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('More than one [login_hint] query parameter was encountered');
@@ -99,7 +97,7 @@ describe('Login Errors', () => {
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, { customState }));
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe(

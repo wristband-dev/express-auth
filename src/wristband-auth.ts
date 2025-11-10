@@ -1,7 +1,7 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 
 import { AuthService } from './auth-service';
-import { AuthConfig, CallbackResult, LoginConfig, LogoutConfig, TokenData } from './types';
+import { AuthConfig, CallbackResult, LoginConfig, LogoutConfig, RequireSessionAuthConfig, TokenData } from './types';
 
 /**
  * WristbandAuth is a utility interface providing methods for seamless interaction with Wristband for authenticating
@@ -80,6 +80,38 @@ export interface WristbandAuth {
    * @throws {Error} If an error occurs during the token refresh process.
    */
   refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null>;
+
+  /**
+   * Create middleware that ensures authenticated session and optionally validates CSRF tokens.
+   * Automatically refreshes access token, if expired, using the refresh token.
+   *
+   * NOTE: Token refresh only occurs when both `refreshToken` and `expiresAt` are present in the session.
+   *
+   * @param config - Optional configuration for the session auth middleware
+   * @param config.enableCsrfProtection - Enable CSRF protection for API requests.
+   *         Default: false (relies on sameSite cookie protection)
+   * @param config.csrfTokenHeaderName - CSRF token header name. Default: 'x-csrf-token'
+   * @returns Express middleware function that validates session authentication
+   * @throws {401} If user is not authenticated or token refresh fails
+   * @throws {403} If CSRF token is missing or invalid (when CSRF protection is enabled)
+   *
+   * @example
+   * ```typescript
+   * // Basic usage - no CSRF protection
+   * const requireWristbandAuth = wristbandAuth.createRequireSessionAuth();
+   * app.use('/api/protected', requireWristbandAuth);
+   *
+   * // With CSRF protection enabled
+   * const requireWristbandAuth = wristbandAuth.createRequireSessionAuth({
+   *   enableCsrfProtection: true,
+   *   csrfTokenHeaderName: 'custom-csrf-name'
+   * });
+   * app.use('/api/protected', requireWristbandAuth);
+   * ```
+   */
+  createRequireSessionAuth(
+    config?: RequireSessionAuthConfig
+  ): (req: Request, res: Response, next: NextFunction) => Promise<void>;
 }
 
 /**
@@ -98,29 +130,92 @@ export class WristbandAuthImpl implements WristbandAuth {
     this.authService = new AuthService(authConfig);
   }
 
+  /**
+   * Internal method to eagerly fetch and cache all auto-configurable values from the
+   * Wristband SDK Configuration Endpoint. This triggers the API call and caches results,
+   * allowing any validation errors to be thrown early (fail-fast).
+   *
+   * @private
+   * @returns {Promise<void>} A Promise that resolves when configuration is preloaded.
+   * @throws {WristbandError} When auto-configuration endpoint is unreachable or returns invalid data.
+   * @throws {TypeError} When required configuration values cannot be resolved.
+   */
   private async discover(): Promise<void> {
     await this.authService.preloadConfig();
   }
 
+  /**
+   * Static factory method to create a WristbandAuth instance with eager auto-configuration.
+   *
+   * This method immediately fetches and resolves all auto-configuration values from the
+   * Wristband SDK Configuration Endpoint during initialization. Unlike the standard constructor,
+   * this ensures all configuration is loaded and validated upfront, allowing the application to
+   * fail fast if auto-configuration is unavailable.
+   *
+   * @static
+   * @param {AuthConfig} authConfig - Configuration for Wristband authentication. Required fields:
+   *   clientId, clientSecret, wristbandApplicationVanityDomain.
+   * @returns {Promise<WristbandAuthImpl>} A Promise that resolves to an instance of WristbandAuthImpl
+   *   with all configuration values already resolved and validated.
+   * @throws {WristbandError} When auto-configuration endpoint is unreachable or returns invalid data.
+   * @throws {TypeError} When required configuration values cannot be resolved.
+   *
+   * @example
+   * ```typescript
+   * // Create with eager auto-configuration
+   * const wristbandAuth = await WristbandAuthImpl.createWithDiscovery({
+   *   clientId: "your-client-id",
+   *   clientSecret: "your-secret",
+   *   wristbandApplicationVanityDomain: "auth.yourapp.io"
+   * });
+   * // All configuration is now resolved and ready to use
+   * ```
+   */
   static async createWithDiscovery(authConfig: AuthConfig): Promise<WristbandAuthImpl> {
     const auth = new WristbandAuthImpl(authConfig);
     await auth.discover();
     return auth;
   }
 
+  /**
+   * @inheritdoc
+   * @see {@link WristbandAuth.login}
+   */
   login(req: Request, res: Response, config?: LoginConfig): Promise<string> {
     return this.authService.login(req, res, config);
   }
 
+  /**
+   * @inheritdoc
+   * @see {@link WristbandAuth.callback}
+   */
   callback(req: Request, res: Response): Promise<CallbackResult> {
     return this.authService.callback(req, res);
   }
 
+  /**
+   * @inheritdoc
+   * @see {@link WristbandAuth.logout}
+   */
   logout(req: Request, res: Response, config?: LogoutConfig): Promise<string> {
     return this.authService.logout(req, res, config);
   }
 
+  /**
+   * @inheritdoc
+   * @see {@link WristbandAuth.refreshTokenIfExpired}
+   */
   refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null> {
     return this.authService.refreshTokenIfExpired(refreshToken, expiresAt);
+  }
+
+  /**
+   * @inheritdoc
+   * @see {@link WristbandAuth.createRequireSessionAuth}
+   */
+  createRequireSessionAuth(
+    config?: RequireSessionAuthConfig
+  ): (req: Request, res: Response, next: NextFunction) => Promise<void> {
+    return this.authService.createRequireSessionAuth(config);
   }
 }

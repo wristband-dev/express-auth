@@ -1,6 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
-/* eslint-disable no-underscore-dangle */
-
 import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 
@@ -46,7 +43,7 @@ describe('Logout Errors', () => {
       mockExpressRes.redirect(
         await wristbandAuth.logout(mockExpressReq, mockExpressRes, { refreshToken: 'refreshToken' })
       );
-      expect.fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('More than one [tenant_domain] query parameter was encountered during logout');
@@ -63,7 +60,7 @@ describe('Logout Errors', () => {
       mockExpressRes.redirect(
         await wristbandAuth.logout(mockExpressReq, mockExpressRes, { refreshToken: 'refreshToken' })
       );
-      expect.fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('More than one [tenant_custom_domain] query parameter was encountered during logout');

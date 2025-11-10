@@ -23,6 +23,7 @@ export function base64URLEncode(str: string): string {
 }
 
 export async function encryptLoginState(loginState: LoginState, loginStateSecret: string): Promise<string> {
+  // @ts-ignore
   const encryptedLoginState: string = await seal(crypto, loginState, loginStateSecret, defaults);
 
   if (encryptedLoginState.length > 4096) {
@@ -35,6 +36,7 @@ export async function encryptLoginState(loginState: LoginState, loginStateSecret
 }
 
 export async function decryptLoginState(loginStateCookie: string, loginStateSecret: string): Promise<LoginState> {
+  // @ts-ignore
   const loginState: unknown = await unseal(crypto, loginStateCookie, loginStateSecret, defaults);
   return loginState as LoginState;
 }
@@ -65,7 +67,7 @@ export function getAndClearLoginStateCookie(
   return loginStateCookie;
 }
 
-export function resolveTenantDomainName(req: Request, parseTenantFromRootDomain: string): string {
+export function resolveTenantName(req: Request, parseTenantFromRootDomain: string): string {
   if (parseTenantFromRootDomain) {
     return parseTenantSubdomain(req, parseTenantFromRootDomain) || '';
   }
@@ -158,12 +160,12 @@ export function getOAuthAuthorizeUrl(
     clientId: string;
     codeVerifier: string;
     defaultTenantCustomDomain?: string;
-    defaultTenantDomainName?: string;
+    defaultTenantName?: string;
     redirectUri: string;
     scopes: string[];
     state: string;
     tenantCustomDomain?: string;
-    tenantDomainName?: string;
+    tenantName?: string;
     isApplicationCustomDomainActive?: boolean;
     wristbandApplicationVanityDomain: string;
   }
@@ -193,17 +195,17 @@ export function getOAuthAuthorizeUrl(
   // 2a) tenant subdomain
   // 2b) tenant_domain query param
   // 3)  defaultTenantCustomDomain login config
-  // 4)  defaultTenantDomainName login config
+  // 4)  defaultTenantName login config
   if (config.tenantCustomDomain) {
     return `https://${config.tenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
   }
-  if (config.tenantDomainName) {
-    return `https://${config.tenantDomainName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+  if (config.tenantName) {
+    return `https://${config.tenantName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
   }
   if (config.defaultTenantCustomDomain) {
     return `https://${config.defaultTenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
   }
-  return `https://${config.defaultTenantDomainName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+  return `https://${config.defaultTenantName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
 }
 
 export function isExpired(expiresAt: number): boolean {

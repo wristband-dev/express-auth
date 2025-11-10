@@ -49,7 +49,7 @@ describe('Multi Tenant Logout', () => {
 
       mockExpressRes.redirect(
         await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-          tenantDomainName: 'devs4you',
+          tenantName: 'devs4you',
           refreshToken: 'refreshToken',
           redirectUrl: 'https://google.com',
         })
@@ -190,7 +190,7 @@ describe('Multi Tenant Logout', () => {
       scope.done();
     });
 
-    test('Custom Domains with Tenant Custom Domain, without subdomains, no tenantDomainName config', async () => {
+    test('Custom Domains with Tenant Custom Domain, without subdomains, no tenantName config', async () => {
       parseTenantFromRootDomain = 'business.invotastic.com';
       wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
@@ -247,7 +247,7 @@ describe('Multi Tenant Logout', () => {
       scope.done();
     });
 
-    test('Custom Domains with Tenant Custom Domain, without subdomains, with tenantDomainName config', async () => {
+    test('Custom Domains with Tenant Custom Domain, without subdomains, with tenantName config', async () => {
       parseTenantFromRootDomain = 'business.invotastic.com';
       wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
@@ -277,7 +277,7 @@ describe('Multi Tenant Logout', () => {
       mockExpressRes.redirect(
         await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
           tenantCustomDomain: 'tenant.custom.com',
-          tenantDomainName: 'global',
+          tenantName: 'global',
           refreshToken: 'refreshToken',
         })
       );
@@ -305,7 +305,7 @@ describe('Multi Tenant Logout', () => {
       scope.done();
     });
 
-    test('Custom Domains with Tenant Custom Domain, with subdomains, no tenantDomainName config', async () => {
+    test('Custom Domains with Tenant Custom Domain, with subdomains, no tenantName config', async () => {
       parseTenantFromRootDomain = 'business.invotastic.com';
       wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
@@ -363,7 +363,7 @@ describe('Multi Tenant Logout', () => {
       scope.done();
     });
 
-    test('Custom Domains with Tenant Custom Domain, with subdomains, with tenantDomainName config', async () => {
+    test('Custom Domains with Tenant Custom Domain, with subdomains, with tenantName config', async () => {
       parseTenantFromRootDomain = 'business.invotastic.com';
       wristbandApplicationVanityDomain = 'auth.invotastic.com';
       loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
@@ -394,7 +394,7 @@ describe('Multi Tenant Logout', () => {
       mockExpressRes.redirect(
         await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
           tenantCustomDomain: 'tenant.custom.com',
-          tenantDomainName: 'global',
+          tenantName: 'global',
           refreshToken: 'refreshToken',
         })
       );
@@ -560,10 +560,7 @@ describe('Multi Tenant Logout', () => {
           headers: { host: parseTenantFromRootDomain },
         });
         const mockExpressRes = httpMocks.createResponse();
-
-        mockExpressRes.redirect(
-          await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you' })
-        );
+        mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'devs4you' }));
 
         // Validate Redirect response
         const { statusCode } = mockExpressRes;
@@ -610,7 +607,7 @@ describe('Multi Tenant Logout', () => {
         mockExpressRes.redirect(
           await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
             refreshToken: 'refreshToken',
-            tenantDomainName: 'devs4you',
+            tenantName: 'devs4you',
           })
         );
 
@@ -639,7 +636,7 @@ describe('Multi Tenant Logout', () => {
   });
 
   describe('Redirect to Application-level Login/Tenant Discovery', () => {
-    test('Unresolved tenantDomainName logout config', async () => {
+    test('Unresolved tenantName logout config', async () => {
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
         clientSecret: CLIENT_SECRET,
@@ -655,7 +652,7 @@ describe('Multi Tenant Logout', () => {
       });
       const mockExpressRes = httpMocks.createResponse();
 
-      // tenantDomainName logout config is missing, which should redirect to app-level login.
+      // tenantName logout config is missing, which should redirect to app-level login.
       mockExpressRes.redirect(await wristbandAuth.logout(mockExpressReq, mockExpressRes));
 
       // Validate Redirect response
@@ -798,7 +795,7 @@ describe('Multi Tenant Logout', () => {
 
       mockExpressRes.redirect(
         await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-          tenantDomainName: 'devs4you',
+          tenantName: 'devs4you',
           state: 'custom-logout-state-123',
         })
       );
@@ -830,7 +827,7 @@ describe('Multi Tenant Logout', () => {
 
       mockExpressRes.redirect(
         await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
-          tenantDomainName: 'devs4you',
+          tenantName: 'devs4you',
           state: 'logout-state-with-redirect',
           redirectUrl: 'https://example.com/logged-out',
         })
@@ -863,7 +860,7 @@ describe('Multi Tenant Logout', () => {
       const mockExpressRes = httpMocks.createResponse();
 
       mockExpressRes.redirect(
-        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you', state: '' })
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'devs4you', state: '' })
       );
 
       const location: string = mockExpressRes._getRedirectUrl();
@@ -894,7 +891,7 @@ describe('Multi Tenant Logout', () => {
       const mockExpressRes = httpMocks.createResponse();
 
       mockExpressRes.redirect(
-        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you', state: maxState })
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'devs4you', state: maxState })
       );
 
       const location: string = mockExpressRes._getRedirectUrl();
@@ -923,7 +920,7 @@ describe('Multi Tenant Logout', () => {
       const mockExpressRes = httpMocks.createResponse();
 
       await expect(
-        wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantDomainName: 'devs4you', state: 'a'.repeat(513) })
+        wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'devs4you', state: 'a'.repeat(513) })
       ).rejects.toThrow('The [state] logout config cannot exceed 512 characters.');
     });
 

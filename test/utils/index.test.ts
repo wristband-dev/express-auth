@@ -8,8 +8,8 @@ import {
   encryptLoginState,
   decryptLoginState,
   getAndClearLoginStateCookie,
-  resolveTenantDomainName,
   resolveTenantCustomDomainParam,
+  resolveTenantName,
   createLoginState,
   clearOldestLoginStateCookie,
   createLoginStateCookie,
@@ -252,13 +252,13 @@ describe('Auth Utils', () => {
     });
   });
 
-  describe('resolveTenantDomainName', () => {
+  describe('resolveTenantName', () => {
     test('Returns subdomain when parseTenantFromRootDomain is provided', () => {
       const req = httpMocks.createRequest({
         headers: { host: 'tenant.business.example.com' },
       });
 
-      const result = resolveTenantDomainName(req, 'business.example.com');
+      const result = resolveTenantName(req, 'business.example.com');
 
       expect(result).toBe('tenant');
     });
@@ -268,7 +268,7 @@ describe('Auth Utils', () => {
         query: { tenant_domain: 'test-tenant' },
       });
 
-      const result = resolveTenantDomainName(req, '');
+      const result = resolveTenantName(req, '');
 
       expect(result).toBe('test-tenant');
     });
@@ -278,7 +278,7 @@ describe('Auth Utils', () => {
         headers: { host: 'different.domain.com' },
       });
 
-      const result = resolveTenantDomainName(req, 'business.example.com');
+      const result = resolveTenantName(req, 'business.example.com');
 
       expect(result).toBe('');
     });
@@ -289,7 +289,7 @@ describe('Auth Utils', () => {
       });
 
       expect(() => {
-        return resolveTenantDomainName(req, '');
+        return resolveTenantName(req, '');
       }).toThrow('More than one [tenant_domain] query parameter was encountered');
     });
 
@@ -298,7 +298,7 @@ describe('Auth Utils', () => {
         query: {},
       });
 
-      const result = resolveTenantDomainName(req, '');
+      const result = resolveTenantName(req, '');
 
       expect(result).toBe('');
     });
@@ -605,12 +605,12 @@ describe('Auth Utils', () => {
       expect(result).toContain('scope=openid+offline_access+email');
     });
 
-    test('Creates authorize URL with tenant domain name (hyphen separator)', () => {
+    test('Creates authorize URL with tenant name (hyphen separator)', () => {
       const req = httpMocks.createRequest();
 
       const config = {
         ...baseConfig,
-        tenantDomainName: 'tenant',
+        tenantName: 'tenant',
         isApplicationCustomDomainActive: false,
       };
 
@@ -619,12 +619,12 @@ describe('Auth Utils', () => {
       expect(result).toContain(`https://tenant-${baseConfig.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
     });
 
-    test('Creates authorize URL with tenant domain name (dot separator)', () => {
+    test('Creates authorize URL with tenant name (dot separator)', () => {
       const req = httpMocks.createRequest();
 
       const config = {
         ...baseConfig,
-        tenantDomainName: 'tenant',
+        tenantName: 'tenant',
         isApplicationCustomDomainActive: true,
       };
 
@@ -646,12 +646,12 @@ describe('Auth Utils', () => {
       expect(result).toContain('https://default.custom.com/api/v1/oauth2/authorize');
     });
 
-    test('Creates authorize URL with default tenant domain name', () => {
+    test('Creates authorize URL with default tenant name', () => {
       const req = httpMocks.createRequest();
 
       const config = {
         ...baseConfig,
-        defaultTenantDomainName: 'default-tenant',
+        defaultTenantName: 'default-tenant',
         isApplicationCustomDomainActive: false,
       };
 
@@ -714,28 +714,25 @@ describe('Auth Utils', () => {
 
     test('Domain priority: tenant custom domain takes precedence', () => {
       const req = httpMocks.createRequest();
-
       const config = {
         ...baseConfig,
         tenantCustomDomain: 'priority.custom.com',
-        tenantDomainName: 'tenant',
+        tenantName: 'tenant',
         defaultTenantCustomDomain: 'default.custom.com',
-        defaultTenantDomainName: 'default-tenant',
+        defaultTenantName: 'default-tenant',
       };
-
       const result = getOAuthAuthorizeUrl(req, config);
-
       expect(result).toContain('https://priority.custom.com/api/v1/oauth2/authorize');
     });
 
-    test('Domain priority: tenant domain name takes precedence over defaults', () => {
+    test('Domain priority: tenant name takes precedence over defaults', () => {
       const req = httpMocks.createRequest();
 
       const config = {
         ...baseConfig,
-        tenantDomainName: 'tenant',
+        tenantName: 'tenant',
         defaultTenantCustomDomain: 'default.custom.com',
-        defaultTenantDomainName: 'default-tenant',
+        defaultTenantName: 'default-tenant',
         isApplicationCustomDomainActive: false,
       };
 

@@ -1,6 +1,3 @@
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable import/no-extraneous-dependencies */
-
 import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 
@@ -42,7 +39,7 @@ describe('Callback Errors', () => {
     // Missing state query parameter should throw an error
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('Invalid query parameter [state] passed from Wristband during callback');
@@ -56,7 +53,7 @@ describe('Callback Errors', () => {
     // Multiple state query parameters should throw an error
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('Invalid query parameter [state] passed from Wristband during callback');
@@ -84,7 +81,7 @@ describe('Callback Errors', () => {
     // Missing code query parameter should throw an error for happy path scenarios.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('Invalid query parameter [code] passed from Wristband during callback');
@@ -100,7 +97,7 @@ describe('Callback Errors', () => {
     // Multiple code query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('Invalid query parameter [code] passed from Wristband during callback');
@@ -120,7 +117,7 @@ describe('Callback Errors', () => {
     // Multiple error query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('Invalid query parameter [error] passed from Wristband during callback');
@@ -140,7 +137,7 @@ describe('Callback Errors', () => {
     // Multiple error_description query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('Invalid query parameter [error_description] passed from Wristband during callback');
@@ -160,7 +157,7 @@ describe('Callback Errors', () => {
     // Multiple tenant_domain query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('More than one [tenant_domain] query parameter was encountered');
@@ -180,7 +177,7 @@ describe('Callback Errors', () => {
     // Multiple error query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe(
@@ -210,7 +207,7 @@ describe('Callback Errors', () => {
     // Only some errors are handled automatically by the SDK. All others will throw a WristbandError.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof WristbandError).toBe(true);
       expect(error.getError()).toBe('BAD');
@@ -241,7 +238,7 @@ describe('Callback Errors', () => {
 
       try {
         await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-        expect('').fail('Error expected to be thrown.');
+        fail('Error expected to be thrown.');
       } catch (error: any) {
         expect(error instanceof WristbandError).toBe(true);
         expect(error.getError()).toBe('missing_tenant_domain');
@@ -276,7 +273,7 @@ describe('Callback Errors', () => {
 
       try {
         await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-        expect('').fail('Error expected to be thrown.');
+        fail('Error expected to be thrown.');
       } catch (error: any) {
         expect(error instanceof WristbandError).toBe(true);
         expect(error.getError()).toBe('missing_tenant_subdomain');

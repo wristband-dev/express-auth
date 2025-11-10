@@ -1,5 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
-
 import nock from 'nock';
 
 import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src/index';
@@ -29,7 +27,7 @@ describe('Refresh Token Errors', () => {
   test('Invalid refreshToken', async () => {
     try {
       await wristbandAuth.refreshTokenIfExpired('', 1000);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('Refresh token must be a valid string');
@@ -39,7 +37,7 @@ describe('Refresh Token Errors', () => {
   test('Invalid expiresAt', async () => {
     try {
       await wristbandAuth.refreshTokenIfExpired('refreshToken', -1000);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
       expect(error.message).toBe('The expiresAt field must be an integer greater than 0');
@@ -58,7 +56,7 @@ describe('Refresh Token Errors', () => {
 
     try {
       await wristbandAuth.refreshTokenIfExpired('refreshToken', Date.now().valueOf() - 1000);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof WristbandError).toBe(true);
       expect(error.error).toBe('invalid_grant');
@@ -76,7 +74,7 @@ describe('Refresh Token Errors', () => {
 
     try {
       await wristbandAuth.refreshTokenIfExpired('refreshToken', Date.now().valueOf() - 1000);
-      expect('').fail('Error expected to be thrown.');
+      fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof WristbandError).toBe(true);
       expect(error.error).toBe('unexpected_error');
