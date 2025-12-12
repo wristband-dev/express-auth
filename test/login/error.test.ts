@@ -25,26 +25,26 @@ describe('Login Errors', () => {
     });
   });
 
-  test('Multiple tenant_domain params', async () => {
+  test('Multiple tenant_name params', async () => {
     const mockExpressReq = httpMocks.createRequest({
-      query: { tenant_domain: ['tenant1', 'tenant2'] },
-    });
-    const mockExpressRes = httpMocks.createResponse();
+      query: { tenant_name: ['tenant1', 'tenant2'] },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
       fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
-      expect(error.message).toBe('More than one [tenant_domain] query parameter was encountered');
+      expect(error.message).toBe('More than one [tenant_name] query parameter was encountered');
     }
   });
 
   test('Multiple tenant_custom_domain params', async () => {
     const mockExpressReq = httpMocks.createRequest({
       query: { tenant_custom_domain: ['tenant1', 'tenant2'] },
-    });
-    const mockExpressRes = httpMocks.createResponse();
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
@@ -57,9 +57,9 @@ describe('Login Errors', () => {
 
   test('Multiple return_url params', async () => {
     const mockExpressReq = httpMocks.createRequest({
-      query: { tenant_domain: 'test', return_url: ['url1', 'url2'] },
-    });
-    const mockExpressRes = httpMocks.createResponse();
+      query: { tenant_name: 'test', return_url: ['url1', 'url2'] },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
@@ -72,9 +72,9 @@ describe('Login Errors', () => {
 
   test('Multiple login_hint params', async () => {
     const mockExpressReq = httpMocks.createRequest({
-      query: { tenant_domain: 'test', login_hint: ['hint1', 'hint2'] },
-    });
-    const mockExpressRes = httpMocks.createResponse();
+      query: { tenant_name: 'test', login_hint: ['hint1', 'hint2'] },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
 
     try {
       mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
@@ -87,9 +87,9 @@ describe('Login Errors', () => {
 
   test('Way too large customState', async () => {
     const mockExpressReq = httpMocks.createRequest({
-      query: { tenant_domain: 'test' },
-    });
-    const mockExpressRes = httpMocks.createResponse();
+      query: { tenant_name: 'test' },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
 
     const customState = {
       superLong: '1234567890'.repeat(300),

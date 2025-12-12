@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
 import { AuthService } from './auth-service';
-import { AuthConfig, CallbackResult, LoginConfig, LogoutConfig, RequireSessionAuthConfig, TokenData } from './types';
+import { AuthConfig, AuthMiddlewareConfig, CallbackResult, LoginConfig, LogoutConfig, TokenData } from './types';
 
 /**
  * WristbandAuth is a utility interface providing methods for seamless interaction with Wristband for authenticating
@@ -23,7 +23,7 @@ export interface WristbandAuth {
    * - return_url: The location of where to send users after authenticating.
    * - tenant_custom_domain: The tenant custom domain for the tenant that the user belongs to, if applicable. Should be
    * used as the domain of the authorize URL when present.
-   * - tenant_domain: The domain name of the tenant the user belongs to. Should be used in the tenant vanity domain of
+   * - tenant_name: The name of the tenant the user belongs to. Should be used in the tenant vanity domain of
    * the authorize URL when not utilizing tenant subdomains nor tenant custom domains.
    *
    * @param {Request} req The Express request object.
@@ -47,7 +47,7 @@ export interface WristbandAuth {
    * - tenant_custom_domain: If the tenant has a tenant custom domain defined, then this query parameter will be part
    * of the incoming request to the Callback Endpoint. n the event a redirect to the Login Endpoint is required, then
    * this should be appended as a query parameter when redirecting to the Login Endpoint.
-   * - tenant_domain: The domain name of the tenant the user belongs to. In the event a redirect to the Login Endpoint
+   * - tenant_name: The name of the tenant the user belongs to. In the event a redirect to the Login Endpoint
    * is required and neither tenant subdomains nor tenant custom domains are not being utilized, then this should be
    * appended as a query parameter when redirecting to the Login Endpoint.
    *
@@ -82,35 +82,66 @@ export interface WristbandAuth {
   refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null>;
 
   /**
-   * Create middleware that ensures authenticated session and optionally validates CSRF tokens.
-   * Automatically refreshes access token, if expired, using the refresh token.
+   * Create middleware that validates authentication using configurable strategies (SESSION, JWT, or both).
+   * Supports multi-strategy authentication with automatic fallback between strategies.
+   *
+   * Strategy behavior:
+   * - SESSION: Validates session authentication, optionally checks CSRF, and refreshes expired tokens
+   * - JWT: Validates JWT bearer tokens from Authorization header
+   * - Multi-strategy: Tries strategies in configured order, falls back to next on failure
    *
    * NOTE: Token refresh only occurs when both `refreshToken` and `expiresAt` are present in the session.
    *
-   * @param config - Optional configuration for the session auth middleware
-   * @param config.enableCsrfProtection - Enable CSRF protection for API requests.
-   *         Default: false (relies on sameSite cookie protection)
-   * @param config.csrfTokenHeaderName - CSRF token header name. Default: 'x-csrf-token'
-   * @returns Express middleware function that validates session authentication
-   * @throws {401} If user is not authenticated or token refresh fails
-   * @throws {403} If CSRF token is missing or invalid (when CSRF protection is enabled)
+   * @param config - Configuration for the auth middleware
+   * @param config.authStrategies - Array of strategies to use: ['SESSION'], ['JWT'], or ['SESSION', 'JWT']
+   * @param config.sessionConfig - Configuration for SESSION strategy (required if SESSION in authStrategies)
+   * @param config.sessionConfig.sessionOptions - Full session options from @wristband/typescript-session
+   * @param config.sessionConfig.csrfTokenHeaderName - CSRF token header name. Default: 'x-csrf-token'
+   * @param config.jwtConfig - Configuration for JWT strategy (optional)
+   * @param config.jwtConfig.jwksCacheMaxSize - Max JWKS cache size. Default: 20
+   * @param config.jwtConfig.jwksCacheTtl - JWKS cache TTL in ms. Default: undefined (infinite until LRU eviction)
+   * @returns Express middleware function that validates authentication using configured strategies
+   * @throws {401} If all configured strategies fail authentication or token refresh fails
+   * @throws {403} If CSRF token validation fails (SESSION strategy only)
+   * @throws {500} If an unexpected error occurs during authentication
    *
    * @example
    * ```typescript
-   * // Basic usage - no CSRF protection
-   * const requireWristbandAuth = wristbandAuth.createRequireSessionAuth();
-   * app.use('/api/protected', requireWristbandAuth);
-   *
-   * // With CSRF protection enabled
-   * const requireWristbandAuth = wristbandAuth.createRequireSessionAuth({
-   *   enableCsrfProtection: true,
-   *   csrfTokenHeaderName: 'custom-csrf-name'
+   * // SESSION only with CSRF protection
+   * const requireAuth = wristbandAuth.createAuthMiddleware({
+   *   authStrategies: ['SESSION'],
+   *   sessionConfig: {
+   *     sessionOptions: {
+   *       secrets: process.env.SESSION_SECRET!,
+   *       cookieName: 'my-session',
+   *       enableCsrfProtection: true,
+   *     }
+   *   }
    * });
-   * app.use('/api/protected', requireWristbandAuth);
+   * app.use('/api/protected', requireAuth);
+   *
+   * // JWT only
+   * import '@wristband/express-auth/jwt'; // Enable req.auth typing
+   * const requireJwtAuth = wristbandAuth.createAuthMiddleware({
+   *   authStrategies: ['JWT']
+   * });
+   * app.use('/api/protected', requireJwtAuth);
+   *
+   * // Hybrid: SESSION first, JWT fallback
+   * const requireAuth = wristbandAuth.createAuthMiddleware({
+   *   authStrategies: ['SESSION', 'JWT'],
+   *   sessionConfig: {
+   *     sessionOptions: {
+   *       secrets: process.env.SESSION_SECRET!,
+   *       enableCsrfProtection: true,
+   *     }
+   *   }
+   * });
+   * app.use('/api/protected', requireAuth);
    * ```
    */
-  createRequireSessionAuth(
-    config?: RequireSessionAuthConfig
+  createAuthMiddleware(
+    config: AuthMiddlewareConfig
   ): (req: Request, res: Response, next: NextFunction) => Promise<void>;
 }
 
@@ -211,11 +242,11 @@ export class WristbandAuthImpl implements WristbandAuth {
 
   /**
    * @inheritdoc
-   * @see {@link WristbandAuth.createRequireSessionAuth}
+   * @see {@link WristbandAuth.createAuthMiddleware}
    */
-  createRequireSessionAuth(
-    config?: RequireSessionAuthConfig
+  createAuthMiddleware(
+    config: AuthMiddlewareConfig
   ): (req: Request, res: Response, next: NextFunction) => Promise<void> {
-    return this.authService.createRequireSessionAuth(config);
+    return this.authService.createAuthMiddleware(config);
   }
 }

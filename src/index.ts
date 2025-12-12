@@ -1,7 +1,9 @@
-import { InvalidGrantError, WristbandError } from './error';
+import { WristbandError } from './error';
 import { createWristbandAuth, discoverWristbandAuth } from './factory';
-import {
+import type {
   AuthConfig,
+  AuthMiddlewareConfig,
+  AuthStrategy,
   CallbackData,
   CallbackResult,
   CallbackResultType,
@@ -19,12 +21,13 @@ import { WristbandAuth } from './wristband-auth';
 export {
   createWristbandAuth,
   discoverWristbandAuth,
-  CallbackResultType,
-  InvalidGrantError,
   WristbandError,
   type AuthConfig,
+  type AuthMiddlewareConfig,
+  type AuthStrategy,
   type CallbackData,
   type CallbackResult,
+  type CallbackResultType,
   type LoginConfig,
   type LogoutConfig,
   type TokenData,
@@ -46,16 +49,38 @@ export {
 export { createWristbandSession } from './session';
 
 /**
- * Re-export session types from typescript-session
- *
- * These types are needed for session configuration and custom session data definitions.
+ * Re-export session types from typescript-session (type-only, safe)
  */
-export {
-  SessionError,
-  SessionErrorCode,
-  type SameSiteOption,
-  type SessionData,
-  type SessionOptions,
-  type SessionResponse,
-  type TokenResponse,
+export type {
+  SameSiteOption,
+  Session,
+  SessionData,
+  SessionOptions,
+  SessionResponse,
+  TokenResponse,
 } from '@wristband/typescript-session';
+
+/**
+ * Session error class exports
+ *
+ * ⚠️ WARNING: These are runtime value exports. Importing them will load the
+ * @wristband/typescript-session module and trigger Express.Request augmentation.
+ *
+ * Only import these if you're using createWristbandSession() middleware.
+ */
+export { SessionError, SessionErrorCode } from '@wristband/typescript-session';
+
+/**
+ * Re-export JWT types and utilities from typescript-jwt (type-only, safe)
+ */
+export type {
+  JWTPayload,
+  JwtValidationResult,
+  WristbandJwtValidator,
+  WristbandJwtValidatorConfig,
+} from '@wristband/typescript-jwt';
+
+/**
+ * Re-export JWT validator factory from typescript-jwt (runtime value)
+ */
+export { createWristbandJwtValidator } from '@wristband/typescript-jwt';

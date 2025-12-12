@@ -23,7 +23,7 @@ describe('Auth Utils', () => {
     test('Extracts tenant subdomain when host matches root domain', () => {
       const req = httpMocks.createRequest({
         headers: { host: 'tenant.business.example.com' },
-      });
+      }) as any;
 
       const result = parseTenantSubdomain(req, 'business.example.com');
 
@@ -33,7 +33,7 @@ describe('Auth Utils', () => {
     test('Returns empty string when host does not match root domain', () => {
       const req = httpMocks.createRequest({
         headers: { host: 'different.domain.com' },
-      });
+      }) as any;
 
       const result = parseTenantSubdomain(req, 'business.example.com');
 
@@ -43,7 +43,7 @@ describe('Auth Utils', () => {
     test('Returns empty string when host is root domain itself', () => {
       const req = httpMocks.createRequest({
         headers: { host: 'business.example.com' },
-      });
+      }) as any;
 
       const result = parseTenantSubdomain(req, 'business.example.com');
 
@@ -53,11 +53,77 @@ describe('Auth Utils', () => {
     test('Handles complex subdomain extraction', () => {
       const req = httpMocks.createRequest({
         headers: { host: 'multi-word-tenant.business.example.com' },
-      });
+      }) as any;
 
       const result = parseTenantSubdomain(req, 'business.example.com');
 
       expect(result).toBe('multi-word-tenant');
+    });
+
+    test('Strips port from host before extracting subdomain', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'tenant.business.example.com:3000' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'business.example.com');
+
+      expect(result).toBe('tenant');
+    });
+
+    test('Handles root domain with port', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'business.example.com:8080' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'business.example.com');
+
+      expect(result).toBe('');
+    });
+
+    test('Handles standard HTTP port (80)', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'tenant.business.example.com:80' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'business.example.com');
+
+      expect(result).toBe('tenant');
+    });
+
+    test('Handles localhost with port', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'tenant.localhost:6001' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'localhost');
+
+      expect(result).toBe('tenant');
+    });
+
+    test('Returns empty string for non-matching domain with port', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'different.domain.com:3000' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'business.example.com');
+
+      expect(result).toBe('');
+    });
+
+    test('Handles complex subdomain with port', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'multi-word-tenant.business.example.com:9000' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'business.example.com');
+
+      expect(result).toBe('multi-word-tenant');
+    });
+
+    it('should return empty string when host is missing', () => {
+      const mockReq = { headers: {} } as any;
+      const result = parseTenantSubdomain(mockReq, 'example.com');
+      expect(result).toBe('');
     });
   });
 
@@ -181,8 +247,8 @@ describe('Auth Utils', () => {
         headers: {
           cookie: `login#${state}#1234567890=encrypted-value; other=cookie`,
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       const result = getAndClearLoginStateCookie(req, res, false);
 
@@ -200,8 +266,8 @@ describe('Auth Utils', () => {
         headers: {
           cookie: 'login#different-state#1234567890=encrypted-value',
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       const result = getAndClearLoginStateCookie(req, res, false);
 
@@ -213,8 +279,8 @@ describe('Auth Utils', () => {
         headers: {
           cookie: 'login#some-state#1234567890=encrypted-value',
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       const result = getAndClearLoginStateCookie(req, res, false);
 
@@ -228,8 +294,8 @@ describe('Auth Utils', () => {
         headers: {
           cookie: `login#${state}#1234567890=encrypted-value`,
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       getAndClearLoginStateCookie(req, res, true);
 
@@ -243,8 +309,8 @@ describe('Auth Utils', () => {
         headers: {
           cookie: 'login#state1,state2#1234567890=encrypted-value',
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       const result = getAndClearLoginStateCookie(req, res, false);
 
@@ -256,17 +322,17 @@ describe('Auth Utils', () => {
     test('Returns subdomain when parseTenantFromRootDomain is provided', () => {
       const req = httpMocks.createRequest({
         headers: { host: 'tenant.business.example.com' },
-      });
+      }) as any;
 
       const result = resolveTenantName(req, 'business.example.com');
 
       expect(result).toBe('tenant');
     });
 
-    test('Returns tenant_domain query param when no parseTenantFromRootDomain', () => {
+    test('Returns tenant_name query param when no parseTenantFromRootDomain', () => {
       const req = httpMocks.createRequest({
-        query: { tenant_domain: 'test-tenant' },
-      });
+        query: { tenant_name: 'test-tenant' },
+      }) as any;
 
       const result = resolveTenantName(req, '');
 
@@ -276,27 +342,27 @@ describe('Auth Utils', () => {
     test('Returns empty string when no tenant resolution possible', () => {
       const req = httpMocks.createRequest({
         headers: { host: 'different.domain.com' },
-      });
+      }) as any;
 
       const result = resolveTenantName(req, 'business.example.com');
 
       expect(result).toBe('');
     });
 
-    test('Throws error for multiple tenant_domain query parameters', () => {
+    test('Throws error for multiple tenant_name query parameters', () => {
       const req = httpMocks.createRequest({
-        query: { tenant_domain: ['tenant1', 'tenant2'] },
-      });
+        query: { tenant_name: ['tenant1', 'tenant2'] },
+      }) as any;
 
       expect(() => {
         return resolveTenantName(req, '');
-      }).toThrow('More than one [tenant_domain] query parameter was encountered');
+      }).toThrow('More than one [tenant_name] query parameter was encountered');
     });
 
-    test('Returns empty string when tenant_domain is undefined', () => {
+    test('Returns empty string when tenant_name is undefined', () => {
       const req = httpMocks.createRequest({
         query: {},
-      });
+      }) as any;
 
       const result = resolveTenantName(req, '');
 
@@ -308,7 +374,7 @@ describe('Auth Utils', () => {
     test('Returns tenant_custom_domain query parameter', () => {
       const req = httpMocks.createRequest({
         query: { tenant_custom_domain: 'custom.domain.com' },
-      });
+      }) as any;
 
       const result = resolveTenantCustomDomainParam(req);
 
@@ -318,7 +384,7 @@ describe('Auth Utils', () => {
     test('Returns empty string when no tenant_custom_domain parameter', () => {
       const req = httpMocks.createRequest({
         query: {},
-      });
+      }) as any;
 
       const result = resolveTenantCustomDomainParam(req);
 
@@ -328,7 +394,7 @@ describe('Auth Utils', () => {
     test('Throws error for multiple tenant_custom_domain query parameters', () => {
       const req = httpMocks.createRequest({
         query: { tenant_custom_domain: ['domain1.com', 'domain2.com'] },
-      });
+      }) as any;
 
       expect(() => {
         return resolveTenantCustomDomainParam(req);
@@ -340,7 +406,7 @@ describe('Auth Utils', () => {
     const redirectUri = 'https://example.com/callback';
 
     test('Creates basic login state', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const result = createLoginState(req, redirectUri);
 
@@ -354,7 +420,7 @@ describe('Auth Utils', () => {
     test('Includes return URL from query parameter', () => {
       const req = httpMocks.createRequest({
         query: { return_url: 'https://example.com/dashboard' },
-      });
+      }) as any;
 
       const result = createLoginState(req, redirectUri);
 
@@ -364,7 +430,7 @@ describe('Auth Utils', () => {
     test('Includes return URL from config (takes precedence over query)', () => {
       const req = httpMocks.createRequest({
         query: { return_url: 'https://example.com/query' },
-      });
+      }) as any;
 
       const config: LoginStateMapConfig = {
         returnUrl: 'https://example.com/config',
@@ -376,7 +442,7 @@ describe('Auth Utils', () => {
     });
 
     test('Includes custom state from config', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const customState = { userId: '123', feature: 'test' };
       const config: LoginStateMapConfig = { customState };
@@ -389,7 +455,7 @@ describe('Auth Utils', () => {
     test('Throws error for multiple return_url query parameters', () => {
       const req = httpMocks.createRequest({
         query: { return_url: ['url1', 'url2'] },
-      });
+      }) as any;
 
       expect(() => {
         return createLoginState(req, redirectUri);
@@ -397,7 +463,7 @@ describe('Auth Utils', () => {
     });
 
     test('Includes empty custom state object', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config: LoginStateMapConfig = { customState: {} };
 
@@ -408,7 +474,7 @@ describe('Auth Utils', () => {
     });
 
     test('Includes both return URL and custom state', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const customState = { userId: '123' };
       const config: LoginStateMapConfig = {
@@ -434,8 +500,8 @@ describe('Auth Utils', () => {
             'other#cookie=value',
           ].join('; '),
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       clearOldestLoginStateCookie(req, res, false);
 
@@ -456,8 +522,8 @@ describe('Auth Utils', () => {
         headers: {
           cookie: ['login#state1#1000000000=value1', 'login#state2#2000000000=value2', 'other#cookie=value'].join('; '),
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       clearOldestLoginStateCookie(req, res, false);
 
@@ -474,8 +540,8 @@ describe('Auth Utils', () => {
             'login#state3#3000000000=value3',
           ].join('; '),
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       clearOldestLoginStateCookie(req, res, true);
 
@@ -492,8 +558,8 @@ describe('Auth Utils', () => {
             'login#state3#3000000000=value3',
           ].join('; '),
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       clearOldestLoginStateCookie(req, res, false);
 
@@ -514,8 +580,8 @@ describe('Auth Utils', () => {
             'login#state5#5000000000=value5',
           ].join('; '),
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       clearOldestLoginStateCookie(req, res, false);
 
@@ -542,7 +608,7 @@ describe('Auth Utils', () => {
 
   describe('createLoginStateCookie', () => {
     test('Creates login state cookie with correct format', () => {
-      const res = httpMocks.createResponse();
+      const res = httpMocks.createResponse() as any;
       const state = 'test-state';
       const encryptedValue = 'encrypted-login-state';
 
@@ -561,7 +627,7 @@ describe('Auth Utils', () => {
     });
 
     test('Creates cookie without Secure flag when dangerouslyDisableSecureCookies is true', () => {
-      const res = httpMocks.createResponse();
+      const res = httpMocks.createResponse() as any;
       const state = 'test-state';
       const encryptedValue = 'encrypted-login-state';
 
@@ -590,7 +656,7 @@ describe('Auth Utils', () => {
     };
 
     test('Creates authorize URL with tenant custom domain', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config = {
         ...baseConfig,
@@ -606,7 +672,7 @@ describe('Auth Utils', () => {
     });
 
     test('Creates authorize URL with tenant name (hyphen separator)', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config = {
         ...baseConfig,
@@ -620,7 +686,7 @@ describe('Auth Utils', () => {
     });
 
     test('Creates authorize URL with tenant name (dot separator)', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config = {
         ...baseConfig,
@@ -634,7 +700,7 @@ describe('Auth Utils', () => {
     });
 
     test('Creates authorize URL with default tenant custom domain', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config = {
         ...baseConfig,
@@ -647,7 +713,7 @@ describe('Auth Utils', () => {
     });
 
     test('Creates authorize URL with default tenant name', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config = {
         ...baseConfig,
@@ -665,7 +731,7 @@ describe('Auth Utils', () => {
     test('Includes login hint when provided in query', () => {
       const req = httpMocks.createRequest({
         query: { login_hint: 'user@example.com' },
-      });
+      }) as any;
 
       const config = {
         ...baseConfig,
@@ -680,7 +746,7 @@ describe('Auth Utils', () => {
     test('Throws error for multiple login_hint query parameters', () => {
       const req = httpMocks.createRequest({
         query: { login_hint: ['hint1', 'hint2'] },
-      });
+      }) as any;
 
       const config = {
         ...baseConfig,
@@ -693,7 +759,7 @@ describe('Auth Utils', () => {
     });
 
     test('Includes all required OAuth parameters', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config = {
         ...baseConfig,
@@ -713,7 +779,7 @@ describe('Auth Utils', () => {
     });
 
     test('Domain priority: tenant custom domain takes precedence', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
       const config = {
         ...baseConfig,
         tenantCustomDomain: 'priority.custom.com',
@@ -726,7 +792,7 @@ describe('Auth Utils', () => {
     });
 
     test('Domain priority: tenant name takes precedence over defaults', () => {
-      const req = httpMocks.createRequest();
+      const req = httpMocks.createRequest() as any;
 
       const config = {
         ...baseConfig,

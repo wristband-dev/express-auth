@@ -11,7 +11,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'sessionId=abc123',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -25,7 +25,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'sessionId=abc123; token=xyz789; userId=456',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -41,7 +41,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'data=key=value=test; simple=basic',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -56,7 +56,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'encoded=hello%20world%21; special=%3D%26%25',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -71,7 +71,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: ' sessionId = abc123 ; token = xyz789 ; userId = 456 ',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -85,7 +85,7 @@ describe('Cookie Utils', () => {
     test('Returns empty object when no cookie header', () => {
       const req = httpMocks.createRequest({
         headers: {},
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -97,7 +97,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: '',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -109,7 +109,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'empty=; hasValue=test; alsoEmpty=',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -125,7 +125,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'login#state#123=value1; user_id=value2; session-token=value3',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -141,7 +141,7 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'valid=test; ; =empty; novalue; another=valid',
         },
-      });
+      }) as any;
 
       const result = parseCookies(req);
 
@@ -349,8 +349,8 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'existing=value1; another=value2',
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       // Parse existing cookies
       const cookies = parseCookies(req);
@@ -369,8 +369,8 @@ describe('Cookie Utils', () => {
         headers: {
           cookie: 'sessionId=abc123; token=xyz789',
         },
-      });
-      const res = httpMocks.createResponse();
+      }) as any;
+      const res = httpMocks.createResponse() as any;
 
       // Parse cookies to verify they exist
       const cookies = parseCookies(req);
@@ -385,7 +385,7 @@ describe('Cookie Utils', () => {
     });
 
     test('Set and clear cookies in same response', () => {
-      const res = httpMocks.createResponse();
+      const res = httpMocks.createResponse() as any;
 
       setCookie(res, 'keep', 'keepValue');
       clearCookie(res, 'remove');

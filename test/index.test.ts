@@ -1,10 +1,6 @@
-/* eslint-disable import/no-extraneous-dependencies */
-
 import {
   createWristbandAuth,
   discoverWristbandAuth,
-  CallbackResultType,
-  InvalidGrantError,
   WristbandError,
   createWristbandSession,
   SessionError,
@@ -34,14 +30,10 @@ describe('Public API Exports', () => {
 
   test('All error classes are exported', () => {
     expect(typeof WristbandError).toBe('function');
-    expect(typeof InvalidGrantError).toBe('function');
     expect(typeof SessionError).toBe('function');
   });
 
   test('All enums are exported', () => {
-    expect(typeof CallbackResultType).toBe('object');
-    expect(CallbackResultType.COMPLETED).toBe('COMPLETED');
-    expect(CallbackResultType.REDIRECT_REQUIRED).toBe('REDIRECT_REQUIRED');
     expect(typeof SessionErrorCode).toBe('object');
   });
 

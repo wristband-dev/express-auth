@@ -1,9 +1,12 @@
-/** *****************************
- * Externally available types
- ***************************** */
+import type { SessionOptions } from '@wristband/typescript-session';
+
+// ==================================================== //
+// ================== PUBLIC TYPES ==================== //
+// ==================================================== //
 
 /**
  * Represents the configuration for Wristband authentication.
+ *
  * @typedef {Object} AuthConfig
  * @property {boolean} [autoConfigureEnabled] Flag that tells the SDK to automatically set some of the SDK configuration values by calling to Wristband's SDK Auto-Configuration Endpoint. Any manually provided configurations will take precedence over the configs returned from the endpoint. Auto-configure is enabled by default. When disabled, if manual configurations are not provided, then an error will be thrown.
  * @property {string} clientId The client ID for the application.
@@ -54,39 +57,61 @@ export type LoginConfig = {
 };
 
 /**
- * Enum representing different possible results from the execution of the callback handler.
+ * String literal type representing different possible results from the execution of the callback handler.
+ *
+ * @remarks
+ * - `'completed'`: Indicates that the callback is successfully completed and data is available for creating a session.
+ * - `'redirect_required'`: Indicates that a redirect is required, generally to a login route or page.
  */
-export enum CallbackResultType {
-  /**
-   * Indicates that the callback is successfully completed and data is available for creating a session.
-   */
-  COMPLETED = 'COMPLETED',
-  /**
-   * Indicates that a redirect is required, generally to a login route or page.
-   */
-  REDIRECT_REQUIRED = 'REDIRECT_REQUIRED',
-}
+export type CallbackResultType = 'completed' | 'redirect_required';
 
 /**
- * Represents the result of the callback execution after authentication. It can include be the set of callback
- * data necessary for creating an authenticated session in the event a redirect is not required.
- * @typedef {Object} CallbackResult
- * @property {CallbackData} [callbackData] The callback data received after authentication (COMPLETED only).
- * @property {string} [redirectUrl] The URL to redirect to (REDIRECT_REQUIRED only).
- * @property {CallbackResultType} type Enum representing the end result of callback execution.
+ * Reason why callback processing failed and requires a redirect to retry authentication.
+ *
+ * @remarks
+ * - `missing_login_state`: Login state cookie was not found (cookie expired or bookmarked callback URL)
+ * - `invalid_login_state`: Login state validation failed (possible CSRF attack or cookie tampering)
+ * - `login_required`: Wristband returned a login_required error (session expired or max_age elapsed)
+ * - `invalid_grant`: Authorization code was invalid, expired, or already used
  */
-export type CallbackResult = {
-  callbackData?: CallbackData;
-  redirectUrl?: string;
-  type: CallbackResultType;
-};
+export type CallbackFailureReason = 'missing_login_state' | 'invalid_login_state' | 'login_required' | 'invalid_grant';
+
+/**
+ * Represents the result of the callback execution after authentication. It can contain the set of callback
+ * data necessary for creating an authenticated session.
+ *
+ * This is a discriminated union type based on the `type` field:
+ * - When `type` is `'completed'`, `callbackData` is present and `redirectUrl` is never present
+ * - When `type` is `'redirect_required'`, `redirectUrl` is present and `callbackData` is never present
+ */
+export type CallbackResult =
+  | {
+      /** The callback data received after authentication */
+      callbackData: CallbackData;
+      /** Never present when type is completed */
+      reason?: never;
+      /** Never present when type is completed */
+      redirectUrl?: never;
+      /** Indicates successful completion with callback data */
+      type: 'completed';
+    }
+  | {
+      /** Never present when type is redirect_required */
+      callbackData?: never;
+      /** Why the redirect is required */
+      reason: CallbackFailureReason;
+      /** The URL to redirect to */
+      redirectUrl: string;
+      /** Indicates a redirect is required */
+      type: 'redirect_required';
+    };
 
 /**
  * Represents the token data received after authentication.
  * @typedef {Object} TokenData
  * @property {string} accessToken The access token.
  * @property {number} expiresAt The absolute expiration time of the access token in milliseconds since the Unix epoch.
- * @property {number} expiresIn The durtaion from the current time until the access token is expired (in seconds).
+ * @property {number} expiresIn The duration from the current time until the access token is expired (in seconds).
  * @property {string} idToken The ID token.
  * @property {string} [refreshToken] The refresh token.
  */
@@ -248,36 +273,90 @@ export type LogoutConfig = {
 };
 
 /**
- * Configuration options for session authentication middleware.
+ * Authentication strategy for Wristband auth.
  *
- * Controls session validation and optional CSRF token protection for authenticated requests.
+ * Available strategies:
+ * - `'SESSION'` - Session-based authentication using cookies
+ * - `'JWT'` - JWT bearer token authentication
  */
-export interface RequireSessionAuthConfig {
+export type AuthStrategy =
+  /** Session-based authentication using cookies */
+  | 'SESSION'
+  /** JWT bearer token authentication */
+  | 'JWT';
+
+/**
+ * Configuration for Wristband authentication middleware
+ */
+export interface AuthMiddlewareConfig {
   /**
-   * Enable CSRF token validation for additional security.
+   * Authentication strategies to use, in order of precedence.
+   * At least one strategy is required.
    *
-   * When enabled, requests must include a valid CSRF token in the specified header.
-   * Only enable if using `sameSite: 'None'` cookies or if you need defense-in-depth.
-   * For most applications, the default `sameSite: 'Lax'` or `'Strict'` provides
-   * sufficient CSRF protection without additional token validation.
+   * - ['SESSION']: Only session-based auth
+   * - ['JWT']: Only JWT bearer token auth
+   * - ['SESSION', 'JWT']: Try session first, fallback to JWT
+   * - ['JWT', 'SESSION']: Try JWT first, fallback to session
    *
-   * @default false
+   * @example
+   * ```typescript
+   * authStrategies: [SESSION, JWT]
+   * ```
    */
-  enableCsrfProtection?: boolean;
+  authStrategies: AuthStrategy[];
+
   /**
-   * HTTP header name where the CSRF token should be sent by the client.
-   *
-   * The token value must match the `csrfToken` stored in the session.
-   * Only used when `enableCsrfProtection` is true.
-   *
-   * @default 'x-csrf-token'
+   * Configuration specific to SESSION authentication strategy.
+   * Required if SESSION is included in authStrategies.
    */
-  csrfTokenHeaderName?: string;
+  sessionConfig?: {
+    /**
+     * Session configuration options including secrets and cookie settings.
+     *
+     * NOTE: If you set `enableCsrfProtection` to true in these options, the middleware will validate
+     * CSRF tokens for all authenticated requests using the SESSION strategy. The CSRF token must be
+     * present in the request header specified by `csrfTokenHeaderName` (default: 'X-CSRF-TOKEN').
+     * JWT strategy does not perform CSRF validation.
+     *
+     * @example
+     * ```typescript
+     * sessionOptions: {
+     *   secrets: process.env.SESSION_SECRET!,
+     *   cookieName: 'my-session',
+     *   maxAge: 24 * 60 * 60 * 1000, // 24 hours
+     * }
+     * ```
+     */
+    sessionOptions: SessionOptions;
+
+    /**
+     * CSRF token header name (only used if `sessionOptions.enableCsrfProtection` is true).
+     * Default: 'X-CSRF-TOKEN'
+     */
+    csrfTokenHeaderName?: string;
+  };
+
+  /**
+   * Configuration specific to JWT strategy.
+   * Optional (all settings rely on @wristband/typescript-jwt SDK defaults).
+   */
+  jwtConfig?: {
+    /**
+     * Maximum number of JWKs to cache.
+     * Default: 20
+     */
+    jwksCacheMaxSize?: number;
+    /**
+     * Time-to-live for cached JWKs in milliseconds.
+     * Default: Infinite (until evicted due to LRU cache eviction)
+     */
+    jwksCacheTtl?: number;
+  };
 }
 
-/** *****************************
- * Internal-only types
- ***************************** */
+// ====================================================== //
+// ================== INTERNAL TYPES ==================== //
+// ====================================================== //
 
 /**
  * Configuration object containing URLs and settings discovered from the Wristband SDK Configuration Endpoint.
@@ -328,14 +407,16 @@ export type LoginStateMapConfig = {
 
 /**
  * Represents the token response received from the Wristband token endpoint.
- * @typedef {Object} TokenResponse
+ * @typedef {Object} WristbandTokenResponse
  * @property {string} access_token The access token.
  * @property {number} expires_in The expiration time of the access token (in seconds).
  * @property {string} id_token The ID token.
  * @property {string} [refresh_token] The refresh token.
  * @property {string} token_type The type of token.
+ *
+ * @internal
  */
-export type TokenResponse = {
+export type WristbandTokenResponse = {
   access_token: string;
   expires_in: number;
   id_token: string;
@@ -351,6 +432,8 @@ export type TokenResponse = {
  *
  * @description Refer to the Wristband userinfo endpoint documentation to see the full list of
  * possible claims that can be returned, depending on your scopes.
+ *
+ * @internal
  */
 export interface WristbandUserinfoResponse {
   /** Subject - unique identifier for the user (OIDC standard claim) */
@@ -364,4 +447,76 @@ export interface WristbandUserinfoResponse {
 
   // All other fields are optional and dynamic based on scopes
   [key: string]: any;
+}
+
+/**
+ * Reason why authentication failed during auth middleware execution.
+ *
+ * Available strategies:
+ * - `'not_authenticated'` - No valid session or JWT token found
+ * - `'csrf_failed'` - CSRF token validation failed (SESSION strategy only)
+ * - `'token_refresh_failed'` - Token refresh attempt failed (SESSION strategy only)
+ * - `'unexpected_error'` - Unexpected error occurred during authentication
+ */
+export type AuthFailureReason =
+  /** No valid session or JWT token found */
+  | 'not_authenticated'
+  /** CSRF token validation failed (SESSION strategy only) */
+  | 'csrf_failed'
+  /** Token refresh attempt failed (SESSION strategy only) */
+  | 'token_refresh_failed'
+  /** Unexpected error occurred during authentication */
+  | 'unexpected_error';
+
+/**
+ * Describes the outcome of running a single authentication strategy.
+ *
+ * A discriminated union that captures whether authentication succeeded or failed,
+ * and provides specific failure reasons to enable proper error handling and HTTP
+ * status code selection.
+ *
+ * @internal
+ */
+export type AuthStrategyResult =
+  | {
+      /** Authentication succeeded */
+      authenticated: true;
+      /** The strategy that produced successful authentication */
+      usedStrategy: AuthStrategy;
+      /** Never present on success */
+      reason?: never;
+    }
+  | {
+      /** Authentication failed */
+      authenticated: false;
+      /** Never present on failure */
+      usedStrategy?: never;
+      /** Why authentication failed */
+      reason: AuthFailureReason;
+    };
+
+/**
+ * Normalized auth middleware configuration with all defaults applied.
+ * This is the internal configuration format used by the middleware after
+ * processing the user-provided AuthMiddlewareConfig.
+ *
+ * @internal
+ */
+export interface NormalizedAuthMiddlewareConfig {
+  /** Authentication strategies to use, in order of precedence */
+  authStrategies: AuthStrategy[];
+  /** Session authentication strategy configuration */
+  sessionConfig: {
+    /** Session options - only defined when SESSION strategy is used */
+    sessionOptions?: SessionOptions;
+    /** CSRF token header name (default: 'X-CSRF-TOKEN') */
+    csrfTokenHeaderName: string;
+  };
+  /** JWT authentication strategy configuration */
+  jwtConfig: {
+    /** Maximum JWKs to cache - uses library default (20) when undefined */
+    jwksCacheMaxSize?: number;
+    /** JWK cache TTL in ms - uses library default of infinite when undefined */
+    jwksCacheTtl?: number;
+  };
 }

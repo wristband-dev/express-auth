@@ -33,11 +33,11 @@ describe('Logout Errors', () => {
     nock.cleanAll();
   });
 
-  test('Multiple tenant_domain params', async () => {
+  test('Multiple tenant_name params', async () => {
     const mockExpressReq = httpMocks.createRequest({
-      query: { tenant_domain: ['tenant1', 'tenant2'] },
-    });
-    const mockExpressRes = httpMocks.createResponse();
+      query: { tenant_name: ['tenant1', 'tenant2'] },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
 
     try {
       mockExpressRes.redirect(
@@ -46,15 +46,15 @@ describe('Logout Errors', () => {
       fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
-      expect(error.message).toBe('More than one [tenant_domain] query parameter was encountered during logout');
+      expect(error.message).toBe('More than one [tenant_name] query parameter was encountered during logout');
     }
   });
 
   test('Multiple tenant_custom_domain params', async () => {
     const mockExpressReq = httpMocks.createRequest({
       query: { tenant_custom_domain: ['tenant1.com', 'tenant2.com'] },
-    });
-    const mockExpressRes = httpMocks.createResponse();
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
 
     try {
       mockExpressRes.redirect(
