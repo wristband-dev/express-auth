@@ -47,6 +47,10 @@ Learn more about Wristband's authentication patterns:
 - [Backend Server Integration Pattern](https://docs.wristband.dev/docs/backend-server-integration)
 - [Login Workflow In Depth](https://docs.wristband.dev/docs/login-workflow)
 
+> **💡 Learn by Example**
+>
+> Want to see the SDK in action? Check out our [Express demo applications](#wristband-multi-tenant-express-demo-app). The demo showcases real-world authentication patterns and best practices.
+
 <br>
 
 ---
@@ -113,6 +117,10 @@ On an older version of our SDK? Check out our migration guide:
 <br>
 
 ## Prerequisites
+
+> **⚡ Try Our Express Quickstart!**
+>
+> For the fastest way to get started with Express authentication, follow our [Quick Start Guide](https://docs.wristband.dev/docs/auth-quick-start). It walks you through setting up a working Express app with Wristband authentication in minutes. Refer back to this README for comprehensive documentation and advanced usage patterns.
 
 Before installing, ensure you have:
 
