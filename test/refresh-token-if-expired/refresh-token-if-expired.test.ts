@@ -71,8 +71,8 @@ describe('Refresh Token If Expired', () => {
       fail('Expected an error to be thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(WristbandError);
-      expect((error as WristbandError).getError()).toBe('invalid_grant');
-      expect((error as WristbandError).getErrorDescription()).toBe(errorResponse.error_description);
+      expect((error as WristbandError).code).toBe('invalid_grant');
+      expect((error as WristbandError).errorDescription).toBe(errorResponse.error_description);
     }
 
     scope.done();
@@ -255,8 +255,8 @@ describe('Refresh Token If Expired', () => {
       fail('Expected an error to be thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(WristbandError);
-      expect((error as WristbandError).getError()).toBe('invalid_refresh_token');
-      expect((error as WristbandError).getErrorDescription()).toBe('Invalid Refresh Token'); // Default description
+      expect((error as WristbandError).code).toBe('invalid_refresh_token');
+      expect((error as WristbandError).errorDescription).toBe('Invalid Refresh Token'); // Default description
     }
 
     scope.done();

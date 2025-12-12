@@ -513,8 +513,8 @@ describe('WristbandService - Error Handling', () => {
         fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(InvalidGrantError);
-        expect((error as InvalidGrantError).getError()).toBe('invalid_grant');
-        expect((error as InvalidGrantError).getErrorDescription()).toBe(errorResponse.error_description);
+        expect((error as InvalidGrantError).code).toBe('invalid_grant');
+        expect((error as InvalidGrantError).errorDescription).toBe(errorResponse.error_description);
       }
 
       scope.done();
@@ -535,8 +535,8 @@ describe('WristbandService - Error Handling', () => {
         fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(InvalidGrantError);
-        expect((error as InvalidGrantError).getError()).toBe('invalid_grant');
-        expect((error as InvalidGrantError).getErrorDescription()).toBe('Invalid grant');
+        expect((error as InvalidGrantError).code).toBe('invalid_grant');
+        expect((error as InvalidGrantError).errorDescription).toBe('Invalid grant');
       }
 
       scope.done();
@@ -555,8 +555,8 @@ describe('WristbandService - Error Handling', () => {
         fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(InvalidGrantError);
-        expect((error as InvalidGrantError).getError()).toBe('invalid_grant');
-        expect((error as InvalidGrantError).getErrorDescription()).toBe(errorResponse.error_description);
+        expect((error as InvalidGrantError).code).toBe('invalid_grant');
+        expect((error as InvalidGrantError).errorDescription).toBe(errorResponse.error_description);
       }
 
       scope.done();
@@ -575,8 +575,8 @@ describe('WristbandService - Error Handling', () => {
         fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(InvalidGrantError);
-        expect((error as InvalidGrantError).getError()).toBe('invalid_grant');
-        expect((error as InvalidGrantError).getErrorDescription()).toBe('Invalid refresh token');
+        expect((error as InvalidGrantError).code).toBe('invalid_grant');
+        expect((error as InvalidGrantError).errorDescription).toBe('Invalid refresh token');
       }
 
       scope.done();

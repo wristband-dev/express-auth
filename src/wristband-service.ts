@@ -1,7 +1,7 @@
 import { AxiosError, AxiosRequestConfig } from 'axios';
 import { WristbandApiClient } from './wristband-api-client';
 import { JSON_MEDIA_TYPE } from './utils/constants';
-import { SdkConfiguration, TokenResponse, UserInfo, WristbandUserinfoResponse } from './types';
+import { SdkConfiguration, UserInfo, WristbandTokenResponse, WristbandUserinfoResponse } from './types';
 import { InvalidGrantError } from './error';
 
 const SDK_CONFIGS_AXIOS_REQUEST_CONFIG: AxiosRequestConfig = {
@@ -75,7 +75,7 @@ export class WristbandService {
    * @throws {Error} When any parameter is missing or empty
    * @throws {InvalidGrantError} When the authorization code is invalid or expired
    */
-  async getTokens(code: string, redirectUri: string, codeVerifier: string): Promise<TokenResponse> {
+  async getTokens(code: string, redirectUri: string, codeVerifier: string): Promise<WristbandTokenResponse> {
     if (!code || !code.trim()) {
       throw new Error('Authorization code is required');
     }
@@ -96,7 +96,7 @@ export class WristbandService {
         this.basicAuthConfig
       );
 
-      // Validate response data is a valid TokenResponse
+      // Validate response data is a valid WristbandTokenResponse
       WristbandService.validateTokenResponse(tokenResponse.data);
 
       return tokenResponse.data;
@@ -152,7 +152,7 @@ export class WristbandService {
    * @throws {Error} When refresh token is missing or empty
    * @throws {InvalidGrantError} When the refresh token is invalid or expired
    */
-  async refreshToken(refreshToken: string): Promise<TokenResponse> {
+  async refreshToken(refreshToken: string): Promise<WristbandTokenResponse> {
     if (!refreshToken || !refreshToken.trim()) {
       throw new Error('Refresh token is required');
     }
@@ -165,7 +165,7 @@ export class WristbandService {
         this.basicAuthConfig
       );
 
-      // Validate response data is a valid TokenResponse
+      // Validate response data is a valid WristbandTokenResponse
       WristbandService.validateTokenResponse(tokenResponse.data);
 
       return tokenResponse.data;
@@ -254,7 +254,7 @@ export class WristbandService {
    *
    * @internal
    */
-  private static validateTokenResponse(data: any): asserts data is TokenResponse {
+  private static validateTokenResponse(data: any): asserts data is WristbandTokenResponse {
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid token response');
     }

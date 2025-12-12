@@ -1,11 +1,8 @@
-/* eslint-disable import/no-extraneous-dependencies */
-/* eslint-disable no-underscore-dangle */
-
 import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { CallbackResult, CallbackResultType, LoginState } from '../../src/types';
+import { CallbackResult, LoginState } from '../../src/types';
 import { encryptLoginState } from '../../src/utils';
 import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 
@@ -21,7 +18,6 @@ describe('Multi Tenant Callback', () => {
   let wristbandApplicationVanityDomain: string;
 
   beforeEach(() => {
-    // Clean up any previous nock interceptors
     nock.cleanAll();
 
     parseTenantFromRootDomain = 'localhost:6001';
@@ -80,16 +76,16 @@ describe('Multi Tenant Callback', () => {
       const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
-        query: { state: 'state', code: 'code', tenant_domain: 'devs4you' },
+        query: { state: 'state', code: 'code', tenant_name: 'devs4you' },
         headers: {
           cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
         },
-      });
-      const mockExpressRes = httpMocks.createResponse();
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
       // Validate callback data contents
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.COMPLETED);
+      expect(type).toBe('completed');
       expect(callbackData).toBeTruthy();
       if (callbackData) {
         expect(callbackData.accessToken).toBe('accessToken');
@@ -108,9 +104,11 @@ describe('Multi Tenant Callback', () => {
         expect(callbackData.userinfo.emailVerified).toBe(true);
       }
       // Validate response is not redirecting the user
+      // eslint-disable-next-line no-underscore-dangle
       const location: string = mockExpressRes._getRedirectUrl();
       expect(location).toBeFalsy();
       // Validate no-cache headers
+      // eslint-disable-next-line no-underscore-dangle
       const headers = mockExpressRes._getHeaders();
       expect(Object.keys(headers)).toHaveLength(3);
       expect(headers['cache-control']).toBe('no-store');
@@ -139,157 +137,169 @@ describe('Multi Tenant Callback', () => {
       userinfoScope.done();
     });
 
-    test('Tenant Subdomains Configuration', async () => {
-      parseTenantFromRootDomain = 'business.invotastic.com';
-      loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
-      redirectUri = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/callback`;
-      wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
-      wristbandAuth = createWristbandAuth({
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
-        loginUrl,
-        redirectUri,
-        parseTenantFromRootDomain,
-        wristbandApplicationVanityDomain,
-        autoConfigureEnabled: false,
+    describe.each([
+      ['tenant_domain', '{tenant_domain}'],
+      ['tenant_name', '{tenant_name}'],
+    ])('Tenant Subdomains Configuration with %s placeholder', (placeholderName, placeholder) => {
+      test(`Tenant Subdomains Configuration using ${placeholderName}`, async () => {
+        parseTenantFromRootDomain = 'business.invotastic.com';
+        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+        wristbandAuth = createWristbandAuth({
+          clientId: CLIENT_ID,
+          clientSecret: CLIENT_SECRET,
+          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+          loginUrl,
+          redirectUri,
+          parseTenantFromRootDomain,
+          wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
+        });
+        // Mock token data
+        const mockTokens = {
+          access_token: 'accessToken',
+          expires_in: 1800,
+          id_token: 'idToken',
+          refresh_token: 'refreshToken',
+          token_type: 'bearer',
+        };
+        const tokenScope = nock(`https://${wristbandApplicationVanityDomain}`)
+          .persist()
+          .post(
+            '/api/v1/oauth2/token',
+            `grant_type=authorization_code&code=code&redirect_uri=${redirectUri}&code_verifier=codeVerifier`
+          )
+          .reply(200, mockTokens);
+        // Mock userinfo data
+        const mockUserinfo = {
+          sub: '5q6j4qe2cva3dm3cbdvjoxvuze',
+          tnt_id: 'fr2vishnqjdvfbcijxa3a4adhe',
+          app_id: 'dy42gabu5jebreq6jajskk2n34',
+          idp_name: 'wristband',
+          email: 'test@wristband.dev',
+          email_verified: true,
+        };
+        const userinfoScope = nock(`https://${wristbandApplicationVanityDomain}`)
+          .persist()
+          .get('/api/v1/oauth2/userinfo')
+          .reply(200, mockUserinfo);
+        // Mock login state
+        const loginState: LoginState = {
+          codeVerifier: 'codeVerifier',
+          redirectUri: redirectUri,
+          state: 'state',
+        };
+        const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+        // Mock Express objects
+        const mockExpressReq = httpMocks.createRequest({
+          query: { state: 'state', code: 'code' },
+          headers: {
+            cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+            host: `devs4you.${parseTenantFromRootDomain}`,
+          },
+        }) as any;
+        const mockExpressRes = httpMocks.createResponse() as any;
+        // Validate callback data contents
+        const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        const { callbackData, type } = callbackResult;
+        expect(type).toBe('completed');
+        expect(callbackData).toBeTruthy();
+        if (callbackData) {
+          expect(callbackData.tenantName).toBe('devs4you');
+          expect(callbackData.customState).toBeFalsy();
+          expect(callbackData.returnUrl).toBeFalsy();
+        }
+        // Validate response is not redirecting the user
+        // eslint-disable-next-line no-underscore-dangle
+        const location: string = mockExpressRes._getRedirectUrl();
+        expect(location).toBeFalsy();
+        tokenScope.done();
+        userinfoScope.done();
       });
-      // Mock token data
-      const mockTokens = {
-        access_token: 'accessToken',
-        expires_in: 1800,
-        id_token: 'idToken',
-        refresh_token: 'refreshToken',
-        token_type: 'bearer',
-      };
-      const tokenScope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .post(
-          '/api/v1/oauth2/token',
-          `grant_type=authorization_code&code=code&redirect_uri=${redirectUri}&code_verifier=codeVerifier`
-        )
-        .reply(200, mockTokens);
-      // Mock userinfo data
-      const mockUserinfo = {
-        sub: '5q6j4qe2cva3dm3cbdvjoxvuze',
-        tnt_id: 'fr2vishnqjdvfbcijxa3a4adhe',
-        app_id: 'dy42gabu5jebreq6jajskk2n34',
-        idp_name: 'wristband',
-        email: 'test@wristband.dev',
-        email_verified: true,
-      };
-      const userinfoScope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .get('/api/v1/oauth2/userinfo')
-        .reply(200, mockUserinfo);
-      // Mock login state
-      const loginState: LoginState = {
-        codeVerifier: 'codeVerifier',
-        redirectUri: redirectUri,
-        state: 'state',
-      };
-      const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
-      // Mock Express objects
-      const mockExpressReq = httpMocks.createRequest({
-        query: { state: 'state', code: 'code' },
-        headers: {
-          cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
-          host: `devs4you.${parseTenantFromRootDomain}`,
-        },
-      });
-      const mockExpressRes = httpMocks.createResponse();
-      // Validate callback data contents
-      const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.COMPLETED);
-      expect(callbackData).toBeTruthy();
-      if (callbackData) {
-        expect(callbackData.tenantName).toBe('devs4you');
-        expect(callbackData.customState).toBeFalsy();
-        expect(callbackData.returnUrl).toBeFalsy();
-      }
-      // Validate response is not redirecting the user
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBeFalsy();
-      tokenScope.done();
-      userinfoScope.done();
     });
 
-    test('Custom Domains and Tenant Subdomains Configuration', async () => {
-      parseTenantFromRootDomain = 'business.invotastic.com';
-      wristbandApplicationVanityDomain = 'auth.invotastic.com';
-      loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
-      redirectUri = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/callback`;
-      wristbandAuth = createWristbandAuth({
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
-        loginUrl,
-        redirectUri,
-        parseTenantFromRootDomain,
-        isApplicationCustomDomainActive: true,
-        wristbandApplicationVanityDomain,
-        autoConfigureEnabled: false,
+    describe.each([
+      ['tenant_domain', '{tenant_domain}'],
+      ['tenant_name', '{tenant_name}'],
+    ])('Custom Domains and Tenant Subdomains with %s placeholder', (placeholderName, placeholder) => {
+      test(`Custom Domains and Tenant Subdomains Configuration using ${placeholderName}`, async () => {
+        parseTenantFromRootDomain = 'business.invotastic.com';
+        wristbandApplicationVanityDomain = 'auth.invotastic.com';
+        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        wristbandAuth = createWristbandAuth({
+          clientId: CLIENT_ID,
+          clientSecret: CLIENT_SECRET,
+          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+          loginUrl,
+          redirectUri,
+          parseTenantFromRootDomain,
+          isApplicationCustomDomainActive: true,
+          wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
+        });
+        // Mock token data
+        const mockTokens = {
+          access_token: 'accessToken',
+          expires_in: 1800,
+          id_token: 'idToken',
+          refresh_token: 'refreshToken',
+          token_type: 'bearer',
+        };
+        const tokenScope = nock(`https://${wristbandApplicationVanityDomain}`)
+          .persist()
+          .post(
+            '/api/v1/oauth2/token',
+            `grant_type=authorization_code&code=code&redirect_uri=${redirectUri}&code_verifier=codeVerifier`
+          )
+          .reply(200, mockTokens);
+        // Mock userinfo data
+        const mockUserinfo = {
+          sub: '5q6j4qe2cva3dm3cbdvjoxvuze',
+          tnt_id: 'fr2vishnqjdvfbcijxa3a4adhe',
+          app_id: 'dy42gabu5jebreq6jajskk2n34',
+          idp_name: 'wristband',
+          email: 'test@wristband.dev',
+          email_verified: true,
+        };
+        const userinfoScope = nock(`https://${wristbandApplicationVanityDomain}`)
+          .persist()
+          .get('/api/v1/oauth2/userinfo')
+          .reply(200, mockUserinfo);
+        // Mock login state
+        const loginState: LoginState = {
+          codeVerifier: 'codeVerifier',
+          redirectUri: redirectUri,
+          state: 'state',
+        };
+        const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+        // Mock Express objects
+        const mockExpressReq = httpMocks.createRequest({
+          query: { state: 'state', code: 'code' },
+          headers: {
+            cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+            host: `devs4you.${parseTenantFromRootDomain}`,
+          },
+        }) as any;
+        const mockExpressRes = httpMocks.createResponse() as any;
+        // Validate callback data contents
+        const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        const { callbackData, type } = callbackResult;
+        expect(type).toBe('completed');
+        expect(callbackData).toBeTruthy();
+        if (callbackData) {
+          expect(callbackData.tenantName).toBe('devs4you');
+          expect(callbackData.customState).toBeFalsy();
+          expect(callbackData.returnUrl).toBeFalsy();
+        }
+        // Validate response is not redirecting the user
+        // eslint-disable-next-line no-underscore-dangle
+        const location: string = mockExpressRes._getRedirectUrl();
+        expect(location).toBeFalsy();
+        tokenScope.done();
+        userinfoScope.done();
       });
-      // Mock token data
-      const mockTokens = {
-        access_token: 'accessToken',
-        expires_in: 1800,
-        id_token: 'idToken',
-        refresh_token: 'refreshToken',
-        token_type: 'bearer',
-      };
-      const tokenScope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .post(
-          '/api/v1/oauth2/token',
-          `grant_type=authorization_code&code=code&redirect_uri=${redirectUri}&code_verifier=codeVerifier`
-        )
-        .reply(200, mockTokens);
-      // Mock userinfo data
-      const mockUserinfo = {
-        sub: '5q6j4qe2cva3dm3cbdvjoxvuze',
-        tnt_id: 'fr2vishnqjdvfbcijxa3a4adhe',
-        app_id: 'dy42gabu5jebreq6jajskk2n34',
-        idp_name: 'wristband',
-        email: 'test@wristband.dev',
-        email_verified: true,
-      };
-      const userinfoScope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .get('/api/v1/oauth2/userinfo')
-        .reply(200, mockUserinfo);
-      // Mock login state
-      const loginState: LoginState = {
-        codeVerifier: 'codeVerifier',
-        redirectUri: redirectUri,
-        state: 'state',
-      };
-      const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
-      // Mock Express objects
-      const mockExpressReq = httpMocks.createRequest({
-        query: { state: 'state', code: 'code' },
-        headers: {
-          cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
-          host: `devs4you.${parseTenantFromRootDomain}`,
-        },
-      });
-      const mockExpressRes = httpMocks.createResponse();
-      // Validate callback data contents
-      const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.COMPLETED);
-      expect(callbackData).toBeTruthy();
-      if (callbackData) {
-        expect(callbackData.tenantName).toBe('devs4you');
-        expect(callbackData.customState).toBeFalsy();
-        expect(callbackData.returnUrl).toBeFalsy();
-      }
-      // Validate response is not redirecting the user
-      const location: string = mockExpressRes._getRedirectUrl();
-      expect(location).toBeFalsy();
-      tokenScope.done();
-      userinfoScope.done();
     });
   });
 
@@ -311,44 +321,49 @@ describe('Multi Tenant Callback', () => {
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: `${parseTenantFromRootDomain}` },
-        query: { state: 'state', code: 'code', tenant_domain: 'devs4you' },
-      });
-      const mockExpressRes = httpMocks.createResponse();
+        query: { state: 'state', code: 'code', tenant_name: 'devs4you' },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
       // login state cookie is missing, which should redirect to app-level login.
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, redirectUrl, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
-      expect(redirectUrl).toBe(`https://${parseTenantFromRootDomain}/api/auth/login?tenant_domain=devs4you`);
+      expect(type).toBe('redirect_required');
+      expect(redirectUrl).toBe(`https://${parseTenantFromRootDomain}/api/auth/login?tenant_name=devs4you`);
       expect(callbackData).toBeFalsy();
     });
 
-    test('Missing login state cookie, with tenant subdomains', async () => {
-      parseTenantFromRootDomain = 'business.invotastic.com';
-      loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
-      redirectUri = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/callback`;
-      wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
-      wristbandAuth = createWristbandAuth({
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
-        loginUrl,
-        redirectUri,
-        parseTenantFromRootDomain,
-        wristbandApplicationVanityDomain,
-        autoConfigureEnabled: false,
+    describe.each([
+      ['tenant_domain', '{tenant_domain}'],
+      ['tenant_name', '{tenant_name}'],
+    ])('Missing login state cookie with %s placeholder', (placeholderName, placeholder) => {
+      test(`Missing login state cookie, with tenant subdomains using ${placeholderName}`, async () => {
+        parseTenantFromRootDomain = 'business.invotastic.com';
+        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+        wristbandAuth = createWristbandAuth({
+          clientId: CLIENT_ID,
+          clientSecret: CLIENT_SECRET,
+          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+          loginUrl,
+          redirectUri,
+          parseTenantFromRootDomain,
+          wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
+        });
+        // Mock Express objects
+        const mockExpressReq = httpMocks.createRequest({
+          headers: { host: `devs4you.${parseTenantFromRootDomain}` },
+          query: { state: 'state', code: 'code' },
+        }) as any;
+        const mockExpressRes = httpMocks.createResponse() as any;
+        // login state cookie is missing, which should redirect to app-level login.
+        const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        const { callbackData, redirectUrl, type } = callbackResult;
+        expect(type).toBe('redirect_required');
+        expect(redirectUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/api/auth/login`);
+        expect(callbackData).toBeFalsy();
       });
-      // Mock Express objects
-      const mockExpressReq = httpMocks.createRequest({
-        headers: { host: `devs4you.${parseTenantFromRootDomain}` },
-        query: { state: 'state', code: 'code' },
-      });
-      const mockExpressRes = httpMocks.createResponse();
-      // login state cookie is missing, which should redirect to app-level login.
-      const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, redirectUrl, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
-      expect(redirectUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/api/auth/login`);
-      expect(callbackData).toBeFalsy();
     });
 
     test('Default Configuration for login_required error', async () => {
@@ -373,54 +388,59 @@ describe('Multi Tenant Callback', () => {
         query: {
           state: 'state',
           code: 'code',
-          tenant_domain: 'devs4you',
+          tenant_name: 'devs4you',
           error: 'login_required',
           error_description: 'Login required',
         },
         headers: {
           cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
         },
-      });
-      const mockExpressRes = httpMocks.createResponse();
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, redirectUrl, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
-      expect(redirectUrl).toBe(`https://${parseTenantFromRootDomain}/api/auth/login?tenant_domain=devs4you`);
+      expect(type).toBe('redirect_required');
+      expect(redirectUrl).toBe(`https://${parseTenantFromRootDomain}/api/auth/login?tenant_name=devs4you`);
       expect(callbackData).toBeFalsy();
     });
 
-    test('Tenant Subdomain Configuration for login_required error', async () => {
-      parseTenantFromRootDomain = 'business.invotastic.com';
-      loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
-      redirectUri = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/callback`;
-      wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
-      wristbandAuth = createWristbandAuth({
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
-        loginUrl,
-        redirectUri,
-        parseTenantFromRootDomain,
-        wristbandApplicationVanityDomain,
-        autoConfigureEnabled: false,
+    describe.each([
+      ['tenant_domain', '{tenant_domain}'],
+      ['tenant_name', '{tenant_name}'],
+    ])('Login required error with %s placeholder', (placeholderName, placeholder) => {
+      test(`Tenant Subdomain Configuration for login_required error using ${placeholderName}`, async () => {
+        parseTenantFromRootDomain = 'business.invotastic.com';
+        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+        wristbandAuth = createWristbandAuth({
+          clientId: CLIENT_ID,
+          clientSecret: CLIENT_SECRET,
+          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+          loginUrl,
+          redirectUri,
+          parseTenantFromRootDomain,
+          wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
+        });
+        // Mock login state
+        const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'state' };
+        const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+        // Mock Express objects
+        const mockExpressReq = httpMocks.createRequest({
+          query: { state: 'state', code: 'code', error: 'login_required', error_description: 'Login required' },
+          headers: {
+            cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+            host: `devs4you.${parseTenantFromRootDomain}`,
+          },
+        }) as any;
+        const mockExpressRes = httpMocks.createResponse() as any;
+        const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        const { callbackData, redirectUrl, type } = callbackResult;
+        expect(type).toBe('redirect_required');
+        expect(redirectUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/api/auth/login`);
+        expect(callbackData).toBeFalsy();
       });
-      // Mock login state
-      const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'state' };
-      const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
-      // Mock Express objects
-      const mockExpressReq = httpMocks.createRequest({
-        query: { state: 'state', code: 'code', error: 'login_required', error_description: 'Login required' },
-        headers: {
-          cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
-          host: `devs4you.${parseTenantFromRootDomain}`,
-        },
-      });
-      const mockExpressRes = httpMocks.createResponse();
-      const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, redirectUrl, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
-      expect(redirectUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/api/auth/login`);
-      expect(callbackData).toBeFalsy();
     });
 
     test('Cookie login state not matching query param state, without subdomains', async () => {
@@ -442,51 +462,56 @@ describe('Multi Tenant Callback', () => {
       const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
       // Mock Express objects
       const mockExpressReq = httpMocks.createRequest({
-        query: { state: 'state', code: 'code', tenant_domain: 'devs4you' },
+        query: { state: 'state', code: 'code', tenant_name: 'devs4you' },
         headers: {
           cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
         },
-      });
-      const mockExpressRes = httpMocks.createResponse();
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       const { callbackData, redirectUrl, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
-      expect(redirectUrl).toBe(`https://${parseTenantFromRootDomain}/api/auth/login?tenant_domain=devs4you`);
+      expect(type).toBe('redirect_required');
+      expect(redirectUrl).toBe(`https://${parseTenantFromRootDomain}/api/auth/login?tenant_name=devs4you`);
       expect(callbackData).toBeFalsy();
     });
 
-    test('Cookie login state not matching query param state, with tenant subdomains', async () => {
-      parseTenantFromRootDomain = 'business.invotastic.com';
-      loginUrl = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/login`;
-      redirectUri = `https://{tenant_domain}.${parseTenantFromRootDomain}/api/auth/callback`;
-      wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
-      wristbandAuth = createWristbandAuth({
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
-        loginUrl,
-        redirectUri,
-        parseTenantFromRootDomain,
-        wristbandApplicationVanityDomain,
-        autoConfigureEnabled: false,
+    describe.each([
+      ['tenant_domain', '{tenant_domain}'],
+      ['tenant_name', '{tenant_name}'],
+    ])('State mismatch with %s placeholder', (placeholderName, placeholder) => {
+      test(`Cookie login state not matching query param state, with tenant subdomains using ${placeholderName}`, async () => {
+        parseTenantFromRootDomain = 'business.invotastic.com';
+        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+        wristbandAuth = createWristbandAuth({
+          clientId: CLIENT_ID,
+          clientSecret: CLIENT_SECRET,
+          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+          loginUrl,
+          redirectUri,
+          parseTenantFromRootDomain,
+          wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
+        });
+        // Mock login state
+        const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'bad_state' };
+        const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+        // Mock Express objects
+        const mockExpressReq = httpMocks.createRequest({
+          query: { state: 'state', code: 'code' },
+          headers: {
+            cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+            host: `devs4you.${parseTenantFromRootDomain}`,
+          },
+        }) as any;
+        const mockExpressRes = httpMocks.createResponse() as any;
+        const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        const { callbackData, redirectUrl, type } = callbackResult;
+        expect(type).toBe('redirect_required');
+        expect(redirectUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/api/auth/login`);
+        expect(callbackData).toBeFalsy();
       });
-      // Mock login state
-      const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'bad_state' };
-      const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
-      // Mock Express objects
-      const mockExpressReq = httpMocks.createRequest({
-        query: { state: 'state', code: 'code' },
-        headers: {
-          cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
-          host: `devs4you.${parseTenantFromRootDomain}`,
-        },
-      });
-      const mockExpressRes = httpMocks.createResponse();
-      const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
-      const { callbackData, redirectUrl, type } = callbackResult;
-      expect(type).toBe(CallbackResultType.REDIRECT_REQUIRED);
-      expect(redirectUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/api/auth/login`);
-      expect(callbackData).toBeFalsy();
     });
   });
 });

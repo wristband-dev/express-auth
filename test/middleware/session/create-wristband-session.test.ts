@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Session, SessionData, getSessionSync } from '@wristband/typescript-session';
 
-import { createWristbandSession } from '../../src/session';
+import { createWristbandSession } from '../../../src/session';
 
 jest.mock('@wristband/typescript-session', () => {
   return { getSessionSync: jest.fn() };

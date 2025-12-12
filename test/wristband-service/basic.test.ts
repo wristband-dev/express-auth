@@ -2,7 +2,7 @@
 
 import nock from 'nock';
 import { WristbandService } from '../../src/wristband-service';
-import { TokenResponse, SdkConfiguration, WristbandUserinfoResponse, UserInfo } from '../../src/types';
+import { SdkConfiguration, WristbandTokenResponse, WristbandUserinfoResponse, UserInfo } from '../../src/types';
 
 const DOMAIN = 'your-wristband-domain';
 const CLIENT_ID = 'test-client-id';
@@ -51,7 +51,7 @@ describe('WristbandService - Basic Functionality', () => {
         const redirectUri = 'https://app.example.com/callback';
         const codeVerifier = 'valid-code-verifier';
 
-        const expectedResponse: TokenResponse = {
+        const expectedResponse: WristbandTokenResponse = {
           access_token: 'new-access-token',
           refresh_token: 'new-refresh-token',
           id_token: 'new-id-token',
@@ -71,7 +71,7 @@ describe('WristbandService - Basic Functionality', () => {
         const redirectUri = 'https://app.example.com/callback';
         const codeVerifier = 'test-verifier';
 
-        const expectedResponse: TokenResponse = {
+        const expectedResponse: WristbandTokenResponse = {
           access_token: 'access-token',
           refresh_token: 'refresh-token',
           id_token: 'id-token',
@@ -93,7 +93,7 @@ describe('WristbandService - Basic Functionality', () => {
       test('With valid token returns token response', async () => {
         const refreshToken = 'valid-refresh-token';
 
-        const expectedResponse: TokenResponse = {
+        const expectedResponse: WristbandTokenResponse = {
           access_token: 'new-access-token',
           refresh_token: 'new-refresh-token',
           id_token: 'new-id-token',
@@ -110,7 +110,7 @@ describe('WristbandService - Basic Functionality', () => {
 
       test('Sends correct form parameters in request body', async () => {
         const refreshToken = 'test-refresh-token';
-        const expectedResponse: TokenResponse = {
+        const expectedResponse: WristbandTokenResponse = {
           access_token: 'new-access-token',
           refresh_token: 'new-refresh-token',
           id_token: 'new-id-token',
@@ -216,7 +216,7 @@ describe('WristbandService - Basic Functionality', () => {
       const redirectUri = 'https://app.example.com/callback';
       const codeVerifier = 'test-verifier';
 
-      const expectedResponse: TokenResponse = {
+      const expectedResponse: WristbandTokenResponse = {
         access_token: 'access-token',
         refresh_token: 'refresh-token',
         id_token: 'id-token',
@@ -238,7 +238,7 @@ describe('WristbandService - Basic Functionality', () => {
     test('refreshToken uses correct basic auth headers', async () => {
       const refreshToken = 'test-refresh-token';
 
-      const expectedResponse: TokenResponse = {
+      const expectedResponse: WristbandTokenResponse = {
         access_token: 'new-access-token',
         refresh_token: 'new-refresh-token',
         id_token: 'new-id-token',

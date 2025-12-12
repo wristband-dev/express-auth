@@ -8,9 +8,9 @@ describe('Error Classes', () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(WristbandError);
       expect(error.name).toBe('WristbandError');
-      expect(error.message).toBe('test_error');
-      expect(error.getError()).toBe('test_error');
-      expect(error.getErrorDescription()).toBe('Test error description');
+      expect(error.message).toBe('Test error description');
+      expect(error.code).toBe('test_error');
+      expect(error.errorDescription).toBe('Test error description');
     });
 
     test('Creates error with only error code', () => {
@@ -20,8 +20,43 @@ describe('Error Classes', () => {
       expect(error).toBeInstanceOf(WristbandError);
       expect(error.name).toBe('WristbandError');
       expect(error.message).toBe('another_error');
-      expect(error.getError()).toBe('another_error');
-      expect(error.getErrorDescription()).toBeUndefined();
+      expect(error.code).toBe('another_error');
+      expect(error.errorDescription).toBeUndefined();
+    });
+
+    test('Creates error with original error cause', () => {
+      const originalError = new Error('Network timeout');
+      const error = new WristbandError('network_error', 'Failed to connect', originalError);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(WristbandError);
+      expect(error.name).toBe('WristbandError');
+      expect(error.message).toBe('Failed to connect');
+      expect(error.code).toBe('network_error');
+      expect(error.errorDescription).toBe('Failed to connect');
+      expect(error.originalError).toBe(originalError);
+      expect(error.originalError?.message).toBe('Network timeout');
+    });
+
+    test('Creates error with empty string description', () => {
+      const error = new WristbandError('empty_desc_error', '');
+
+      expect(error).toBeInstanceOf(WristbandError);
+      expect(error.message).toBe('empty_desc_error'); // Falls back to code when description is empty
+      expect(error.code).toBe('empty_desc_error');
+      expect(error.errorDescription).toBe('');
+      expect(error.originalError).toBeUndefined();
+    });
+
+    test('Creates error with only code and originalError', () => {
+      const originalError = new TypeError('Invalid type');
+      const error = new WristbandError('type_error', undefined, originalError);
+
+      expect(error).toBeInstanceOf(WristbandError);
+      expect(error.message).toBe('type_error');
+      expect(error.code).toBe('type_error');
+      expect(error.errorDescription).toBeUndefined();
+      expect(error.originalError).toBe(originalError);
     });
 
     test('Error can be thrown and caught', () => {
@@ -45,8 +80,9 @@ describe('Error Classes', () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(WristbandError);
       expect(error).toBeInstanceOf(InvalidGrantError);
-      expect(error.getError()).toBe('invalid_grant');
-      expect(error.getErrorDescription()).toBe('The grant is invalid');
+      expect(error.code).toBe('invalid_grant');
+      expect(error.errorDescription).toBe('The grant is invalid');
+      expect(error.message).toBe('The grant is invalid');
     });
 
     test('Creates error without description', () => {
@@ -55,8 +91,9 @@ describe('Error Classes', () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(WristbandError);
       expect(error).toBeInstanceOf(InvalidGrantError);
-      expect(error.getError()).toBe('invalid_grant');
-      expect(error.getErrorDescription()).toBe('');
+      expect(error.code).toBe('invalid_grant');
+      expect(error.errorDescription).toBe('');
+      expect(error.message).toBe('invalid_grant'); // Falls back to code
     });
 
     test('Creates error with empty string description', () => {
@@ -65,8 +102,9 @@ describe('Error Classes', () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(WristbandError);
       expect(error).toBeInstanceOf(InvalidGrantError);
-      expect(error.getError()).toBe('invalid_grant');
-      expect(error.getErrorDescription()).toBe('');
+      expect(error.code).toBe('invalid_grant');
+      expect(error.errorDescription).toBe('');
+      expect(error.message).toBe('invalid_grant');
     });
 
     test('Error can be thrown and caught', () => {
@@ -88,9 +126,19 @@ describe('Error Classes', () => {
       const error2 = new InvalidGrantError('Second error');
       const error3 = new InvalidGrantError();
 
-      expect(error1.getError()).toBe('invalid_grant');
-      expect(error2.getError()).toBe('invalid_grant');
-      expect(error3.getError()).toBe('invalid_grant');
+      expect(error1.code).toBe('invalid_grant');
+      expect(error2.code).toBe('invalid_grant');
+      expect(error3.code).toBe('invalid_grant');
+    });
+
+    test('InvalidGrantError does not support originalError', () => {
+      const error = new InvalidGrantError('Test');
+      expect(error.originalError).toBeUndefined();
+    });
+
+    test('Error has correct name property', () => {
+      const error = new InvalidGrantError('Test');
+      expect(error.name).toBe('WristbandError'); // Inherits from WristbandError
     });
   });
 });
