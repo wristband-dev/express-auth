@@ -298,23 +298,13 @@ export class AuthService {
     const parseTenantFromRootDomain = await this.configResolver.getParseTenantFromRootDomain();
     const wristbandApplicationVanityDomain = this.configResolver.getWristbandApplicationVanityDomain();
 
-    const { host } = req.headers;
-    const { tenant_custom_domain: tenantCustomDomainParam, tenant_name: tenantNameParam } = req.query;
-
-    if (!!tenantCustomDomainParam && typeof tenantCustomDomainParam !== 'string') {
-      throw new TypeError('More than one [tenant_custom_domain] query parameter was encountered during logout');
-    }
-    if (!!tenantNameParam && typeof tenantNameParam !== 'string') {
-      throw new TypeError('More than one [tenant_name] query parameter was encountered during logout');
-    }
-
     // Revoke the refresh token only if present.
     if (config.refreshToken) {
       try {
         await this.wristbandService.revokeRefreshToken(config.refreshToken);
       } catch (error) {
         // No need to block logout execution if revoking fails
-        console.debug(`Revoking the refresh token failed during logout`);
+        // Silently continue - the refresh token will eventually expire and can be revoked by admin
       }
     }
 
@@ -323,40 +313,41 @@ export class AuthService {
     }
 
     // The client ID is always required by the Wristband Logout Endpoint.
-    const redirectUrl = config.redirectUrl ? `&redirect_url=${config.redirectUrl}` : '';
-    const state = config.state ? `&state=${config.state}` : '';
-    const query = `client_id=${clientId}${redirectUrl}${state}`;
+    const logoutRedirectUrl: string = config.redirectUrl ? `&redirect_url=${config.redirectUrl}` : '';
+    const state: string = config.state ? `&state=${config.state}` : '';
+    const logoutPath: string = `/api/v1/logout?client_id=${clientId}${logoutRedirectUrl}${state}`;
     const separator = isApplicationCustomDomainActive ? '.' : '-';
+    const tenantCustomDomainParam: string = resolveTenantCustomDomainParam(req);
+    const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
+
+    // 4a) If tenant subdomains are enabled, get the tenant name from the host.
+    // 4b) Otherwise, if tenant subdomains are not enabled, then look for it in the tenant_name query param.
 
     // Domain priority order resolution:
     // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
-    // 2) If the LogoutConfig has a tenant name defined, then use that.
-    // 3) If the tenant_custom_domain query param exists, then use that.
-    // 4a) If tenant subdomains are enabled, get the tenant name from the host.
-    // 4b) Otherwise, if tenant subdomains are not enabled, then look for it in the tenant_name query param.
-    let tenantDomainToUse = '';
     if (config.tenantCustomDomain) {
-      tenantDomainToUse = config.tenantCustomDomain;
-    } else if (config.tenantName) {
-      tenantDomainToUse = `${config.tenantName}${separator}${wristbandApplicationVanityDomain}`;
-    } else if (tenantCustomDomainParam) {
-      tenantDomainToUse = tenantCustomDomainParam;
-    } else if (
-      parseTenantFromRootDomain &&
-      host &&
-      host!.substring(host!.indexOf('.') + 1) === parseTenantFromRootDomain
-    ) {
-      const tenantNameFromHost = host!.substring(0, host!.indexOf('.'));
-      tenantDomainToUse = `${tenantNameFromHost}${separator}${wristbandApplicationVanityDomain}`;
-    } else if (tenantNameParam) {
-      tenantDomainToUse = `${tenantNameParam}${separator}${wristbandApplicationVanityDomain}`;
-    } else {
-      // Construct the appropriate fallback URL that the user will get redirected to.
-      const appLoginUrl: string = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
-      return config.redirectUrl || `${appLoginUrl}?client_id=${clientId}`;
+      return `https://${config.tenantCustomDomain}${logoutPath}`;
     }
 
-    return `https://${tenantDomainToUse}/api/v1/logout?${query}`;
+    // 2) If the LogoutConfig has a tenant name defined, then use that.
+    if (config.tenantName) {
+      return `https://${config.tenantName}${separator}${wristbandApplicationVanityDomain}${logoutPath}`;
+    }
+
+    // 3) If the tenant_custom_domain query param exists, then use that.
+    if (tenantCustomDomainParam) {
+      return `https://${tenantCustomDomainParam}${logoutPath}`;
+    }
+
+    // 4a) If tenant subdomains are enabled, get the tenant name from the host.
+    // 4b) Otherwise, if tenant subdomains are not enabled, then look for it in the tenant_name query param.
+    if (tenantName) {
+      return `https://${tenantName}${separator}${wristbandApplicationVanityDomain}${logoutPath}`;
+    }
+
+    // Fallback to the appropriate Application-Level Login or Redirect URL if tenant cannot be resolved.
+    const appLoginUrl: string = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
+    return config.redirectUrl || `${appLoginUrl}?client_id=${clientId}`;
   }
 
   /**

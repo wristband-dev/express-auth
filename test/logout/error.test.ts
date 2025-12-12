@@ -46,7 +46,7 @@ describe('Logout Errors', () => {
       fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
-      expect(error.message).toBe('More than one [tenant_name] query parameter was encountered during logout');
+      expect(error.message).toBe('More than one [tenant_name] query parameter was encountered');
     }
   });
 
@@ -63,7 +63,7 @@ describe('Logout Errors', () => {
       fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof TypeError).toBe(true);
-      expect(error.message).toBe('More than one [tenant_custom_domain] query parameter was encountered during logout');
+      expect(error.message).toBe('More than one [tenant_custom_domain] query parameter was encountered');
     }
   });
 });
