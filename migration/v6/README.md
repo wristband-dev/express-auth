@@ -33,7 +33,7 @@
 ## Table of Contents
 
 - [Authentication Middleware API Changes](#authentication-middleware-api-changes)
-- [Tenant Domain Query Parameter Rename](#tenant-domain-query-parameter-rename)
+- [Tenant Domain Query Parameter and URL Placeholder Rename](#tenant-domain-query-parameter-and-url-placeholder-rename)
 - [AuthMiddlewareConfig Type Changes](#authmiddlewareconfig-type-changes)
 - [CallbackResultType Changes](#callbackresulttype-changes)
 
@@ -109,7 +109,7 @@ export const wristbandAuth = createWristbandAuth({
 
 <br>
 
-## Tenant Domain Query Parameter Rename
+## Tenant Domain Query Parameter and URL Placeholder Rename
 
 The `tenant_domain` query parameter has been renamed to `tenant_name` as part of a broader standardization across the Wristband platform.
 
@@ -133,9 +133,29 @@ The `tenant_domain` query parameter has been renamed to `tenant_name` as part of
 + window.location.href = '/api/auth/logout?tenant_name=customer01';
 ```
 
+**URL Placeholder Changes:**
+
+**Before (v5.x):**
+```typescript
+const wristbandAuth = createWristbandAuth({
+  // ... other config
+  loginUrl: "https://{tenant_domain}.yourapp.com/auth/login",
+  redirectUri: "https://{tenant_domain}.yourapp.com/auth/callback",
+});
+```
+
+**After (v6.x):**
+```typescript
+const wristbandAuth = createWristbandAuth({
+  // ... other config
+  loginUrl: "https://{tenant_name}.yourapp.com/auth/login",
+  redirectUri: "https://{tenant_name}.yourapp.com/auth/callback",
+});
+```
+
 > **⚠️ Important:**
 >
-> The old `tenant_domain` query parameter will continue to work for backward compatibility, but it is now deprecated and will be removed in a future major version. All new code should use `tenant_name`.
+> The old `{tenant_domain}` placeholder still works for backwards compatibility, but it is now deprecated and will be removed in a future major version. All new code should use `{tenant_name}`.
 
 <br>
 
@@ -204,7 +224,7 @@ The configuration structure for authentication middleware has changed significan
 
 ## CallbackResultType Changes
 
-The `CallbackResultType` enum values have changed to use snake_case string literals instead of SCREAMING_SNAKE_CASE.
+The `CallbackResultType` enum has been replaced with a string literal union type for better TypeScript ergonomics and consistency with modern TypeScript patterns.
 
 **Before (v5.x):**
 ```typescript
@@ -236,12 +256,6 @@ const callbackResult = await wristbandAuth.callback(req, res);
 + if (type === 'completed') {
 +   // Handle successful authentication
 + }
-```
-
-The type is now a string literal union:
-
-```typescript
-type CallbackResultType = 'completed' | 'redirect_required';
 ```
 
 <br>

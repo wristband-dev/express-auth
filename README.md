@@ -1611,7 +1611,7 @@ The `'JWT'` strategy validates authentication using JWT bearer tokens from the `
 1. **Extracts JWT token** - Gets token from `Authorization: Bearer <token>` header
 2. **Verifies signature** - Uses cached JWKS from Wristband to verify token signature
 3. **Validates claims** - Checks token expiration, issuer, etc.
-4. Populates req.auth - Sets JWT payload and raw token on request
+4. **Populates `req.auth`** - Sets JWT payload and raw token on request
 5. **Caches JWKs** - Stores JSON Web Keys in memory according to `jwksCacheMaxSize` and `jwksCacheTtl` settings
 6. **No session management** - Stateless authentication with no cookies or token refresh
 
@@ -1662,7 +1662,7 @@ export const requireWristbandAuth = wristbandAuth.createAuthMiddleware({
 
 ##### TypeScript Safety
 
-When using the JWT strategy, enable type augmentation for req.auth by importing the JWT type definitions:
+When using the JWT strategy, enable type augmentation for `req.auth` by importing the JWT type definitions:
 
 ```typescript
 // src/wristband.ts
@@ -1726,7 +1726,7 @@ If all strategies fail, the request is considered unauthenticated and returns HT
 
 ### Using the Auth Middleware
 
-You can apply the session auth middleware in two ways:
+You can apply the auth middleware in two ways:
 
 - At the router level to protect all routes within a router
 - At the individual route level for more granular control
