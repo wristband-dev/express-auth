@@ -535,7 +535,7 @@ Both functions accept an `AuthConfig` object containing the settings required to
 | loginUrl | string | Yes | Yes | The URL of your application's login endpoint.  This is the endpoint within your application that redirects to Wristband to initialize the login flow. If you intend to use tenant subdomains in your Login Endpoint URL, then this value must contain the `{tenant_domain}` placeholder. For example: `https://{tenant_domain}.yourapp.com/auth/login`. |
 | parseTenantFromRootDomain | string | Only if using tenant subdomains in your application | Yes | The root domain for your application. This value only needs to be specified if you intend to use tenant subdomains in your Login and Callback Endpoint URLs.  The root domain should be set to the portion of the domain that comes after the tenant subdomain.  For example, if your application uses tenant subdomains such as `tenantA.yourapp.com` and `tenantB.yourapp.com`, then the root domain should be set to `yourapp.com`. This has no effect on any tenant custom domains passed to your Login Endpoint either via the `tenant_custom_domain` query parameter or via the `defaultTenantCustomDomain` config. When this configuration is enabled, the SDK extracts the tenant subdomain from the host and uses it to construct the Wristband Authorize URL. |
 | redirectUri | string | Yes | Yes | The URI that Wristband will redirect to after authenticating a user.  This should point to your application's callback endpoint. If you intend to use tenant subdomains in your Callback Endpoint URL, then this value must contain the `{tenant_domain}` placeholder. For example: `https://{tenant_domain}.yourapp.com/auth/callback`. |
-| scopes | string[] | No | No | The scopes required for authentication. Refer to the docs for [currently supported scopes](https://docs.wristband.dev/docs/oauth2-and-openid-connect-oidc#supported-openid-scopes). The default value is `[openid, offline_access, email]`. |
+| scopes | string[] | No | No | The scopes required for authentication. Refer to the [UserInfo API docs](https://docs.wristband.dev/reference/userinfov1) for currently supported scopes. The default value is `[openid, offline_access, email]`. |
 | tokenExpirationBuffer | number | No | No | Buffer time (in seconds) to subtract from the access token’s expiration time. This causes the token to be treated as expired before its actual expiration, helping to avoid token expiration during API calls. Defaults to 60 seconds. |
 | wristbandApplicationVanityDomain | string | Yes | No | The vanity domain of the Wristband application. |
 
@@ -913,7 +913,7 @@ logout(req: Request, res: Response, config?: LogoutConfig): Promise<string>;
 const logoutUrl = await logout(req, res, { refreshToken: '98yht308hf902hc90wh09' });
 ```
 
-When users of your application are ready to log out and/or their application session expires, your frontend should redirect the user to your Next.js Logout Endpoint.
+When users of your application are ready to log out and/or their application session expires, your frontend should redirect the user to your Express Logout Endpoint.
 
 ```sh
 GET https://customer01.yourapp.io/auth/logout
