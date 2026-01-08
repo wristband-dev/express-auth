@@ -1835,7 +1835,7 @@ This SDK leverages the Wristband TypeScript Session SDK for encrypted cookie-bas
 
 This SDK leverages the Wristband TypeScript JWT SDK for JWT validation when using the `JWT` authentication strategy in middleware. It handles JWT signature verification, token parsing, and JWKS key management. The JWT SDK functions are also re-exported from this package, allowing you to use them directly for custom JWT validation scenarios beyond the built-in middleware strategy. Refer to that GitHub repository for more information on JWT validation configuration and options.
 
-**[@wristband/react-client-auth](https://github.com/wristband-dev/react-auth)**
+**[@wristband/react-client-auth](https://github.com/wristband-dev/react-client-auth)**
 
 For handling client-side authentication and session management in your React frontend, check out the Wristband React Client Auth SDK. It integrates seamlessly with this backend SDK by consuming the Session and Token endpoints you create. Refer to that GitHub repository for more information on frontend authentication patterns.
 
