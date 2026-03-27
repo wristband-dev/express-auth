@@ -1,5 +1,4 @@
 import { NextFunction, Request, Response } from 'express';
-import { AxiosError } from 'axios';
 import {
   createWristbandJwtValidator,
   WristbandJwtValidatorConfig,
@@ -40,7 +39,7 @@ import {
   UserInfo,
   WristbandTokenResponse,
 } from './types';
-import { InvalidGrantError, WristbandError } from './error';
+import { FetchError, InvalidGrantError, WristbandError } from './error';
 import { ConfigResolver } from './config-resolver';
 import { isValidCsrf, normalizeAuthMiddlewareConfig, sendAuthFailureResponse } from './utils/middleware';
 
@@ -402,23 +401,25 @@ export class AuthService {
       } catch (error: unknown) {
         // Specifically handle invalid_grant errors
         if (error instanceof InvalidGrantError) {
-          throw error;
+          throw new WristbandError('invalid_refresh_token', error.errorDescription, error);
         }
 
         // Only 4xx errors should short-circuit the retry loop early.
         if (
-          error instanceof AxiosError &&
+          error instanceof FetchError &&
           error.response &&
           error.response.status >= 400 &&
           error.response.status < 500
         ) {
-          const errorDescription = error.response.data?.error_description ?? 'Invalid Refresh Token';
-          throw new WristbandError('invalid_refresh_token', errorDescription);
+          // Only 4xx errors should short-circuit the retry loop early.
+          const errorDescription =
+            error.body && error.body.error_description ? error.body.error_description : 'Invalid Refresh Token';
+          throw new WristbandError('invalid_refresh_token', errorDescription, error);
         }
 
         // Last attempt failed
         if (attempt === MAX_REFRESH_ATTEMPTS) {
-          throw new WristbandError('unexpected_error', 'Unexpected Error');
+          throw new WristbandError('unexpected_error', 'Unexpected Error', error instanceof Error ? error : undefined);
         }
 
         // Wait before next retry (only for 5xx errors or network failures)

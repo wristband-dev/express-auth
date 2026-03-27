@@ -1,7 +1,5 @@
-/* eslint-disable import/no-extraneous-dependencies */
 /* eslint-disable no-underscore-dangle */
 
-import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
@@ -9,6 +7,26 @@ import { createWristbandAuth, WristbandAuth } from '../../src/index';
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
 const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
+
+function mockFetchRevoke(status: number) {
+  global.fetch = jest.fn().mockResolvedValue({
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {
+      get: () => {
+        return 'application/json';
+      },
+    },
+    text: jest.fn().mockResolvedValue(''),
+  });
+}
+
+function expectRevokeCalled(domain: string) {
+  expect(global.fetch).toHaveBeenCalledWith(
+    `https://${domain}/api/v1/oauth2/revoke`,
+    expect.objectContaining({ method: 'POST', body: 'token=refreshToken' })
+  );
+}
 
 describe('Multi Tenant Logout', () => {
   let wristbandAuth: WristbandAuth;
@@ -22,16 +40,16 @@ describe('Multi Tenant Logout', () => {
     loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
     redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
     wristbandApplicationVanityDomain = 'invotasticb2c-invotastic.dev.wristband.dev';
-    nock.cleanAll();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('Domain Resolution Priority Tests', () => {
     describe('Priority 1: logoutConfig.tenantCustomDomain (highest priority)', () => {
       test('tenantCustomDomain config overrides everything else', async () => {
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -70,16 +88,13 @@ describe('Multi Tenant Logout', () => {
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
         expect(searchParams.get('redirect_url')).toEqual('https://example.com');
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
     });
 
     describe('Priority 2: logoutConfig.tenantName', () => {
       test('tenantName config with default separator', async () => {
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -115,14 +130,11 @@ describe('Multi Tenant Logout', () => {
         expect(pathname).toEqual('/api/v1/logout');
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
 
       test('tenantName config with custom domain separator', async () => {
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -158,16 +170,13 @@ describe('Multi Tenant Logout', () => {
         expect(pathname).toEqual('/api/v1/logout');
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
     });
 
     describe('Priority 3: tenant_custom_domain query parameter', () => {
       test('tenant_custom_domain query param used when no config overrides', async () => {
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -202,14 +211,11 @@ describe('Multi Tenant Logout', () => {
         expect(pathname).toEqual('/api/v1/logout');
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
 
       test('tenant_custom_domain query param with redirect URL', async () => {
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -246,7 +252,7 @@ describe('Multi Tenant Logout', () => {
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
         expect(searchParams.get('redirect_url')).toEqual('https://redirect.example.com');
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
     });
 
@@ -260,10 +266,7 @@ describe('Multi Tenant Logout', () => {
           loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
           redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-          const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-            .persist()
-            .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-            .reply(200);
+          mockFetchRevoke(200);
 
           wristbandAuth = createWristbandAuth({
             clientId: CLIENT_ID,
@@ -298,7 +301,7 @@ describe('Multi Tenant Logout', () => {
           expect(pathname).toEqual('/api/v1/logout');
           expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-          scope.done();
+          expectRevokeCalled(wristbandApplicationVanityDomain);
         });
 
         test(`tenant subdomain with custom domain separator using ${placeholderName}`, async () => {
@@ -306,10 +309,7 @@ describe('Multi Tenant Logout', () => {
           loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
           redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-          const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-            .persist()
-            .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-            .reply(200);
+          mockFetchRevoke(200);
 
           wristbandAuth = createWristbandAuth({
             clientId: CLIENT_ID,
@@ -345,16 +345,13 @@ describe('Multi Tenant Logout', () => {
           expect(pathname).toEqual('/api/v1/logout');
           expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-          scope.done();
+          expectRevokeCalled(wristbandApplicationVanityDomain);
         });
       });
 
       describe('4b: Tenant subdomains disabled - query param', () => {
         test('tenant_name query parameter with default separator', async () => {
-          const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-            .persist()
-            .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-            .reply(200);
+          mockFetchRevoke(200);
 
           wristbandAuth = createWristbandAuth({
             clientId: CLIENT_ID,
@@ -389,14 +386,11 @@ describe('Multi Tenant Logout', () => {
           expect(pathname).toEqual('/api/v1/logout');
           expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-          scope.done();
+          expectRevokeCalled(wristbandApplicationVanityDomain);
         });
 
         test('tenant_name query parameter with custom domain separator', async () => {
-          const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-            .persist()
-            .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-            .reply(200);
+          mockFetchRevoke(200);
 
           wristbandAuth = createWristbandAuth({
             clientId: CLIENT_ID,
@@ -432,7 +426,7 @@ describe('Multi Tenant Logout', () => {
           expect(pathname).toEqual('/api/v1/logout');
           expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-          scope.done();
+          expectRevokeCalled(wristbandApplicationVanityDomain);
         });
       });
     });
@@ -530,10 +524,7 @@ describe('Multi Tenant Logout', () => {
 
   describe('Logout Happy Path', () => {
     test('Default Configuration', async () => {
-      const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-        .reply(200);
+      mockFetchRevoke(200);
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -578,7 +569,7 @@ describe('Multi Tenant Logout', () => {
       expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
       expect(searchParams.get('redirect_url')).toEqual('https://google.com');
 
-      scope.done();
+      expectRevokeCalled(wristbandApplicationVanityDomain);
     });
 
     describe.each([
@@ -590,10 +581,7 @@ describe('Multi Tenant Logout', () => {
         loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
         redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -637,7 +625,7 @@ describe('Multi Tenant Logout', () => {
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
         expect(searchParams.get('redirect_url')).toBeFalsy();
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
     });
 
@@ -651,10 +639,7 @@ describe('Multi Tenant Logout', () => {
         loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
         redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -699,7 +684,7 @@ describe('Multi Tenant Logout', () => {
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
         expect(searchParams.get('redirect_url')).toBeFalsy();
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
     });
 
@@ -709,10 +694,7 @@ describe('Multi Tenant Logout', () => {
       loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
       redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
 
-      const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-        .reply(200);
+      mockFetchRevoke(200);
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -757,7 +739,7 @@ describe('Multi Tenant Logout', () => {
       expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
       expect(searchParams.get('redirect_url')).toBeFalsy();
 
-      scope.done();
+      expectRevokeCalled(wristbandApplicationVanityDomain);
     });
 
     test('Custom Domains with Tenant Custom Domain, without subdomains, with tenantName config', async () => {
@@ -766,10 +748,7 @@ describe('Multi Tenant Logout', () => {
       loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
       redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
 
-      const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-        .reply(200);
+      mockFetchRevoke(200);
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -815,7 +794,7 @@ describe('Multi Tenant Logout', () => {
       expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
       expect(searchParams.get('redirect_url')).toBeFalsy();
 
-      scope.done();
+      expectRevokeCalled(wristbandApplicationVanityDomain);
     });
 
     describe.each([
@@ -828,10 +807,7 @@ describe('Multi Tenant Logout', () => {
         loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
         redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -877,7 +853,7 @@ describe('Multi Tenant Logout', () => {
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
         expect(searchParams.get('redirect_url')).toBeFalsy();
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
 
       test('with tenantName config', async () => {
@@ -886,10 +862,7 @@ describe('Multi Tenant Logout', () => {
         loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
         redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(200);
+        mockFetchRevoke(200);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -936,7 +909,7 @@ describe('Multi Tenant Logout', () => {
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
         expect(searchParams.get('redirect_url')).toBeFalsy();
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
     });
 
@@ -946,10 +919,7 @@ describe('Multi Tenant Logout', () => {
       loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
       redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-      const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-        .reply(200);
+      mockFetchRevoke(200);
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -994,7 +964,7 @@ describe('Multi Tenant Logout', () => {
       expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
       expect(searchParams.get('redirect_url')).toBeFalsy();
 
-      scope.done();
+      expectRevokeCalled(wristbandApplicationVanityDomain);
     });
 
     test('Tenant Domain with Tenant Name query param', async () => {
@@ -1003,10 +973,7 @@ describe('Multi Tenant Logout', () => {
       loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
       redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
 
-      const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-        .persist()
-        .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-        .reply(200);
+      mockFetchRevoke(200);
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -1049,7 +1016,7 @@ describe('Multi Tenant Logout', () => {
       expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
       expect(searchParams.get('redirect_url')).toBeFalsy();
 
-      scope.done();
+      expectRevokeCalled(wristbandApplicationVanityDomain);
     });
 
     describe('Refresh Token Edge Cases', () => {
@@ -1101,10 +1068,7 @@ describe('Multi Tenant Logout', () => {
       });
 
       test('Revoke Token Failure', async () => {
-        const scope = nock(`https://${wristbandApplicationVanityDomain}`)
-          .persist()
-          .post('/api/v1/oauth2/revoke', 'token=refreshToken')
-          .reply(401);
+        mockFetchRevoke(401);
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -1148,7 +1112,7 @@ describe('Multi Tenant Logout', () => {
         // Validate query params of Logout URL
         expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
-        scope.done();
+        expectRevokeCalled(wristbandApplicationVanityDomain);
       });
     });
   });

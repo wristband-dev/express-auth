@@ -1,13 +1,8 @@
-import { AxiosError, AxiosRequestConfig } from 'axios';
-import { WristbandApiClient } from './wristband-api-client';
-import { JSON_MEDIA_TYPE } from './utils/constants';
+import { FetchError, InvalidGrantError } from './error';
 import { SdkConfiguration, UserInfo, WristbandTokenResponse, WristbandUserinfoResponse } from './types';
-import { InvalidGrantError } from './error';
-
-const SDK_CONFIGS_AXIOS_REQUEST_CONFIG: AxiosRequestConfig = {
-  auth: undefined,
-  headers: { 'Content-Type': JSON_MEDIA_TYPE, Accept: JSON_MEDIA_TYPE },
-};
+import { encodeBase64 } from './utils';
+import { FORM_URLENCODED_MEDIA_TYPE, JSON_MEDIA_TYPE } from './utils/constants';
+import { WristbandApiClient } from './wristband-api-client';
 
 /**
  * Service class for making REST API calls to the Wristband platform.
@@ -20,9 +15,8 @@ const SDK_CONFIGS_AXIOS_REQUEST_CONFIG: AxiosRequestConfig = {
  */
 export class WristbandService {
   private wristbandApiClient: WristbandApiClient;
+  private basicAuthHeaders: HeadersInit;
   private clientId: string;
-  private clientSecret: string;
-  private basicAuthConfig: AxiosRequestConfig;
 
   constructor(wristbandApplicationVanityDomain: string, clientId: string, clientSecret: string) {
     if (!wristbandApplicationVanityDomain || !wristbandApplicationVanityDomain.trim()) {
@@ -39,9 +33,10 @@ export class WristbandService {
 
     this.wristbandApiClient = new WristbandApiClient(wristbandApplicationVanityDomain);
     this.clientId = clientId;
-    this.clientSecret = clientSecret;
-    this.basicAuthConfig = {
-      auth: { username: this.clientId, password: this.clientSecret },
+    this.basicAuthHeaders = {
+      'Content-Type': FORM_URLENCODED_MEDIA_TYPE,
+      Accept: JSON_MEDIA_TYPE,
+      Authorization: `Basic ${encodeBase64(`${clientId}:${clientSecret}`)}`,
     };
   }
 
@@ -55,11 +50,10 @@ export class WristbandService {
    * @throws {Error} When the API request fails
    */
   async getSdkConfiguration(): Promise<SdkConfiguration> {
-    const response = await this.wristbandApiClient.axiosInstance.get(
-      `/clients/${this.clientId}/sdk-configuration`,
-      SDK_CONFIGS_AXIOS_REQUEST_CONFIG
-    );
-    return response.data;
+    return this.wristbandApiClient.get<SdkConfiguration>(`/clients/${this.clientId}/sdk-configuration`, {
+      'Content-Type': JSON_MEDIA_TYPE,
+      Accept: JSON_MEDIA_TYPE,
+    });
   }
 
   /**
@@ -88,20 +82,21 @@ export class WristbandService {
       throw new Error('Code verifier is required');
     }
 
+    const authData: string = [
+      'grant_type=authorization_code',
+      `code=${code}`,
+      `redirect_uri=${encodeURIComponent(redirectUri)}`,
+      `code_verifier=${encodeURIComponent(codeVerifier)}`,
+    ].join('&');
+
     try {
-      const formParams: string = `grant_type=authorization_code&code=${code}&redirect_uri=${redirectUri}&code_verifier=${codeVerifier}`;
-      const tokenResponse = await this.wristbandApiClient.axiosInstance.post(
+      return await this.wristbandApiClient.post<WristbandTokenResponse>(
         '/oauth2/token',
-        formParams,
-        this.basicAuthConfig
+        authData,
+        this.basicAuthHeaders
       );
-
-      // Validate response data is a valid WristbandTokenResponse
-      WristbandService.validateTokenResponse(tokenResponse.data);
-
-      return tokenResponse.data;
-    } catch (error: unknown) {
-      if (WristbandService.isAxiosError(error) && WristbandService.hasInvalidGrantError(error)) {
+    } catch (error) {
+      if (WristbandService.hasInvalidGrantError(error)) {
         throw new InvalidGrantError(WristbandService.getErrorDescription(error) || 'Invalid grant');
       }
       throw error;
@@ -125,20 +120,14 @@ export class WristbandService {
       throw new Error('Access token is required');
     }
 
-    const bearerTokenConfig = {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': JSON_MEDIA_TYPE,
-        Accept: JSON_MEDIA_TYPE,
-      },
-    };
+    const userinfo = await this.wristbandApiClient.get('/oauth2/userinfo', {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': JSON_MEDIA_TYPE,
+      Accept: JSON_MEDIA_TYPE,
+    });
 
-    const response = await this.wristbandApiClient.axiosInstance.get('/oauth2/userinfo', bearerTokenConfig);
-
-    // Validate response data is a valid UserInfo object
-    WristbandService.validateUserinfoResponse(response.data);
-
-    return WristbandService.mapUserinfoClaims(response.data);
+    WristbandService.validateUserinfoResponse(userinfo);
+    return WristbandService.mapUserinfoClaims(userinfo);
   }
 
   /**
@@ -157,20 +146,16 @@ export class WristbandService {
       throw new Error('Refresh token is required');
     }
 
+    const authData: string = `grant_type=refresh_token&refresh_token=${refreshToken}`;
+
     try {
-      const formParams: string = `grant_type=refresh_token&refresh_token=${refreshToken}`;
-      const tokenResponse = await this.wristbandApiClient.axiosInstance.post(
+      return await this.wristbandApiClient.post<WristbandTokenResponse>(
         '/oauth2/token',
-        formParams,
-        this.basicAuthConfig
+        authData,
+        this.basicAuthHeaders
       );
-
-      // Validate response data is a valid WristbandTokenResponse
-      WristbandService.validateTokenResponse(tokenResponse.data);
-
-      return tokenResponse.data;
-    } catch (error: unknown) {
-      if (WristbandService.isAxiosError(error) && WristbandService.hasInvalidGrantError(error)) {
+    } catch (error) {
+      if (WristbandService.hasInvalidGrantError(error)) {
         throw new InvalidGrantError(WristbandService.getErrorDescription(error) || 'Invalid refresh token');
       }
       throw error;
@@ -193,7 +178,7 @@ export class WristbandService {
       throw new Error('Refresh token is required');
     }
 
-    await this.wristbandApiClient.axiosInstance.post('/oauth2/revoke', `token=${refreshToken}`, this.basicAuthConfig);
+    await this.wristbandApiClient.post<void>('/oauth2/revoke', `token=${refreshToken}`, this.basicAuthHeaders);
   }
 
   /// /////////////////////////////////
@@ -201,71 +186,37 @@ export class WristbandService {
   /// /////////////////////////////////
 
   /**
-   * Type guard to check if an error is an Axios error.
+   * Checks if an error is a FetchError containing an invalid_grant error code.
    *
    * @param error - The error to check
-   * @returns True if the error is an AxiosError
+   * @returns True if the error is a FetchError with an invalid_grant body
    *
    * @internal
    */
-  private static isAxiosError(error: unknown): error is AxiosError {
-    return !!error && typeof error === 'object' && 'isAxiosError' in error;
+  private static hasInvalidGrantError(error: unknown): boolean {
+    if (error instanceof FetchError) {
+      const data = error.body;
+      return data && typeof data === 'object' && 'error' in data && (data as any).error === 'invalid_grant';
+    }
+    return false;
   }
 
   /**
-   * Checks if an Axios error response contains an invalid_grant error.
+   * Extracts the error_description field from a FetchError response body.
    *
-   * @param error - The Axios error to check
-   * @returns True if the error response has error code 'invalid_grant'
-   *
-   * @internal
-   */
-  private static hasInvalidGrantError(error: AxiosError): boolean {
-    return (
-      !!error.response?.data &&
-      typeof error.response.data === 'object' &&
-      'error' in error.response.data &&
-      error.response.data.error === 'invalid_grant'
-    );
-  }
-
-  /**
-   * Extracts the error_description field from an Axios error response.
-   *
-   * @param error - The Axios error
+   * @param error - The error to inspect
    * @returns The error description string, or undefined if not present
    *
    * @internal
    */
-  private static getErrorDescription(error: AxiosError): string | undefined {
-    if (error.response?.data && typeof error.response.data === 'object' && 'error_description' in error.response.data) {
-      return error.response.data.error_description as string;
+  private static getErrorDescription(error: unknown): string | undefined {
+    if (error instanceof FetchError) {
+      const data = error.body;
+      if (data && typeof data === 'object' && 'error_description' in data) {
+        return (data as any).error_description as string;
+      }
     }
     return undefined;
-  }
-
-  /**
-   * Validates that a token response contains required fields.
-   *
-   * Ensures the response has access_token and expires_in fields with correct types.
-   *
-   * @param data - The response data to validate
-   * @throws {Error} When response is invalid or missing required fields
-   *
-   * @internal
-   */
-  private static validateTokenResponse(data: any): asserts data is WristbandTokenResponse {
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid token response');
-    }
-
-    if (!('access_token' in data) || typeof data.access_token !== 'string') {
-      throw new Error('Invalid token response: missing access_token');
-    }
-
-    if (!('expires_in' in data) || typeof data.expires_in !== 'number') {
-      throw new Error('Invalid token response: missing expires_in');
-    }
   }
 
   /**
@@ -276,16 +227,15 @@ export class WristbandService {
    * app_id (applicationId), and idp_name (identityProviderName).
    *
    * @param data - The raw response data from the userinfo endpoint
-   * @throws {Error} When response is not an object or missing required claims
+   * @throws {TypeError} When response is not an object or missing required claims
    *
    * @internal
    */
   private static validateUserinfoResponse(data: any): asserts data is WristbandUserinfoResponse {
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new TypeError('Invalid userinfo response: expected object');
     }
 
-    // Validate required fields that are always present
     if (!data.sub || typeof data.sub !== 'string') {
       throw new TypeError('Invalid userinfo response: missing sub claim');
     }
@@ -307,7 +257,6 @@ export class WristbandService {
    * @param userinfo - Raw userinfo claims from Wristband auth SDK
    * @returns Structured UserInfo object from Wristband session SDK
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private static mapUserinfoClaims(userinfo: WristbandUserinfoResponse): UserInfo {
     return {
       // Always present

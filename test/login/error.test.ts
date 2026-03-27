@@ -85,6 +85,21 @@ describe('Login Errors', () => {
     }
   });
 
+  test('With multiple idp_hint query params throws TypeError', async () => {
+    const mockExpressReq = httpMocks.createRequest({
+      query: { tenant_name: 'test', idp_hint: ['hint1', 'hint2'] },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    try {
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
+      fail('Error expected to be thrown.');
+    } catch (error: any) {
+      expect(error instanceof TypeError).toBe(true);
+      expect(error.message).toBe('More than one [idp_hint] query parameter was encountered');
+    }
+  });
+
   test('Way too large customState', async () => {
     const mockExpressReq = httpMocks.createRequest({
       query: { tenant_name: 'test' },

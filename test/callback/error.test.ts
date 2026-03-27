@@ -1,4 +1,3 @@
-import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 
 import { LoginState } from '../../src/types';
@@ -13,6 +12,19 @@ const LOGIN_URL = 'http://localhost:6001/api/auth/login';
 const REDIRECT_URI = 'http://localhost:6001/api/auth/callback';
 const WRISTBAND_APPLICATION_DOMAIN = 'invotasticb2c-invotastic.dev.wristband.dev';
 
+function mockFetchToken(status: number, body: unknown) {
+  global.fetch = jest.fn().mockResolvedValue({
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {
+      get: () => {
+        return 'application/json';
+      },
+    },
+    text: jest.fn().mockResolvedValue(JSON.stringify(body)),
+  });
+}
+
 describe('Callback Errors', () => {
   let wristbandAuth: WristbandAuth;
 
@@ -26,17 +38,18 @@ describe('Callback Errors', () => {
       wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
       autoConfigureEnabled: false,
     });
-    nock.cleanAll();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test('Invalid state query param', async () => {
-    // Mock Express objects
     let mockExpressReq = httpMocks.createRequest({
       query: { code: 'code', tenant_name: 'devs4you' },
     }) as any;
     let mockExpressRes = httpMocks.createResponse() as any;
 
-    // Missing state query parameter should throw an error
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -50,7 +63,6 @@ describe('Callback Errors', () => {
     }) as unknown as Request;
     mockExpressRes = httpMocks.createResponse();
 
-    // Multiple state query parameters should throw an error
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -61,7 +73,6 @@ describe('Callback Errors', () => {
   });
 
   test('Invalid code query param', async () => {
-    // Mock login state
     const loginState: LoginState = {
       codeVerifier: 'codeVerifier',
       redirectUri: REDIRECT_URI,
@@ -69,7 +80,6 @@ describe('Callback Errors', () => {
     };
     const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
 
-    // Mock Express objects
     let mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_name: 'devs4you' },
       headers: {
@@ -78,7 +88,6 @@ describe('Callback Errors', () => {
     }) as any;
     let mockExpressRes = httpMocks.createResponse() as any;
 
-    // Missing code query parameter should throw an error for happy path scenarios.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -94,7 +103,7 @@ describe('Callback Errors', () => {
       },
     }) as unknown as Request;
     mockExpressRes = httpMocks.createResponse() as unknown as Response;
-    // Multiple code query parameters should throw an error.
+
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -105,7 +114,6 @@ describe('Callback Errors', () => {
   });
 
   test('Invalid error query param', async () => {
-    // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', error: ['a', 'b'] },
       headers: {
@@ -114,7 +122,6 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    // Multiple error query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -125,7 +132,6 @@ describe('Callback Errors', () => {
   });
 
   test('Invalid error_description query param', async () => {
-    // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', error_description: ['a', 'b'] },
       headers: {
@@ -134,7 +140,6 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    // Multiple error_description query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -145,7 +150,6 @@ describe('Callback Errors', () => {
   });
 
   test('Invalid tenant_name query param', async () => {
-    // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_name: ['a', 'b'] },
       headers: {
@@ -154,7 +158,6 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    // Multiple tenant_name query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -165,7 +168,6 @@ describe('Callback Errors', () => {
   });
 
   test('Invalid tenant_custom_domain query param', async () => {
-    // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_custom_domain: ['a', 'b'] },
       headers: {
@@ -174,7 +176,6 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    // Multiple error query parameters should throw an error.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -187,7 +188,6 @@ describe('Callback Errors', () => {
   });
 
   test('Error query parameter throws WristbandError', async () => {
-    // Mock login state
     const loginState: LoginState = {
       codeVerifier: 'codeVerifier',
       redirectUri: REDIRECT_URI,
@@ -195,7 +195,6 @@ describe('Callback Errors', () => {
     };
     const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
 
-    // Mock Express objects
     const mockExpressReq = httpMocks.createRequest({
       query: { state: 'state', tenant_name: 'devs4you', error: 'BAD', error_description: 'Really bad' },
       headers: {
@@ -204,7 +203,6 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    // Only some errors are handled automatically by the SDK. All others will throw a WristbandError.
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
       fail('Error expected to be thrown.');
@@ -223,7 +221,6 @@ describe('Callback Errors', () => {
         code: 'testcode',
         tenant_name: 'tenant1',
       },
-      // No cookie header
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
@@ -315,10 +312,7 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(400, {
-      error: 'invalid_grant',
-      error_description: 'Token exchange failed',
-    });
+    mockFetchToken(400, { error: 'invalid_grant', error_description: 'Token exchange failed' });
 
     const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
 
@@ -349,10 +343,7 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(500, {
-      error: 'server_error',
-      error_description: 'Internal server error',
-    });
+    mockFetchToken(500, { error: 'server_error', error_description: 'Internal server error' });
 
     try {
       await wristbandAuth.callback(mockExpressReq, mockExpressRes);
@@ -402,10 +393,7 @@ describe('Callback Errors', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`).post('/api/v1/oauth2/token').reply(400, {
-      error: 'invalid_grant',
-      error_description: 'Token exchange failed',
-    });
+    mockFetchToken(400, { error: 'invalid_grant', error_description: 'Token exchange failed' });
 
     const result = await tenantSubdomainAuth.callback(mockExpressReq, mockExpressRes);
 

@@ -1,250 +1,250 @@
-import axios from 'axios';
 import { WristbandApiClient } from '../src/wristband-api-client';
+import { FetchError } from '../src/error/fetch-error';
 import { FORM_URLENCODED_MEDIA_TYPE, JSON_MEDIA_TYPE } from '../src/utils/constants';
 
-// Mock axios.create to avoid actual HTTP calls
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+const WRISTBAND_DOMAIN = 'test.wristband.dev';
+const BASE_URL = `https://${WRISTBAND_DOMAIN}/api/v1`;
+
+function mockFetch(status: number, body: unknown, contentType = 'application/json') {
+  const bodyText = typeof body === 'string' ? body : JSON.stringify(body);
+  global.fetch = jest.fn().mockResolvedValue({
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {
+      get: () => {
+        return contentType;
+      },
+    },
+    text: jest.fn().mockResolvedValue(bodyText),
+    json: jest.fn().mockResolvedValue(body),
+  });
+}
 
 describe('WristbandApiClient', () => {
-  const WRISTBAND_DOMAIN = 'test.wristband.dev';
-  let wristbandApiClient: WristbandApiClient;
-  let mockAxiosInstance: any;
+  let client: WristbandApiClient;
 
   beforeEach(() => {
-    mockAxiosInstance = {
-      get: jest.fn(),
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
-      patch: jest.fn(),
-      request: jest.fn(),
-    };
-    mockedAxios.create.mockReturnValue(mockAxiosInstance);
-    wristbandApiClient = new WristbandApiClient(WRISTBAND_DOMAIN);
+    client = new WristbandApiClient(WRISTBAND_DOMAIN);
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Constructor', () => {
-    test('Creates axios instance with correct base URL', () => {
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: `https://${WRISTBAND_DOMAIN}/api/v1` })
-      );
+    test('Sets correct base URL from domain', () => {
+      mockFetch(200, {});
+      client.get('/test');
+      expect(global.fetch).toHaveBeenCalledWith(`${BASE_URL}/test`, expect.any(Object));
     });
 
-    test('Sets correct default headers', () => {
-      expect(mockedAxios.create).toHaveBeenCalledWith(
+    test('Sets default Content-Type and Accept headers', () => {
+      mockFetch(200, {});
+      client.get('/test');
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
         expect.objectContaining({
-          headers: { 'Content-Type': FORM_URLENCODED_MEDIA_TYPE, Accept: JSON_MEDIA_TYPE },
+          headers: expect.objectContaining({
+            'Content-Type': FORM_URLENCODED_MEDIA_TYPE,
+            Accept: JSON_MEDIA_TYPE,
+          }),
         })
       );
     });
 
-    test('Configures HTTP agent with correct settings', () => {
-      const createCall = mockedAxios.create.mock.calls[0]?.[0];
-      expect(createCall).toBeDefined();
-      expect(createCall!.httpAgent).toBeDefined();
-      expect(createCall!.httpAgent.keepAlive).toBe(true);
-      expect(createCall!.httpAgent.maxSockets).toBe(100);
-      expect(createCall!.httpAgent.maxFreeSockets).toBe(10);
-      expect(createCall!.httpAgent.options.timeout).toBe(60000);
-      expect(createCall!.httpAgent.keepAliveMsecs).toBe(1000);
-      expect(createCall!.httpAgent.scheduling).toBe('lifo');
-    });
-
-    test('Configures HTTPS agent with correct settings', () => {
-      const createCall = mockedAxios.create.mock.calls[0]?.[0];
-      expect(createCall).toBeDefined();
-      expect(createCall!.httpsAgent).toBeDefined();
-      expect(createCall!.httpsAgent.keepAlive).toBe(true);
-      expect(createCall!.httpsAgent.maxSockets).toBe(100);
-      expect(createCall!.httpsAgent.maxFreeSockets).toBe(10);
-      expect(createCall!.httpsAgent.options.timeout).toBe(60000);
-      expect(createCall!.httpsAgent.keepAliveMsecs).toBe(1000);
-      expect(createCall!.httpsAgent.scheduling).toBe('lifo');
-    });
-
-    test('Disables redirects', () => {
-      expect(mockedAxios.create).toHaveBeenCalledWith(expect.objectContaining({ maxRedirects: 0 }));
-    });
-
-    test('Exposes axios instance publicly', () => {
-      expect(wristbandApiClient.axiosInstance).toBe(mockAxiosInstance);
+    test('Handles different domains correctly', () => {
+      const otherClient = new WristbandApiClient('other.wristband.dev');
+      mockFetch(200, {});
+      otherClient.get('/test');
+      expect(global.fetch).toHaveBeenCalledWith('https://other.wristband.dev/api/v1/test', expect.any(Object));
     });
   });
 
-  describe('Multiple instances', () => {
-    test('Creates axios instances for different domains', () => {
-      const domain1 = 'domain1.wristband.dev';
-      const domain2 = 'domain2.wristband.dev';
+  describe('get()', () => {
+    test('Makes GET request to correct URL', async () => {
+      mockFetch(200, { result: 'ok' });
+      await client.get('/oauth2/userinfo');
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}/oauth2/userinfo`,
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
 
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(domain1);
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(domain2);
+    test('Returns parsed JSON body on success', async () => {
+      const responseBody = { sub: 'user-123', tnt_id: 'tenant-abc' };
+      mockFetch(200, responseBody);
+      const result = await client.get('/oauth2/userinfo');
+      expect(result).toEqual(responseBody);
+    });
 
-      // Including the beforeEach call
-      expect(mockedAxios.create).toHaveBeenCalledTimes(3);
+    test('Merges per-request headers with defaults', async () => {
+      mockFetch(200, {});
+      await client.get('/test', { Authorization: 'Bearer token123' });
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': FORM_URLENCODED_MEDIA_TYPE,
+            Accept: JSON_MEDIA_TYPE,
+            Authorization: 'Bearer token123',
+          }),
+        })
+      );
+    });
 
-      const calls = mockedAxios.create.mock.calls.map((call) => {
-        return call[0]?.baseURL;
+    test('Per-request headers override defaults', async () => {
+      mockFetch(200, {});
+      await client.get('/test', { 'Content-Type': JSON_MEDIA_TYPE });
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Content-Type': JSON_MEDIA_TYPE }),
+        })
+      );
+    });
+
+    test('Sets keepalive to true', async () => {
+      mockFetch(200, {});
+      await client.get('/test');
+      expect(global.fetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ keepalive: true }));
+    });
+
+    test('Throws FetchError on 400 response', async () => {
+      const errorBody = { error: 'bad_request', error_description: 'Invalid request' };
+      mockFetch(400, errorBody);
+      await expect(client.get('/test')).rejects.toThrow(FetchError);
+    });
+
+    test('Throws FetchError on 401 response', async () => {
+      mockFetch(401, { error: 'unauthorized' });
+      await expect(client.get('/test')).rejects.toThrow(FetchError);
+    });
+
+    test('Throws FetchError on 500 response', async () => {
+      mockFetch(500, { error: 'server_error' });
+      await expect(client.get('/test')).rejects.toThrow(FetchError);
+    });
+
+    test('FetchError carries correct status and body', async () => {
+      const errorBody = { error: 'invalid_grant', error_description: 'Code expired' };
+      mockFetch(400, errorBody);
+      try {
+        await client.get('/test');
+        fail('Expected FetchError to be thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(FetchError);
+        const fetchError = err as FetchError<Response>;
+        expect(fetchError.response?.status).toBe(400);
+        expect(fetchError.body).toEqual(errorBody);
+      }
+    });
+
+    test('Returns undefined on 204 No Content', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        status: 204,
+        ok: true,
+        headers: {
+          get: () => {
+            return null;
+          },
+        },
+        text: jest.fn().mockResolvedValue(''),
       });
-
-      expect(calls).toContain(`https://${domain1}/api/v1`);
-      expect(calls).toContain(`https://${domain2}/api/v1`);
+      const result = await client.get('/test');
+      expect(result).toBeUndefined();
     });
   });
 
-  describe('Domain handling', () => {
-    test('Handles domain with protocol (strips it)', () => {
-      const domainWithProtocol = 'https://test.wristband.dev';
-
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(domainWithProtocol);
-
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: `https://${domainWithProtocol}/api/v1` })
+  describe('post()', () => {
+    test('Makes POST request to correct URL', async () => {
+      mockFetch(200, { access_token: 'token', expires_in: 3600 });
+      await client.post('/oauth2/token', 'grant_type=authorization_code&code=abc');
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}/oauth2/token`,
+        expect.objectContaining({ method: 'POST' })
       );
     });
 
-    test('Handles domain with path (includes it)', () => {
-      const domainWithPath = 'test.wristband.dev/custom';
+    test('Sends body in request', async () => {
+      mockFetch(200, {});
+      const body = 'grant_type=refresh_token&refresh_token=abc123';
+      await client.post('/oauth2/token', body);
+      expect(global.fetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ body }));
+    });
 
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(domainWithPath);
+    test('Returns parsed JSON body on success', async () => {
+      const responseBody = { access_token: 'token123', expires_in: 3600 };
+      mockFetch(200, responseBody);
+      const result = await client.post('/oauth2/token', 'grant_type=refresh_token&refresh_token=abc');
+      expect(result).toEqual(responseBody);
+    });
 
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: `https://${domainWithPath}/api/v1` })
+    test('Merges per-request headers with defaults', async () => {
+      mockFetch(200, {});
+      await client.post('/oauth2/token', 'body', { Authorization: 'Basic dXNlcjpwYXNz' });
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': FORM_URLENCODED_MEDIA_TYPE,
+            Accept: JSON_MEDIA_TYPE,
+            Authorization: 'Basic dXNlcjpwYXNz',
+          }),
+        })
       );
     });
 
-    test('Handles domain with port', () => {
-      const domainWithPort = 'test.wristband.dev:8080';
-
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(domainWithPort);
-
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: `https://${domainWithPort}/api/v1` })
-      );
+    test('Sets keepalive to true', async () => {
+      mockFetch(200, {});
+      await client.post('/test', 'body');
+      expect(global.fetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ keepalive: true }));
     });
 
-    test('Handles empty domain', () => {
-      const emptyDomain = '';
-
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(emptyDomain);
-
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: `https://${emptyDomain}/api/v1` })
-      );
-    });
-  });
-
-  describe('Agent configuration validation', () => {
-    test('HTTP and HTTPS agents have identical configurations', () => {
-      const createCall = mockedAxios.create.mock.calls[0]?.[0];
-      expect(createCall).toBeDefined();
-
-      const httpAgent = createCall!.httpAgent;
-      const httpsAgent = createCall!.httpsAgent;
-
-      // Compare all properties
-      expect(httpAgent.keepAlive).toBe(httpsAgent.keepAlive);
-      expect(httpAgent.maxSockets).toBe(httpsAgent.maxSockets);
-      expect(httpAgent.maxFreeSockets).toBe(httpsAgent.maxFreeSockets);
-      expect(httpAgent.timeout).toBe(httpsAgent.timeout);
-      expect(httpAgent.keepAliveMsecs).toBe(httpsAgent.keepAliveMsecs);
-      expect(httpAgent.scheduling).toBe(httpsAgent.scheduling);
+    test('Throws FetchError on 400 response', async () => {
+      const errorBody = { error: 'invalid_grant', error_description: 'Invalid code' };
+      mockFetch(400, errorBody);
+      await expect(client.post('/oauth2/token', 'grant_type=authorization_code&code=bad')).rejects.toThrow(FetchError);
     });
 
-    test('Uses different agent constructors for HTTP and HTTPS', () => {
-      const createCall = mockedAxios.create.mock.calls[0]?.[0];
-      expect(createCall).toBeDefined();
+    test('FetchError carries correct status and body', async () => {
+      const errorBody = { error: 'invalid_grant', error_description: 'Refresh token expired' };
+      mockFetch(400, errorBody);
+      try {
+        await client.post('/oauth2/token', 'grant_type=refresh_token&refresh_token=expired');
+        fail('Expected FetchError to be thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(FetchError);
+        const fetchError = err as FetchError<Response>;
+        expect(fetchError.response?.status).toBe(400);
+        expect(fetchError.body).toEqual(errorBody);
+      }
+    });
 
-      // Verify that different constructors were used
-      expect(createCall!.httpAgent.constructor.name).toBe('Agent');
-      expect(createCall!.httpsAgent.constructor.name).toBe('Agent');
+    test('Returns undefined on 204 No Content', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        status: 204,
+        ok: true,
+        headers: {
+          get: () => {
+            return null;
+          },
+        },
+        text: jest.fn().mockResolvedValue(''),
+      });
+      const result = await client.post('/oauth2/revoke', 'token=abc');
+      expect(result).toBeUndefined();
+    });
 
-      // They should be different instances
-      expect(createCall!.httpAgent).not.toBe(createCall!.httpsAgent);
+    test('Throws FetchError on 500 response', async () => {
+      mockFetch(500, { error: 'server_error' });
+      await expect(client.post('/oauth2/token', 'body')).rejects.toThrow(FetchError);
     });
   });
 
   describe('Configuration constants', () => {
     test('Uses correct media type constants', () => {
-      // This test ensures the constants are properly imported and used
       expect(FORM_URLENCODED_MEDIA_TYPE).toBe('application/x-www-form-urlencoded');
       expect(JSON_MEDIA_TYPE).toBe('application/json;charset=UTF-8');
-
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json;charset=UTF-8' },
-        })
-      );
-    });
-  });
-
-  describe('Instance behavior', () => {
-    test('Axios instance methods are available', () => {
-      expect(wristbandApiClient.axiosInstance.get).toBeDefined();
-      expect(wristbandApiClient.axiosInstance.post).toBeDefined();
-      expect(wristbandApiClient.axiosInstance.put).toBeDefined();
-      expect(wristbandApiClient.axiosInstance.delete).toBeDefined();
-      expect(wristbandApiClient.axiosInstance.patch).toBeDefined();
-      expect(wristbandApiClient.axiosInstance.request).toBeDefined();
-    });
-
-    test('Can make HTTP requests through the axios instance', async () => {
-      const mockResponse = { data: { test: 'data' }, status: 200 };
-      mockAxiosInstance.get.mockResolvedValue(mockResponse);
-      const response = await wristbandApiClient.axiosInstance.get('/test-endpoint');
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/test-endpoint');
-      expect(response).toBe(mockResponse);
-    });
-
-    test('Axios instance inherits all configuration', async () => {
-      const mockResponse = { data: { test: 'data' }, status: 200 };
-      mockAxiosInstance.post.mockResolvedValue(mockResponse);
-      await wristbandApiClient.axiosInstance.post('/test', { data: 'test' });
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/test', { data: 'test' });
-    });
-  });
-
-  describe('Edge cases', () => {
-    test('Handles special characters in domain', () => {
-      const specialDomain = 'test-domain_123.wristband.dev';
-
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(specialDomain);
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: `https://${specialDomain}/api/v1` })
-      );
-    });
-
-    test('Handles very long domain names', () => {
-      const longDomain = `${'a'.repeat(100)}.wristband.dev`;
-
-      // eslint-disable-next-line no-new
-      new WristbandApiClient(longDomain);
-      expect(mockedAxios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: `https://${longDomain}/api/v1` })
-      );
-    });
-
-    test('Configuration is immutable after creation', () => {
-      const createCall = mockedAxios.create.mock.calls[0]?.[0];
-      expect(createCall).toBeDefined();
-      const originalBaseURL = createCall!.baseURL;
-
-      // Attempt to modify the configuration (this shouldn't affect the instance)
-      createCall!.baseURL = 'https://different.domain.com/api/v1';
-
-      // The axios instance should still use the original configuration
-      expect(originalBaseURL).toBe(`https://${WRISTBAND_DOMAIN}/api/v1`);
     });
   });
 });

@@ -1,4 +1,3 @@
-import nock from 'nock';
 import { createWristbandAuth, discoverWristbandAuth } from '../src/factory';
 import { WristbandError } from '../src/error';
 import { TENANT_DOMAIN_PLACEHOLDER, TENANT_NAME_PLACEHOLDER } from '../src/utils/constants';
@@ -10,14 +9,32 @@ const LOGIN_URL = 'http://localhost:6001/api/auth/login';
 const REDIRECT_URI = 'http://localhost:6001/api/auth/callback';
 const ROOT_DOMAIN = 'business.invotastic.com';
 const WRISTBAND_APPLICATION_DOMAIN = 'invotasticb2b-invotastic.dev.wristband.dev';
+const SDK_CONFIG_ENDPOINT = `https://${WRISTBAND_APPLICATION_DOMAIN}/api/v1/clients/${CLIENT_ID}/sdk-configuration`;
 
-// Helper functions to create URLs with placeholders
 const getLoginUrlWithPlaceholder = (placeholder: string) => {
   return `http://${placeholder}.business.invotastic.com/api/auth/login`;
 };
 const getRedirectUriWithPlaceholder = (placeholder: string) => {
   return `http://${placeholder}.business.invotastic.com/api/auth/callback`;
 };
+
+function mockFetchSdkConfig(responses: { status: number; body: unknown }[]) {
+  let callCount = 0;
+  global.fetch = jest.fn().mockImplementation(() => {
+    const response = responses[Math.min(callCount, responses.length - 1)];
+    callCount += 1;
+    return Promise.resolve({
+      status: response.status,
+      ok: response.status >= 200 && response.status < 300,
+      headers: {
+        get: () => {
+          return 'application/json';
+        },
+      },
+      text: jest.fn().mockResolvedValue(JSON.stringify(response.body)),
+    });
+  });
+}
 
 describe('createWristbandAuth Instantiation Errors', () => {
   test('Empty clientId', async () => {
@@ -187,8 +204,8 @@ describe('createWristbandAuth Instantiation Errors', () => {
 });
 
 describe('discoverWristbandAuth', () => {
-  beforeEach(() => {
-    nock.cleanAll();
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test('error when autoConfigureEnabled set to false', async () => {
@@ -213,10 +230,7 @@ describe('discoverWristbandAuth', () => {
       loginUrlTenantDomainSuffix: null,
       redirectUri: REDIRECT_URI,
     };
-
-    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .get(`/api/v1/clients/${CLIENT_ID}/sdk-configuration`)
-      .reply(200, mockSdkConfig);
+    mockFetchSdkConfig([{ status: 200, body: mockSdkConfig }]);
 
     const wristbandAuth = await discoverWristbandAuth({
       clientId: CLIENT_ID,
@@ -229,14 +243,17 @@ describe('discoverWristbandAuth', () => {
     expect(wristbandAuth.callback).toBeDefined();
     expect(wristbandAuth.logout).toBeDefined();
     expect(wristbandAuth.refreshTokenIfExpired).toBeDefined();
-
-    scope.done();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(SDK_CONFIG_ENDPOINT, expect.any(Object));
   });
 
   test('Handles SDK configuration fetch failure', async () => {
-    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .get(`/api/v1/clients/${CLIENT_ID}/sdk-configuration`)
-      .reply(500, { error: 'Internal Server Error' });
+    // 3 attempts all fail — exhausts MAX_FETCH_ATTEMPTS
+    mockFetchSdkConfig([
+      { status: 500, body: { error: 'Internal Server Error' } },
+      { status: 500, body: { error: 'Internal Server Error' } },
+      { status: 500, body: { error: 'Internal Server Error' } },
+    ]);
 
     await expect(
       discoverWristbandAuth({
@@ -247,7 +264,7 @@ describe('discoverWristbandAuth', () => {
       })
     ).rejects.toThrow();
 
-    scope.done();
+    expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
   test('Discovery fails with partial manual config override', async () => {
@@ -258,10 +275,7 @@ describe('discoverWristbandAuth', () => {
       loginUrlTenantDomainSuffix: 'sdk.domain.com',
       redirectUri: 'https://sdk-redirect.com',
     };
-
-    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .get(`/api/v1/clients/${CLIENT_ID}/sdk-configuration`)
-      .reply(200, mockSdkConfig);
+    mockFetchSdkConfig([{ status: 200, body: mockSdkConfig }]);
 
     await expect(
       discoverWristbandAuth({
@@ -274,13 +288,11 @@ describe('discoverWristbandAuth', () => {
       })
     ).rejects.toThrow();
 
-    scope.done();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   test('Discovery with invalid SDK configuration response', async () => {
-    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .get(`/api/v1/clients/${CLIENT_ID}/sdk-configuration`)
-      .reply(200, { invalid: 'response' }); // Missing required fields
+    mockFetchSdkConfig([{ status: 200, body: { invalid: 'response' } }]);
 
     await expect(
       discoverWristbandAuth({
@@ -290,6 +302,6 @@ describe('discoverWristbandAuth', () => {
       })
     ).rejects.toThrow();
 
-    scope.done();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,3 @@
-import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
@@ -29,8 +28,6 @@ describe('Logout Errors', () => {
       wristbandApplicationVanityDomain,
       autoConfigureEnabled: false,
     });
-
-    nock.cleanAll();
   });
 
   test('Multiple tenant_name params', async () => {

@@ -561,10 +561,18 @@ describe('ConfigResolver', () => {
       const invalidSdkConfig = { loginUrl: 'https://test.example.com/auth/login' } as SdkConfiguration;
       initWristbandServiceMock(invalidSdkConfig);
       resolver = new ConfigResolver(validAuthConfig);
-
       await expect(resolver.getRedirectUri()).rejects.toThrow(
-        'SDK configuration response missing required field: redirectUri'
+        'The [redirectUri] could not be resolved. Provide it explicitly in your SDK config or ensure your Wristband OAuth2 Client has a single redirect URI configured.'
       );
+    });
+
+    it('should not throw when redirectUri missing from auto-config but manually provided', async () => {
+      const invalidSdkConfig = { loginUrl: 'https://test.example.com/auth/login' } as SdkConfiguration;
+      initWristbandServiceMock(invalidSdkConfig);
+      const config = { ...validAuthConfig, redirectUri: 'https://manual.com/callback' };
+      resolver = new ConfigResolver(config);
+
+      await expect(resolver.getRedirectUri()).resolves.toBe('https://manual.com/callback');
     });
   });
 
@@ -687,7 +695,19 @@ describe('ConfigResolver', () => {
       const invalidSdkConfig = { loginUrl: 'https://test.com/login' } as SdkConfiguration;
       expect(() => {
         return resolver['validateAllDynamicConfigs'](invalidSdkConfig);
-      }).toThrow('SDK configuration response missing required field: redirectUri');
+      }).toThrow(
+        'The [redirectUri] could not be resolved. Provide it explicitly in your SDK config or ensure your Wristband OAuth2 Client has a single redirect URI configured.'
+      );
+    });
+
+    it('should not throw when redirectUri missing from SDK config but manually provided', () => {
+      const manualConfig = { ...validAuthConfig, redirectUri: 'https://manual.com/callback' };
+      resolver = new ConfigResolver(manualConfig);
+
+      const invalidSdkConfig = { loginUrl: 'https://test.com/login' } as SdkConfiguration;
+      expect(() => {
+        return resolver['validateAllDynamicConfigs'](invalidSdkConfig);
+      }).not.toThrow();
     });
 
     it(`should validate resolved config with parseTenantFromRootDomain requires ${placeholderName}`, () => {
