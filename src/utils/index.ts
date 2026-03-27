@@ -7,6 +7,16 @@ import { LOGIN_STATE_COOKIE_PREFIX, LOGIN_STATE_COOKIE_SEPARATOR } from './const
 import { LoginState, LoginStateMapConfig } from '../types';
 import { clearCookie, parseCookies, setCookie } from './cookies';
 
+export function encodeBase64(input: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  let binary = '';
+  data.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
 export function parseTenantSubdomain(req: Request, parseTenantFromRootDomain: string): string {
   const { host } = req.headers;
 
@@ -179,7 +189,11 @@ export function getOAuthAuthorizeUrl(
     wristbandApplicationVanityDomain: string;
   }
 ): string {
-  const { login_hint: loginHint } = req.query;
+  const { idp_hint: idpHint, login_hint: loginHint } = req.query;
+
+  if (!!idpHint && typeof idpHint !== 'string') {
+    throw new TypeError('More than one [idp_hint] query parameter was encountered');
+  }
 
   if (!!loginHint && typeof loginHint !== 'string') {
     throw new TypeError('More than one [login_hint] query parameter was encountered');
@@ -194,6 +208,7 @@ export function getOAuthAuthorizeUrl(
     code_challenge: base64URLEncode(createHash('sha256').update(config.codeVerifier).digest('base64')),
     code_challenge_method: 'S256',
     nonce: generateRandomString(32),
+    ...(!!idpHint && typeof idpHint === 'string' ? { idp_hint: idpHint } : {}),
     ...(!!loginHint && typeof loginHint === 'string' ? { login_hint: loginHint } : {}),
   });
 

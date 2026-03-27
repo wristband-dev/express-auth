@@ -497,6 +497,42 @@ describe('Multi Tenant Login', () => {
       expect(loginState.returnUrl).toBe(`https://devs4you.${parseTenantFromRootDomain}/settings`);
     });
 
+    test('With idp_hint query param', async () => {
+      parseTenantFromRootDomain = 'business.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
+      loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+      redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
+
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        parseTenantFromRootDomain,
+        isApplicationCustomDomainActive: true,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `devs4you.${parseTenantFromRootDomain}` },
+        query: { idp_hint: 'google' },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
+
+      const { statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { searchParams } = locationUrl;
+
+      expect(searchParams.get('idp_hint')).toBe('google');
+    });
+
     test('With returnUrl in LoginConfig', async () => {
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,

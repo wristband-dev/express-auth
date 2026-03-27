@@ -1,6 +1,4 @@
-import nock from 'nock';
-
-import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src/index';
+import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -8,6 +6,7 @@ const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
 const LOGIN_URL = 'http://localhost:6001/api/auth/login';
 const REDIRECT_URI = 'http://localhost:6001/api/auth/callback';
 const WRISTBAND_APPLICATION_DOMAIN = 'invotasticb2c-invotastic.dev.wristband.dev';
+const TOKEN_ENDPOINT = `https://${WRISTBAND_APPLICATION_DOMAIN}/api/v1/oauth2/token`;
 
 const wristbandAuth: WristbandAuth = createWristbandAuth({
   clientId: CLIENT_ID,
@@ -19,9 +18,23 @@ const wristbandAuth: WristbandAuth = createWristbandAuth({
   autoConfigureEnabled: false,
 });
 
+function mockFetchToken(status: number, body: unknown) {
+  const bodyText = JSON.stringify(body);
+  global.fetch = jest.fn().mockResolvedValue({
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {
+      get: () => {
+        return 'application/json';
+      },
+    },
+    text: jest.fn().mockResolvedValue(bodyText),
+  });
+}
+
 describe('Refresh Token Errors', () => {
-  beforeEach(() => {
-    nock.cleanAll();
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test('Invalid refreshToken', async () => {
@@ -45,32 +58,30 @@ describe('Refresh Token Errors', () => {
   });
 
   test('Perform a token refresh with a bad token value', async () => {
-    const mockError = {
-      error: 'invalid_grant',
-      error_description: 'Invalid refresh token',
-    };
-    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .persist()
-      .post('/api/v1/oauth2/token', 'grant_type=refresh_token&refresh_token=refreshToken')
-      .reply(400, mockError);
+    const mockError = { error: 'invalid_grant', error_description: 'Invalid refresh token' };
+    mockFetchToken(400, mockError);
 
     try {
       await wristbandAuth.refreshTokenIfExpired('refreshToken', Date.now().valueOf() - 1000);
       fail('Error expected to be thrown.');
     } catch (error: any) {
       expect(error instanceof WristbandError).toBe(true);
-      expect(error.code).toBe('invalid_grant');
+      expect(error.code).toBe('invalid_refresh_token');
       expect(error.errorDescription).toBe('Invalid refresh token');
     }
 
-    scope.done();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(
+      TOKEN_ENDPOINT,
+      expect.objectContaining({
+        method: 'POST',
+        body: 'grant_type=refresh_token&refresh_token=refreshToken',
+      })
+    );
   });
 
   test('Perform a token refresh with a server error', async () => {
-    const scope = nock(`https://${WRISTBAND_APPLICATION_DOMAIN}`)
-      .persist()
-      .post('/api/v1/oauth2/token', 'grant_type=refresh_token&refresh_token=refreshToken')
-      .reply(500);
+    mockFetchToken(500, { error: 'server_error' });
 
     try {
       await wristbandAuth.refreshTokenIfExpired('refreshToken', Date.now().valueOf() - 1000);
@@ -81,6 +92,6 @@ describe('Refresh Token Errors', () => {
       expect(error.errorDescription).toBe('Unexpected Error');
     }
 
-    scope.done();
+    expect(global.fetch).toHaveBeenCalledTimes(3); // All 3 retry attempts exhausted
   });
 });

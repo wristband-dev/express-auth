@@ -1,4 +1,4 @@
-import { WristbandError, InvalidGrantError } from '../src/error';
+import { WristbandError, InvalidGrantError, FetchError } from '../src/error';
 
 describe('Error Classes', () => {
   describe('WristbandError', () => {
@@ -139,6 +139,108 @@ describe('Error Classes', () => {
     test('Error has correct name property', () => {
       const error = new InvalidGrantError('Test');
       expect(error.name).toBe('WristbandError'); // Inherits from WristbandError
+    });
+  });
+
+  describe('FetchError', () => {
+    test('Creates error with response and body', () => {
+      const mockResponse = new Response(null, { status: 400 });
+      const body = { error: 'invalid_grant', error_description: 'Invalid grant' };
+      const error = new FetchError(mockResponse, body);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(FetchError);
+      expect(error.name).toBe('FetchError');
+      expect(error.message).toBe('Fetch Error');
+      expect(error.response).toBe(mockResponse);
+      expect(error.body).toBe(body);
+    });
+
+    test('Creates error with undefined body', () => {
+      const mockResponse = new Response(null, { status: 204 });
+      const error = new FetchError(mockResponse, undefined);
+
+      expect(error).toBeInstanceOf(FetchError);
+      expect(error.response).toBe(mockResponse);
+      expect(error.body).toBeUndefined();
+    });
+
+    test('Creates error with null body', () => {
+      const mockResponse = new Response(null, { status: 500 });
+      const error = new FetchError(mockResponse, null);
+
+      expect(error).toBeInstanceOf(FetchError);
+      expect(error.response).toBe(mockResponse);
+      expect(error.body).toBeNull();
+    });
+
+    test('Creates error with string body', () => {
+      const mockResponse = new Response(null, { status: 503 });
+      const error = new FetchError(mockResponse, 'Service Unavailable');
+
+      expect(error).toBeInstanceOf(FetchError);
+      expect(error.body).toBe('Service Unavailable');
+    });
+
+    test('Response and body properties are readonly', () => {
+      const mockResponse = new Response(null, { status: 400 });
+      const error = new FetchError(mockResponse, { error: 'bad_request' });
+
+      // TypeScript readonly enforced at compile time; verify values are stable at runtime
+      expect(error.response).toBe(mockResponse);
+      expect(error.body).toEqual({ error: 'bad_request' });
+    });
+
+    test('Works with generic response type', () => {
+      interface MockResponse {
+        status: number;
+        ok: boolean;
+      }
+      const mockResponse: MockResponse = { status: 401, ok: false };
+      const error = new FetchError<MockResponse>(mockResponse, { error: 'unauthorized' });
+
+      expect(error.response?.status).toBe(401);
+      expect(error.response?.ok).toBe(false);
+    });
+
+    test('Error can be thrown and caught', () => {
+      const mockResponse = new Response(null, { status: 400 });
+      expect(() => {
+        throw new FetchError(mockResponse, { error: 'bad_request' });
+      }).toThrow(FetchError);
+    });
+
+    test('Error has correct prototype chain', () => {
+      const mockResponse = new Response(null, { status: 400 });
+      const error = new FetchError(mockResponse, null);
+
+      expect(error instanceof FetchError).toBe(true);
+      expect(error instanceof Error).toBe(true);
+    });
+
+    test('instanceof check works for downstream error handling', () => {
+      const mockResponse = new Response(null, { status: 400 });
+      const fetchError = new FetchError(mockResponse, { error: 'invalid_grant' });
+      const regularError = new Error('regular error');
+
+      expect(fetchError instanceof FetchError).toBe(true);
+      expect(regularError instanceof FetchError).toBe(false);
+    });
+
+    test('Body with invalid_grant error is accessible', () => {
+      const mockResponse = new Response(null, { status: 400 });
+      const body = { error: 'invalid_grant', error_description: 'The authorization code has expired' };
+      const error = new FetchError(mockResponse, body);
+
+      expect(error.body.error).toBe('invalid_grant');
+      expect(error.body.error_description).toBe('The authorization code has expired');
+    });
+
+    test('Response status is accessible via response property', () => {
+      const mockResponse = new Response(null, { status: 401 });
+      const error = new FetchError(mockResponse, { error: 'unauthorized' });
+
+      expect(error.response?.status).toBe(401);
     });
   });
 });

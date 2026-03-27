@@ -15,6 +15,7 @@ import {
   createLoginStateCookie,
   getOAuthAuthorizeUrl,
   isExpired,
+  encodeBase64,
 } from '../../src/utils';
 import { LoginState, LoginStateMapConfig } from '../../src/types';
 
@@ -758,6 +759,36 @@ describe('Auth Utils', () => {
       }).toThrow('More than one [login_hint] query parameter was encountered');
     });
 
+    test('Includes idp hint when provided in query', () => {
+      const req = httpMocks.createRequest({
+        query: { idp_hint: 'google' },
+      }) as any;
+
+      const config = {
+        ...baseConfig,
+        tenantCustomDomain: 'tenant.custom.com',
+      };
+
+      const result = getOAuthAuthorizeUrl(req, config);
+
+      expect(result).toContain('idp_hint=google');
+    });
+
+    test('Throws error for multiple idp_hint query parameters', () => {
+      const req = httpMocks.createRequest({
+        query: { idp_hint: ['google', 'github'] },
+      }) as any;
+
+      const config = {
+        ...baseConfig,
+        tenantCustomDomain: 'tenant.custom.com',
+      };
+
+      expect(() => {
+        return getOAuthAuthorizeUrl(req, config);
+      }).toThrow('More than one [idp_hint] query parameter was encountered');
+    });
+
     test('Includes all required OAuth parameters', () => {
       const req = httpMocks.createRequest() as any;
 
@@ -842,6 +873,26 @@ describe('Auth Utils', () => {
       const result = isExpired(0);
 
       expect(result).toBe(true);
+    });
+  });
+
+  describe('encodeBase64', () => {
+    test('Encodes a simple ASCII string', () => {
+      expect(encodeBase64('hello')).toBe(btoa('hello'));
+    });
+
+    test('Encodes clientId:clientSecret format correctly', () => {
+      const input = 'myClientId:myClientSecret';
+      expect(encodeBase64(input)).toBe(btoa(input));
+    });
+
+    test('Encodes empty string', () => {
+      expect(encodeBase64('')).toBe('');
+    });
+
+    test('Produces valid base64 output', () => {
+      const result = encodeBase64('test-input');
+      expect(result).toMatch(/^[A-Za-z0-9+/]+=*$/);
     });
   });
 });
