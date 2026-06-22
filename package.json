@@ -8,7 +8,7 @@
   "homepage": "https://wristband.dev",
   "repository": {
     "type": "git",
-    "url": "git@github.com:wristband-dev/express-auth.git"
+    "url": "git+https://github.com/wristband-dev/express-auth.git"
   },
   "bugs": {
     "email": "support@wristband.dev"
