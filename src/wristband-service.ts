@@ -196,7 +196,12 @@ export class WristbandService {
   private static hasInvalidGrantError(error: unknown): boolean {
     if (error instanceof FetchError) {
       const data = error.body;
-      return data && typeof data === 'object' && 'error' in data && (data as any).error === 'invalid_grant';
+      return (
+        !!data &&
+        typeof data === 'object' &&
+        'error' in data &&
+        (data as Record<string, unknown>).error === 'invalid_grant'
+      );
     }
     return false;
   }
@@ -213,7 +218,7 @@ export class WristbandService {
     if (error instanceof FetchError) {
       const data = error.body;
       if (data && typeof data === 'object' && 'error_description' in data) {
-        return (data as any).error_description as string;
+        return (data as Record<string, unknown>).error_description as string;
       }
     }
     return undefined;
@@ -231,21 +236,23 @@ export class WristbandService {
    *
    * @internal
    */
-  private static validateUserinfoResponse(data: any): asserts data is WristbandUserinfoResponse {
+  private static validateUserinfoResponse(data: unknown): asserts data is WristbandUserinfoResponse {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new TypeError('Invalid userinfo response: expected object');
     }
 
-    if (!data.sub || typeof data.sub !== 'string') {
+    const record = data as Record<string, unknown>;
+
+    if (!record.sub || typeof record.sub !== 'string') {
       throw new TypeError('Invalid userinfo response: missing sub claim');
     }
-    if (!data.tnt_id || typeof data.tnt_id !== 'string') {
+    if (!record.tnt_id || typeof record.tnt_id !== 'string') {
       throw new TypeError('Invalid userinfo response: missing tnt_id claim');
     }
-    if (!data.app_id || typeof data.app_id !== 'string') {
+    if (!record.app_id || typeof record.app_id !== 'string') {
       throw new TypeError('Invalid userinfo response: missing app_id claim');
     }
-    if (!data.idp_name || typeof data.idp_name !== 'string') {
+    if (!record.idp_name || typeof record.idp_name !== 'string') {
       throw new TypeError('Invalid userinfo response: missing idp_name claim');
     }
   }
