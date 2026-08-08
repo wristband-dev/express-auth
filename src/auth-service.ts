@@ -413,6 +413,7 @@ export class AuthService {
         ) {
           // Only 4xx errors should short-circuit the retry loop early.
           const errorDescription =
+            // @ts-expect-error - body is unknown, error_description access not type-checked
             error.body && error.body.error_description ? error.body.error_description : 'Invalid Refresh Token';
           throw new WristbandError('invalid_refresh_token', errorDescription, error);
         }
@@ -487,7 +488,11 @@ export class AuthService {
     const normalizedConfig = normalizeAuthMiddlewareConfig(config);
 
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-      // Initialize req.auth at the very beginning regardless of strategy
+      // Initialize req.auth at the very beginning regardless of strategy.
+      // Cast via any (not module augmentation) since this SDK is published and consumers
+      // may already type/augment Request.auth themselves - globally extending their Request
+      // type from within this package would risk colliding with their own code.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (req as any).auth = {};
 
       let result: AuthStrategyResult = { authenticated: false, reason: 'not_authenticated' };
@@ -596,8 +601,11 @@ export class AuthService {
           return { authenticated: false, reason: 'not_authenticated' };
         }
 
-        // Attach JWT and decoded payload to req.auth
+        // Attach JWT and decoded payload to req.auth. Cast via any for the same reason as
+        // above: avoiding a global Request augmentation that would leak into consumer projects.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (req as any).auth = payload;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (req as any).auth.jwt = bearerToken;
 
         return { authenticated: true, usedStrategy: 'JWT' };

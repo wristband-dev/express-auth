@@ -50,6 +50,10 @@ export type AuthConfig = {
  * @property {string} [returnUrl] The URL to return to after authentication is completed. If a value is provided, then it takes precence over the `return_url` request query parameter.
  */
 export type LoginConfig = {
+  // TODO: customState is typed `any` for consumer flexibility. Tightening to Record<string, unknown>
+  // would change consumer-side type-checking behavior (any allows unchecked property access, unknown
+  // does not), so this is deferred to the next major version alongside the iron-webcrypto v2 upgrade.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   customState?: { [key: string]: any };
   defaultTenantCustomDomain?: string;
   defaultTenantName?: string;
@@ -247,6 +251,10 @@ export interface UserInfo {
  * @property {UserInfo} userinfo User information received in the callback.
  */
 export type CallbackData = TokenData & {
+  // TODO: customState is typed `any` for consumer flexibility. Tightening to Record<string, unknown>
+  // would change consumer-side type-checking behavior, deferred to the next major version alongside
+  // the iron-webcrypto v2 upgrade.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   customState?: { [key: string]: any };
   returnUrl?: string;
   tenantCustomDomain?: string;
@@ -388,7 +396,7 @@ export type SdkConfiguration = {
  */
 export type LoginState = {
   codeVerifier: string;
-  customState?: { [key: string]: any };
+  customState?: Record<string, unknown>;
   redirectUri: string;
   returnUrl?: string;
   state: string;
@@ -401,7 +409,7 @@ export type LoginState = {
  * @property {string} [returnUrl] The URL to return to after authentication.
  */
 export type LoginStateMapConfig = {
-  customState?: { [key: string]: any };
+  customState?: Record<string, unknown>;
   returnUrl?: string;
 };
 
@@ -445,7 +453,11 @@ export interface WristbandUserinfoResponse {
   /** Identity Provider Name - name of the identity provider (Wristband custom claim) */
   idp_name: string;
 
-  // All other fields are optional and dynamic based on scopes
+  // All other fields are optional and dynamic based on scopes. Left as `any` since
+  // wristband-service.ts's mapUserinfoClaims() relies on unchecked property access
+  // (userinfo.name, userinfo.roles, userinfo.custom_claims, etc.) against this index
+  // signature. Narrowing to `unknown` would need a coordinated update there too.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 

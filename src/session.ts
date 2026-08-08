@@ -51,8 +51,10 @@ function onHeaders(res: Response, listener: () => void): void {
     }
 
     // Restore original to prevent repeated hooks
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (res.writeHead as any) = prevWriteHead;
     return prevWriteHead(...args);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
 

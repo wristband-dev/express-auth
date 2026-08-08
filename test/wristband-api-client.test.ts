@@ -130,7 +130,7 @@ describe('WristbandApiClient', () => {
       mockFetch(400, errorBody);
       try {
         await client.get('/test');
-        fail('Expected FetchError to be thrown');
+        throw new Error('Expected FetchError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(FetchError);
         const fetchError = err as FetchError<Response>;
@@ -211,7 +211,7 @@ describe('WristbandApiClient', () => {
       mockFetch(400, errorBody);
       try {
         await client.post('/oauth2/token', 'grant_type=refresh_token&refresh_token=expired');
-        fail('Expected FetchError to be thrown');
+        throw new Error('Expected FetchError to be thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(FetchError);
         const fetchError = err as FetchError<Response>;

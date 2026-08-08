@@ -3,7 +3,7 @@ import { FORM_URLENCODED_MEDIA_TYPE, JSON_MEDIA_TYPE } from './utils/constants';
 
 interface RequestOptions extends RequestInit {
   headers?: HeadersInit;
-  body?: any;
+  body?: BodyInit;
 }
 
 /**
@@ -29,6 +29,8 @@ export class WristbandApiClient {
     const url = `${this.baseURL}${endpoint}`;
     const headers = { ...this.defaultHeaders, ...options.headers };
     const config: RequestInit = { ...options, headers };
+    // Fetch is experimental on Node 20, but functional without a flag; accepted tradeoff for engines >=20.0.0.
+    // eslint-disable-next-line n/no-unsupported-features/node-builtins
     const response = await fetch(url, config);
 
     if (response.status === 204) {
@@ -66,7 +68,7 @@ export class WristbandApiClient {
    * @returns The parsed JSON response body.
    * @throws {FetchError} On non-2xx responses.
    */
-  public async post<T>(endpoint: string, body: any, headers: HeadersInit = {}): Promise<T> {
+  public async post<T>(endpoint: string, body: BodyInit, headers: HeadersInit = {}): Promise<T> {
     return this.request<T>(endpoint, { method: 'POST', headers, body, keepalive: true });
   }
 }
