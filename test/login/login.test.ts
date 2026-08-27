@@ -7,6 +7,7 @@ import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { decryptLoginState, encryptLoginState } from '../../src/utils';
 import { LoginState } from '../../src/types';
 import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
+import { mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -77,6 +78,11 @@ describe('Multi Tenant Login', () => {
     loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
     redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
     wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
+    mockWristbandFetch();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('Successful Redirect to Authorize Endpoint', () => {
