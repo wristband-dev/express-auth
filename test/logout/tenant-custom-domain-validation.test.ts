@@ -38,9 +38,10 @@ describe('Logout - Tenant Custom Domain Validation', () => {
     jest.restoreAllMocks();
   });
 
-  describe('Priority 1: logoutConfig.tenantCustomDomain', () => {
-    test('Validates the config value and redirects to it when valid', async () => {
-      mockWristbandFetch({ tenantCustomDomainValid: true });
+  describe('logoutConfig.tenantCustomDomain (developer-supplied)', () => {
+    test('Does not validate the config value, since it cannot be manipulated by the caller', async () => {
+      // The validation endpoint would reject this domain, but the config value is never sent to it.
+      mockWristbandFetch({ tenantCustomDomainValid: false });
 
       const mockExpressReq = httpMocks.createRequest({ headers: { host: parseTenantFromRootDomain } }) as any;
       const mockExpressRes = httpMocks.createResponse() as any;
@@ -49,22 +50,11 @@ describe('Logout - Tenant Custom Domain Validation', () => {
         tenantCustomDomain: CONFIG_CUSTOM_DOMAIN,
       });
 
-      expectValidateCalled(wristbandApplicationVanityDomain, CONFIG_CUSTOM_DOMAIN);
+      expectValidateNotCalled();
       expect(new URL(logoutUrl).origin).toEqual(`https://${CONFIG_CUSTOM_DOMAIN}`);
     });
 
-    test('Throws a TypeError when the config value is not valid', async () => {
-      mockWristbandFetch({ tenantCustomDomainValid: false });
-
-      const mockExpressReq = httpMocks.createRequest({ headers: { host: parseTenantFromRootDomain } }) as any;
-      const mockExpressRes = httpMocks.createResponse() as any;
-
-      await expect(
-        wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantCustomDomain: CONFIG_CUSTOM_DOMAIN })
-      ).rejects.toThrow('Tenant custom domain is not valid');
-    });
-
-    test('Does not validate the query param that the config value outranks', async () => {
+    test('Still validates the query param even though the config value outranks it', async () => {
       mockWristbandFetch({ tenantCustomDomainValid: true });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -77,18 +67,42 @@ describe('Logout - Tenant Custom Domain Validation', () => {
         tenantCustomDomain: CONFIG_CUSTOM_DOMAIN,
       });
 
+      expectValidateCalled(wristbandApplicationVanityDomain, PARAM_CUSTOM_DOMAIN);
       expect(new URL(logoutUrl).origin).toEqual(`https://${CONFIG_CUSTOM_DOMAIN}`);
-      expectValidateCalled(wristbandApplicationVanityDomain, CONFIG_CUSTOM_DOMAIN);
-      expect(global.fetch).not.toHaveBeenCalledWith(
-        expect.stringContaining('/custom-domains/validate'),
-        expect.objectContaining({ body: JSON.stringify({ tenantCustomDomain: PARAM_CUSTOM_DOMAIN }) })
-      );
+    });
+
+    test('Rejects an invalid query param even though the config value outranks it', async () => {
+      mockWristbandFetch({ tenantCustomDomainValid: false });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+        query: { tenant_custom_domain: PARAM_CUSTOM_DOMAIN },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      await expect(
+        wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantCustomDomain: CONFIG_CUSTOM_DOMAIN })
+      ).rejects.toThrow('Tenant custom domain is not valid');
     });
   });
 
   describe('Priority 2: logoutConfig.tenantName', () => {
-    test('Does not validate the query param that the tenantName config outranks', async () => {
+    test('Still validates the query param even though tenantName outranks it', async () => {
       mockWristbandFetch({ tenantCustomDomainValid: false });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+        query: { tenant_custom_domain: PARAM_CUSTOM_DOMAIN },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      await expect(
+        wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'priority2tenant' })
+      ).rejects.toThrow('Tenant custom domain is not valid');
+    });
+
+    test('Redirects using tenantName when the query param is valid', async () => {
+      mockWristbandFetch({ tenantCustomDomainValid: true });
 
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: parseTenantFromRootDomain },
@@ -100,7 +114,6 @@ describe('Logout - Tenant Custom Domain Validation', () => {
         tenantName: 'priority2tenant',
       });
 
-      expectValidateNotCalled();
       expect(new URL(logoutUrl).origin).toEqual(`https://priority2tenant-${wristbandApplicationVanityDomain}`);
     });
   });

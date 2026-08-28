@@ -349,6 +349,7 @@ export class AuthService {
     const logoutPath: string = `/api/v1/logout?client_id=${clientId}${logoutRedirectUrl}${state}`;
     const separator = isApplicationCustomDomainActive ? '.' : '-';
     const tenantCustomDomainParam: string = resolveTenantCustomDomainParam(req);
+    await this.validateTenantCustomDomainIfPresent(tenantCustomDomainParam);
     const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
 
     // 4a) If tenant subdomains are enabled, get the tenant name from the host.
@@ -357,7 +358,6 @@ export class AuthService {
     // Domain priority order resolution:
     // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
     if (config.tenantCustomDomain) {
-      await this.validateTenantCustomDomainIfPresent(config.tenantCustomDomain);
       return `https://${config.tenantCustomDomain}${logoutPath}`;
     }
 
@@ -368,7 +368,6 @@ export class AuthService {
 
     // 3) If the tenant_custom_domain query param exists, then use that.
     if (tenantCustomDomainParam) {
-      await this.validateTenantCustomDomainIfPresent(tenantCustomDomainParam);
       return `https://${tenantCustomDomainParam}${logoutPath}`;
     }
 
