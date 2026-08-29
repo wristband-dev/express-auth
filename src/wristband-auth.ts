@@ -82,16 +82,6 @@ export interface WristbandAuth {
   refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null>;
 
   /**
-   * Validates that a tenant custom domain is verified and belongs to your Wristband application.
-   *
-   * @param {string} tenantCustomDomain The tenant custom domain to validate.
-   * @returns {Promise<boolean>} A Promise resolving to true if the tenant custom domain is verified and belongs
-   *   to your application.
-   * @throws {Error} If tenantCustomDomain is missing or empty.
-   */
-  validateTenantCustomDomain(tenantCustomDomain: string): Promise<boolean>;
-
-  /**
    * Create middleware that validates authentication using configurable strategies (SESSION, JWT, or both).
    * Supports multi-strategy authentication with automatic fallback between strategies.
    *
@@ -248,14 +238,6 @@ export class WristbandAuthImpl implements WristbandAuth {
    */
   refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null> {
     return this.authService.refreshTokenIfExpired(refreshToken, expiresAt);
-  }
-
-  /**
-   * @inheritdoc
-   * @see {@link WristbandAuth.validateTenantCustomDomain}
-   */
-  validateTenantCustomDomain(tenantCustomDomain: string): Promise<boolean> {
-    return this.authService.validateTenantCustomDomain(tenantCustomDomain);
   }
 
   /**
