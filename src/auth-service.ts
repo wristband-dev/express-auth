@@ -83,18 +83,6 @@ export class AuthService {
   }
 
   /**
-   * Validates that a tenant custom domain is verified and belongs to your Wristband application.
-   *
-   * @param {string} tenantCustomDomain - The tenant custom domain to validate.
-   * @returns {Promise<boolean>} A Promise resolving to true if the tenant custom domain is verified and belongs
-   *   to your application.
-   * @throws {Error} When tenantCustomDomain is missing or empty.
-   */
-  async validateTenantCustomDomain(tenantCustomDomain: string): Promise<boolean> {
-    return this.wristbandService.validateTenantCustomDomain(tenantCustomDomain);
-  }
-
-  /**
    * Validates a tenant custom domain when one is present. No-ops when the value is empty, since callers
    * fall back to other domain resolution strategies in that case.
    *
@@ -104,7 +92,7 @@ export class AuthService {
    */
   private async validateTenantCustomDomainIfPresent(tenantCustomDomain: string): Promise<void> {
     if (tenantCustomDomain) {
-      const isValid = await this.validateTenantCustomDomain(tenantCustomDomain);
+      const isValid = await this.wristbandService.validateTenantCustomDomain(tenantCustomDomain);
       if (!isValid) {
         throw new TypeError('Tenant custom domain is not valid');
       }
@@ -351,9 +339,6 @@ export class AuthService {
     const tenantCustomDomainParam: string = resolveTenantCustomDomainParam(req);
     await this.validateTenantCustomDomainIfPresent(tenantCustomDomainParam);
     const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
-
-    // 4a) If tenant subdomains are enabled, get the tenant name from the host.
-    // 4b) Otherwise, if tenant subdomains are not enabled, then look for it in the tenant_name query param.
 
     // Domain priority order resolution:
     // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
