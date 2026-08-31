@@ -83,20 +83,20 @@ export class AuthService {
   }
 
   /**
-   * Validates a tenant custom domain when one is present. No-ops when the value is empty, since callers
-   * fall back to other domain resolution strategies in that case.
+   * Resolves a tenant custom domain to itself when it is verified and belongs to your Wristband
+   * application. Resolves to an empty string otherwise, so the caller skips over it and falls through
+   * to the next domain in its resolution precedence order.
    *
    * @param {string} tenantCustomDomain - The tenant custom domain to validate.
-   * @returns {Promise<void>} A Promise that resolves when the tenant custom domain is verified.
-   * @throws {TypeError} When the tenant custom domain is not verified or does not belong to your application.
+   * @returns {Promise<string>} The tenant custom domain when valid, otherwise an empty string.
    */
-  private async validateTenantCustomDomainIfPresent(tenantCustomDomain: string): Promise<void> {
-    if (tenantCustomDomain) {
-      const isValid = await this.wristbandService.validateTenantCustomDomain(tenantCustomDomain);
-      if (!isValid) {
-        throw new TypeError('Tenant custom domain is not valid');
-      }
+  private async resolveValidTenantCustomDomain(tenantCustomDomain: string): Promise<string> {
+    if (!tenantCustomDomain) {
+      return '';
     }
+
+    const isValid = await this.wristbandService.validateTenantCustomDomain(tenantCustomDomain);
+    return isValid ? tenantCustomDomain : '';
   }
 
   /**
@@ -123,8 +123,7 @@ export class AuthService {
     const wristbandApplicationVanityDomain = this.configResolver.getWristbandApplicationVanityDomain();
 
     // Determine which domain-related values are present as it will be needed for the authorize URL.
-    const tenantCustomDomain: string = resolveTenantCustomDomainParam(req);
-    await this.validateTenantCustomDomainIfPresent(tenantCustomDomain);
+    const tenantCustomDomain: string = await this.resolveValidTenantCustomDomain(resolveTenantCustomDomainParam(req));
     const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
     const defaultTenantCustomDomain: string = config.defaultTenantCustomDomain || '';
     const defaultTenantName: string = config.defaultTenantName || '';
@@ -207,7 +206,10 @@ export class AuthService {
       throw new TypeError('Invalid query parameter [tenant_custom_domain] passed from Wristband during callback');
     }
 
-    await this.validateTenantCustomDomainIfPresent(tenantCustomDomainParam || '');
+    // An invalid tenant custom domain is skipped over rather than failing the callback.
+    const tenantCustomDomain: string = await this.resolveValidTenantCustomDomain(
+      typeof tenantCustomDomainParam === 'string' ? tenantCustomDomainParam : ''
+    );
 
     // Resolve and validate the tenant name
     const resolvedTenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
@@ -224,8 +226,8 @@ export class AuthService {
     let tenantLoginUrl: string = parseTenantFromRootDomain
       ? loginUrl.replace(TENANT_PLACEHOLDER_REGEX, resolvedTenantName)
       : `${loginUrl}?tenant_name=${resolvedTenantName}`;
-    if (tenantCustomDomainParam) {
-      tenantLoginUrl = `${tenantLoginUrl}${parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomainParam}`;
+    if (tenantCustomDomain) {
+      tenantLoginUrl = `${tenantLoginUrl}${parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomain}`;
     }
 
     // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
@@ -288,7 +290,7 @@ export class AuthService {
       idToken,
       ...(!!refreshToken && { refreshToken }),
       ...(!!returnUrl && { returnUrl }),
-      ...(!!tenantCustomDomainParam && { tenantCustomDomain: tenantCustomDomainParam }),
+      ...(!!tenantCustomDomain && { tenantCustomDomain }),
       tenantName: resolvedTenantName,
       userinfo,
     };
@@ -336,8 +338,9 @@ export class AuthService {
     const state: string = config.state ? `&state=${config.state}` : '';
     const logoutPath: string = `/api/v1/logout?client_id=${clientId}${logoutRedirectUrl}${state}`;
     const separator = isApplicationCustomDomainActive ? '.' : '-';
-    const tenantCustomDomainParam: string = resolveTenantCustomDomainParam(req);
-    await this.validateTenantCustomDomainIfPresent(tenantCustomDomainParam);
+    const tenantCustomDomainParam: string = await this.resolveValidTenantCustomDomain(
+      resolveTenantCustomDomainParam(req)
+    );
     const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
 
     // Domain priority order resolution:

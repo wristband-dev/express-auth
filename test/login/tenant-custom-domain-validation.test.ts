@@ -54,22 +54,22 @@ describe('Login - Tenant Custom Domain Validation', () => {
     expect(new URL(authorizeUrl).origin).toEqual(`https://${TENANT_CUSTOM_DOMAIN}`);
   });
 
-  test('Throws a TypeError when the tenant_custom_domain query param is not valid', async () => {
+  test('Skips an invalid tenant custom domain and falls through to the tenant_name query param', async () => {
     mockWristbandFetch({ tenantCustomDomainValid: false });
 
     const mockExpressReq = httpMocks.createRequest({
       headers: { host: parseTenantFromRootDomain },
-      query: { tenant_custom_domain: TENANT_CUSTOM_DOMAIN },
+      query: { tenant_custom_domain: TENANT_CUSTOM_DOMAIN, tenant_name: 'devs4you' },
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    await expect(wristbandAuth.login(mockExpressReq, mockExpressRes)).rejects.toThrow(TypeError);
-    await expect(wristbandAuth.login(mockExpressReq, mockExpressRes)).rejects.toThrow(
-      'Tenant custom domain is not valid'
-    );
+    const authorizeUrl: string = await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+    expectValidateCalled(wristbandApplicationVanityDomain, TENANT_CUSTOM_DOMAIN);
+    expect(new URL(authorizeUrl).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
   });
 
-  test('Does not create a login state cookie when validation fails', async () => {
+  test('Skips an invalid tenant custom domain and falls through to the defaultTenantCustomDomain config', async () => {
     mockWristbandFetch({ tenantCustomDomainValid: false });
 
     const mockExpressReq = httpMocks.createRequest({
@@ -78,10 +78,25 @@ describe('Login - Tenant Custom Domain Validation', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    await expect(wristbandAuth.login(mockExpressReq, mockExpressRes)).rejects.toThrow(
-      'Tenant custom domain is not valid'
-    );
+    const authorizeUrl: string = await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+      defaultTenantCustomDomain: 'default.tenant.com',
+    });
 
+    expect(new URL(authorizeUrl).origin).toEqual('https://default.tenant.com');
+  });
+
+  test('Redirects to application-level login when an invalid tenant custom domain is the only domain', async () => {
+    mockWristbandFetch({ tenantCustomDomainValid: false });
+
+    const mockExpressReq = httpMocks.createRequest({
+      headers: { host: parseTenantFromRootDomain },
+      query: { tenant_custom_domain: TENANT_CUSTOM_DOMAIN },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    const appLoginUrl: string = await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+    expect(appLoginUrl).toEqual(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
     expect(mockExpressRes._getHeaders()['set-cookie']).toBeUndefined();
   });
 

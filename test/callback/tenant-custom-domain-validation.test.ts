@@ -77,7 +77,7 @@ describe('Callback - Tenant Custom Domain Validation', () => {
     expect(callbackResult.callbackData?.tenantCustomDomain).toBe(TENANT_CUSTOM_DOMAIN);
   });
 
-  test('Throws a TypeError when the tenant_custom_domain query param is not valid', async () => {
+  test('Skips an invalid tenant_custom_domain query param and still completes the callback', async () => {
     mockWristbandFetch({ tenantCustomDomainValid: false, tokens: MOCK_TOKENS, userinfo: MOCK_USERINFO });
 
     const mockExpressReq = httpMocks.createRequest({
@@ -86,12 +86,16 @@ describe('Callback - Tenant Custom Domain Validation', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    await expect(wristbandAuth.callback(mockExpressReq, mockExpressRes)).rejects.toThrow(TypeError);
+    const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+
+    expectValidateCalled(wristbandApplicationVanityDomain, TENANT_CUSTOM_DOMAIN);
+    expect(callbackResult.type).toBe('completed');
+    expect(callbackResult.callbackData?.tenantCustomDomain).toBeUndefined();
   });
 
   test('Validates before exchanging the authorization code for tokens', async () => {
     const fetchMock = mockWristbandFetch({
-      tenantCustomDomainValid: false,
+      tenantCustomDomainValid: true,
       tokens: MOCK_TOKENS,
       userinfo: MOCK_USERINFO,
     });
@@ -102,15 +106,13 @@ describe('Callback - Tenant Custom Domain Validation', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    await expect(wristbandAuth.callback(mockExpressReq, mockExpressRes)).rejects.toThrow(
-      'Tenant custom domain is not valid'
-    );
+    await wristbandAuth.callback(mockExpressReq, mockExpressRes);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain('/custom-domains/validate');
+    expect(fetchMock.mock.calls[1][0]).toContain('/oauth2/token');
   });
 
-  test('Throws before the missing login state cookie redirect is returned', async () => {
+  test('Omits an invalid tenant custom domain from the login redirect URL', async () => {
     mockWristbandFetch({ tenantCustomDomainValid: false, tokens: MOCK_TOKENS, userinfo: MOCK_USERINFO });
 
     const mockExpressReq = httpMocks.createRequest({
@@ -118,9 +120,10 @@ describe('Callback - Tenant Custom Domain Validation', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    await expect(wristbandAuth.callback(mockExpressReq, mockExpressRes)).rejects.toThrow(
-      'Tenant custom domain is not valid'
-    );
+    const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+
+    expect(callbackResult.type).toBe('redirect_required');
+    expect(callbackResult.redirectUrl).not.toContain('tenant_custom_domain');
   });
 
   test('Skips validation when no tenant_custom_domain query param is present', async () => {

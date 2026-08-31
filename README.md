@@ -647,10 +647,9 @@ Wristband supports various tenant domain configurations, including subdomains an
 If none of these are specified, the SDK redirects users to the Application-Level Login (Tenant Discovery) Page.
 
 > [!NOTE]
-> For the `tenant_custom_domain` query parameter (#1) and the `defaultTenantCustomDomain` in LoginConfig (#4),
-> the value is validated against the Wristband tenant custom domain validation API. If the value is not a valid
-> tenant custom domain for your application, it is ignored and skipped over during evaluation of the precedence
-> order above.
+> The `tenant_custom_domain` query parameter (#1) is validated against the Wristband tenant custom domain
+> validation API. If the value is not a valid tenant custom domain for your application, it is ignored and
+> skipped over during evaluation, and the SDK continues on to the next entry in the precedence order above.
 
 #### Tenant Name Query Param
 
@@ -964,10 +963,9 @@ Wristband supports various tenant domain configurations, including subdomains an
 If none of these are specified, the SDK redirects users to the Application-Level Login (Tenant Discovery) Page.
 
 > [!NOTE]
-> For the `tenantCustomDomain` in LogoutConfig (#1) and the `tenant_custom_domain` query parameter (#3),
-> the value is validated against the Wristband tenant custom domain validation API. If the value is not a valid
-> tenant custom domain for your application, it is ignored and skipped over during evaluation of the precedence
-> order above.
+> The `tenant_custom_domain` query parameter (#3) is validated against the Wristband tenant custom domain
+> validation API. If the value is not a valid tenant custom domain for your application, it is ignored and
+> skipped over during evaluation, and the SDK continues on to the next entry in the precedence order above.
 
 #### Revoking Refresh Tokens
 
