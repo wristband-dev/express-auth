@@ -3,22 +3,14 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
+import { mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
 const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
 
 function mockFetchRevoke(status: number) {
-  global.fetch = jest.fn().mockResolvedValue({
-    status,
-    ok: status >= 200 && status < 300,
-    headers: {
-      get: () => {
-        return 'application/json';
-      },
-    },
-    text: jest.fn().mockResolvedValue(''),
-  });
+  mockWristbandFetch({ revokeStatus: status });
 }
 
 function expectRevokeCalled(domain: string) {
@@ -40,6 +32,7 @@ describe('Multi Tenant Logout', () => {
     loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
     redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
     wristbandApplicationVanityDomain = 'invotasticb2c-invotastic.dev.wristband.dev';
+    mockWristbandFetch();
   });
 
   afterEach(() => {

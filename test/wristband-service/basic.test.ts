@@ -1,7 +1,13 @@
 import { WristbandService } from '../../src/wristband-service';
 import { FetchError } from '../../src/error/fetch-error';
 import { InvalidGrantError } from '../../src/error';
-import { SdkConfiguration, WristbandTokenResponse, WristbandUserinfoResponse, UserInfo } from '../../src/types';
+import {
+  SdkConfiguration,
+  UserInfo,
+  ValidateTenantCustomDomainResponse,
+  WristbandTokenResponse,
+  WristbandUserinfoResponse,
+} from '../../src/types';
 import { JSON_MEDIA_TYPE } from '../../src/utils/constants';
 
 const DOMAIN = 'your-wristband-domain';
@@ -380,6 +386,71 @@ describe('WristbandService', () => {
 
     test('Throws when refreshToken is empty', async () => {
       await expect(wristbandService.revokeRefreshToken('')).rejects.toThrow('Refresh token is required');
+    });
+  });
+
+  describe('validateTenantCustomDomain', () => {
+    const tenantCustomDomain = 'auth.yourapp.io';
+
+    test('Returns true when the tenant custom domain is valid', async () => {
+      const expectedResponse: ValidateTenantCustomDomainResponse = { valid: true };
+      mockFetch(200, expectedResponse);
+
+      const result = await wristbandService.validateTenantCustomDomain(tenantCustomDomain);
+
+      expect(result).toBe(true);
+    });
+
+    test('Returns false when the tenant custom domain is invalid', async () => {
+      const expectedResponse: ValidateTenantCustomDomainResponse = { valid: false };
+      mockFetch(200, expectedResponse);
+
+      const result = await wristbandService.validateTenantCustomDomain(tenantCustomDomain);
+
+      expect(result).toBe(false);
+    });
+
+    test('Sends correct JSON body', async () => {
+      mockFetch(200, { valid: true });
+
+      await wristbandService.validateTenantCustomDomain(tenantCustomDomain);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}/custom-domains/validate`,
+        expect.objectContaining({ body: JSON.stringify({ tenantCustomDomain }) })
+      );
+    });
+
+    test('Sends JSON content-type and accept headers', async () => {
+      mockFetch(200, { valid: true });
+
+      await wristbandService.validateTenantCustomDomain(tenantCustomDomain);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': JSON_MEDIA_TYPE,
+            Accept: JSON_MEDIA_TYPE,
+          }),
+        })
+      );
+    });
+
+    test('Throws FetchError on error response', async () => {
+      mockFetch(400, { error: 'bad_request' });
+
+      await expect(wristbandService.validateTenantCustomDomain(tenantCustomDomain)).rejects.toThrow(FetchError);
+    });
+
+    test('Throws when tenantCustomDomain is missing', async () => {
+      await expect(wristbandService.validateTenantCustomDomain('')).rejects.toThrow('Tenant custom domain is required');
+    });
+
+    test('Throws when tenantCustomDomain is whitespace', async () => {
+      await expect(wristbandService.validateTenantCustomDomain('   ')).rejects.toThrow(
+        'Tenant custom domain is required'
+      );
     });
   });
 });

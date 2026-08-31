@@ -7,6 +7,7 @@ import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { decryptLoginState } from '../../src/utils';
 import { LoginState } from '../../src/types';
 import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
+import { mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -79,6 +80,11 @@ describe('Custom Login Configurations', () => {
     wristbandApplicationVanityDomain = 'auth.invotastic.com';
     loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
     redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
+    mockWristbandFetch();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('Successful Redirect to Authorize Endpoint', () => {
