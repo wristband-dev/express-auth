@@ -1,6 +1,6 @@
 import { withRetry } from '../../src/utils/retry';
 import { FetchError } from '../../src/error';
-import { API_RETRY_DELAY_MS, MAX_API_RETRY_ATTEMPTS } from '../../src/utils/constants';
+import { API_RETRY_DELAY_MS, API_RETRY_DELAY_MULTIPLIER, MAX_API_RETRY_ATTEMPTS } from '../../src/utils/constants';
 
 function createFetchError(status: number, body: unknown = {}): FetchError<{ status: number }> {
   return new FetchError({ status } as any, body);
@@ -98,5 +98,21 @@ describe('withRetry', () => {
     const elapsed = Date.now() - startTime;
 
     expect(elapsed).toBeLessThan(API_RETRY_DELAY_MS);
+  });
+
+  test('Applies exponential backoff, multiplying the delay after each retry', async () => {
+    const fn = jest
+      .fn()
+      .mockRejectedValueOnce(createFetchError(500))
+      .mockRejectedValueOnce(createFetchError(500))
+      .mockResolvedValue('result');
+
+    const expectedMinElapsed = API_RETRY_DELAY_MS + API_RETRY_DELAY_MS * API_RETRY_DELAY_MULTIPLIER;
+
+    const startTime = Date.now();
+    await withRetry(fn);
+    const elapsed = Date.now() - startTime;
+
+    expect(elapsed).toBeGreaterThanOrEqual(expectedMinElapsed - 1);
   });
 });
