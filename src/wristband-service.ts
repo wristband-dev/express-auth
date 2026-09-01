@@ -8,6 +8,7 @@ import {
 } from './types';
 import { encodeBase64 } from './utils';
 import { FORM_URLENCODED_MEDIA_TYPE, JSON_MEDIA_TYPE } from './utils/constants';
+import { withRetry } from './utils/retry';
 import { WristbandApiClient } from './wristband-api-client';
 
 /**
@@ -15,7 +16,9 @@ import { WristbandApiClient } from './wristband-api-client';
  *
  * Handles OAuth token exchange, user information retrieval, token refresh,
  * and token revocation. Most methods use HTTP Basic Authentication with
- * the configured client credentials.
+ * the configured client credentials. Every external API call made here is
+ * automatically retried on transient failures (5xx responses, network errors) via
+ * {@link withRetry}.
  *
  * @internal
  */
@@ -56,9 +59,11 @@ export class WristbandService {
    * @throws {Error} When the API request fails
    */
   async getSdkConfiguration(): Promise<SdkConfiguration> {
-    return this.wristbandApiClient.get<SdkConfiguration>(`/clients/${this.clientId}/sdk-configuration`, {
-      'Content-Type': JSON_MEDIA_TYPE,
-      Accept: JSON_MEDIA_TYPE,
+    return withRetry(() => {
+      return this.wristbandApiClient.get<SdkConfiguration>(`/clients/${this.clientId}/sdk-configuration`, {
+        'Content-Type': JSON_MEDIA_TYPE,
+        Accept: JSON_MEDIA_TYPE,
+      });
     });
   }
 
@@ -96,11 +101,9 @@ export class WristbandService {
     ].join('&');
 
     try {
-      return await this.wristbandApiClient.post<WristbandTokenResponse>(
-        '/oauth2/token',
-        authData,
-        this.basicAuthHeaders
-      );
+      return await withRetry(() => {
+        return this.wristbandApiClient.post<WristbandTokenResponse>('/oauth2/token', authData, this.basicAuthHeaders);
+      });
     } catch (error) {
       if (WristbandService.hasInvalidGrantError(error)) {
         throw new InvalidGrantError(WristbandService.getErrorDescription(error) || 'Invalid grant');
@@ -126,10 +129,12 @@ export class WristbandService {
       throw new Error('Access token is required');
     }
 
-    const userinfo = await this.wristbandApiClient.get('/oauth2/userinfo', {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': JSON_MEDIA_TYPE,
-      Accept: JSON_MEDIA_TYPE,
+    const userinfo = await withRetry(() => {
+      return this.wristbandApiClient.get('/oauth2/userinfo', {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': JSON_MEDIA_TYPE,
+        Accept: JSON_MEDIA_TYPE,
+      });
     });
 
     WristbandService.validateUserinfoResponse(userinfo);
@@ -155,11 +160,9 @@ export class WristbandService {
     const authData: string = `grant_type=refresh_token&refresh_token=${refreshToken}`;
 
     try {
-      return await this.wristbandApiClient.post<WristbandTokenResponse>(
-        '/oauth2/token',
-        authData,
-        this.basicAuthHeaders
-      );
+      return await withRetry(() => {
+        return this.wristbandApiClient.post<WristbandTokenResponse>('/oauth2/token', authData, this.basicAuthHeaders);
+      });
     } catch (error) {
       if (WristbandService.hasInvalidGrantError(error)) {
         throw new InvalidGrantError(WristbandService.getErrorDescription(error) || 'Invalid refresh token');
@@ -184,7 +187,9 @@ export class WristbandService {
       throw new Error('Refresh token is required');
     }
 
-    await this.wristbandApiClient.post<void>('/oauth2/revoke', `token=${refreshToken}`, this.basicAuthHeaders);
+    await withRetry(() => {
+      return this.wristbandApiClient.post<void>('/oauth2/revoke', `token=${refreshToken}`, this.basicAuthHeaders);
+    });
   }
 
   /**
@@ -199,11 +204,13 @@ export class WristbandService {
       throw new Error('Tenant custom domain is required');
     }
 
-    const response = await this.wristbandApiClient.post<ValidateTenantCustomDomainResponse>(
-      '/custom-domains/validate',
-      JSON.stringify({ tenantCustomDomain }),
-      { 'Content-Type': JSON_MEDIA_TYPE, Accept: JSON_MEDIA_TYPE }
-    );
+    const response = await withRetry(() => {
+      return this.wristbandApiClient.post<ValidateTenantCustomDomainResponse>(
+        '/custom-domains/validate',
+        JSON.stringify({ tenantCustomDomain }),
+        { 'Content-Type': JSON_MEDIA_TYPE, Accept: JSON_MEDIA_TYPE }
+      );
+    });
 
     return response.valid;
   }
