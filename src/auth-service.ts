@@ -5,12 +5,7 @@ import {
   WristbandJwtValidator,
 } from '@wristband/typescript-jwt';
 
-import {
-  LOGIN_REQUIRED_ERROR,
-  MAX_REFRESH_ATTEMPT_DELAY_MS,
-  MAX_REFRESH_ATTEMPTS,
-  TENANT_PLACEHOLDER_REGEX,
-} from './utils/constants';
+import { LOGIN_REQUIRED_ERROR, TENANT_PLACEHOLDER_REGEX } from './utils/constants';
 import {
   clearOldestLoginStateCookie,
   createLoginState,
@@ -397,63 +392,49 @@ export class AuthService {
       return null;
     }
 
-    // Try up to 3 times to perform a token refresh.
-    for (let attempt = 1; attempt <= MAX_REFRESH_ATTEMPTS; attempt += 1) {
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        const tokenResponse = await this.wristbandService.refreshToken(refreshToken);
-        const {
-          access_token: accessToken,
-          id_token: idToken,
-          expires_in: expiresIn,
-          refresh_token: responseRefreshToken,
-        } = tokenResponse;
+    // Retrying on transient failures (5xx errors, network errors) is already handled one layer
+    // down by WristbandService -- see withRetry() in utils/retry.ts. By the time an error
+    // surfaces here, retries (if any applied) have already been exhausted.
+    try {
+      const tokenResponse = await this.wristbandService.refreshToken(refreshToken);
+      const {
+        access_token: accessToken,
+        id_token: idToken,
+        expires_in: expiresIn,
+        refresh_token: responseRefreshToken,
+      } = tokenResponse;
 
-        const resolvedExpiresIn = expiresIn - (tokenExpirationBuffer || 0);
-        const resolvedExpiresAt = Date.now() + resolvedExpiresIn * 1000;
+      const resolvedExpiresIn = expiresIn - (tokenExpirationBuffer || 0);
+      const resolvedExpiresAt = Date.now() + resolvedExpiresIn * 1000;
 
-        return {
-          accessToken,
-          idToken,
-          refreshToken: responseRefreshToken,
-          expiresAt: resolvedExpiresAt,
-          expiresIn: resolvedExpiresIn,
-        };
-      } catch (error: unknown) {
-        // Specifically handle invalid_grant errors
-        if (error instanceof InvalidGrantError) {
-          throw new WristbandError('invalid_refresh_token', error.errorDescription, error);
-        }
-
-        // Only 4xx errors should short-circuit the retry loop early.
-        if (
-          error instanceof FetchError &&
-          error.response &&
-          error.response.status >= 400 &&
-          error.response.status < 500
-        ) {
-          // Only 4xx errors should short-circuit the retry loop early.
-          const errorDescription =
-            // @ts-expect-error - body is unknown, error_description access not type-checked
-            error.body && error.body.error_description ? error.body.error_description : 'Invalid Refresh Token';
-          throw new WristbandError('invalid_refresh_token', errorDescription, error);
-        }
-
-        // Last attempt failed
-        if (attempt === MAX_REFRESH_ATTEMPTS) {
-          throw new WristbandError('unexpected_error', 'Unexpected Error', error instanceof Error ? error : undefined);
-        }
-
-        // Wait before next retry (only for 5xx errors or network failures)
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, MAX_REFRESH_ATTEMPT_DELAY_MS);
-        });
+      return {
+        accessToken,
+        idToken,
+        refreshToken: responseRefreshToken,
+        expiresAt: resolvedExpiresAt,
+        expiresIn: resolvedExpiresIn,
+      };
+    } catch (error: unknown) {
+      // Specifically handle invalid_grant errors
+      if (error instanceof InvalidGrantError) {
+        throw new WristbandError('invalid_refresh_token', error.errorDescription, error);
       }
-    }
 
-    // This is merely a safety check, but this should never happen.
-    throw new WristbandError('unexpected_error', 'Unexpected Error');
+      // Any remaining 4xx error also indicates an invalid refresh token.
+      if (
+        error instanceof FetchError &&
+        error.response &&
+        error.response.status >= 400 &&
+        error.response.status < 500
+      ) {
+        const errorDescription =
+          // @ts-expect-error - body is unknown, error_description access not type-checked
+          error.body && error.body.error_description ? error.body.error_description : 'Invalid Refresh Token';
+        throw new WristbandError('invalid_refresh_token', errorDescription, error);
+      }
+
+      throw new WristbandError('unexpected_error', 'Unexpected Error', error instanceof Error ? error : undefined);
+    }
   }
 
   /**

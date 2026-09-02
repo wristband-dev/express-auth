@@ -3,8 +3,11 @@ export const JSON_MEDIA_TYPE: string = 'application/json;charset=UTF-8';
 export const LOGIN_REQUIRED_ERROR: string = 'login_required';
 export const LOGIN_STATE_COOKIE_SEPARATOR: string = '#';
 export const LOGIN_STATE_COOKIE_PREFIX: string = `login${LOGIN_STATE_COOKIE_SEPARATOR}`;
-export const MAX_REFRESH_ATTEMPTS: number = 3;
-export const MAX_REFRESH_ATTEMPT_DELAY_MS: number = 100;
+// Common retry settings applied to all Wristband API calls made from WristbandService.
+export const MAX_API_RETRY_ATTEMPTS: number = 3;
+export const API_RETRY_DELAY_MS: number = 100;
+// Multiplier applied to the delay after each retry attempt (exponential backoff).
+export const API_RETRY_DELAY_MULTIPLIER: number = 2;
 export const TENANT_DOMAIN_PLACEHOLDER: string = '{tenant_domain}';
 export const TENANT_NAME_PLACEHOLDER: string = '{tenant_name}';
 // Regex to match either placeholder
