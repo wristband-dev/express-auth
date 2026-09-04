@@ -1,5 +1,6 @@
 import { withRetry } from '../../src/utils/retry';
 import { FetchError } from '../../src/error';
+import { WristbandApiClient } from '../../src/wristband-api-client';
 import { API_RETRY_DELAY_MS, API_RETRY_DELAY_MULTIPLIER, MAX_API_RETRY_ATTEMPTS } from '../../src/utils/constants';
 
 function createFetchError(status: number, body: unknown = {}): FetchError<{ status: number }> {
@@ -98,6 +99,32 @@ describe('withRetry', () => {
     const elapsed = Date.now() - startTime;
 
     expect(elapsed).toBeLessThan(API_RETRY_DELAY_MS);
+  });
+
+  // Regression: a 4xx whose body isn't JSON (e.g. a plain-text or HTML error page from a
+  // proxy/CDN) must still surface as a FetchError so it is classified as non-retryable. Before
+  // wristband-api-client.ts parsed defensively, it surfaced as a SyntaxError and got retried.
+  test('Does not retry a 4xx that carried a non-JSON body', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 401,
+      ok: false,
+      headers: {
+        get: () => {
+          return 'text/plain';
+        },
+      },
+      text: jest.fn().mockResolvedValue('Unauthorized'),
+    });
+
+    const client = new WristbandApiClient('test.wristband.dev');
+
+    await expect(
+      withRetry(() => {
+        return client.get('/test');
+      })
+    ).rejects.toBeInstanceOf(FetchError);
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   test('Applies exponential backoff, multiplying the delay after each retry', async () => {

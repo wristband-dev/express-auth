@@ -155,6 +155,40 @@ describe('WristbandApiClient', () => {
     });
   });
 
+  describe('Non-JSON response bodies', () => {
+    test('Throws FetchError (not SyntaxError) for a 4xx with a plain-text body', async () => {
+      mockFetch(401, 'Unauthorized');
+
+      try {
+        await client.get('/test');
+        throw new Error('Expected FetchError to be thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(FetchError);
+        const fetchError = err as FetchError<Response>;
+        expect(fetchError.response?.status).toBe(401);
+        expect(fetchError.body).toBe('Unauthorized');
+      }
+    });
+
+    test('Throws FetchError for a 5xx with an HTML error page body', async () => {
+      mockFetch(502, '<html><body>502 Bad Gateway</body></html>');
+
+      try {
+        await client.get('/test');
+        throw new Error('Expected FetchError to be thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(FetchError);
+        expect((err as FetchError<Response>).response?.status).toBe(502);
+      }
+    });
+
+    test('Returns the raw text for a 2xx with a non-JSON body', async () => {
+      mockFetch(200, 'plain text');
+
+      await expect(client.get('/test')).resolves.toBe('plain text');
+    });
+  });
+
   describe('post()', () => {
     test('Makes POST request to correct URL', async () => {
       mockFetch(200, { access_token: 'token', expires_in: 3600 });
