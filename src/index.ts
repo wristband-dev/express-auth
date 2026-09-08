@@ -1,4 +1,4 @@
-import { WristbandError } from './error';
+import { WristbandError } from '@wristband/typescript-auth';
 import { createWristbandAuth, discoverWristbandAuth } from './factory';
 import type {
   AuthConfig,
@@ -12,7 +12,7 @@ import type {
   TokenData,
   UserInfo,
   UserInfoRole,
-} from './types';
+} from '@wristband/typescript-auth';
 import { WristbandAuth } from './wristband-auth';
 
 /**

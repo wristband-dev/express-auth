@@ -20,6 +20,6 @@
     "/test/helpers/"
   ],
   "moduleNameMapper": {
-    "^../types/express$": "<rootDir>/src/types/express.d.ts"
+    "^@wristband/typescript-jwt$": "<rootDir>/node_modules/@wristband/typescript-jwt/dist/index.cjs"
   }
 }

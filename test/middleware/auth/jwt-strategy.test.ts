@@ -1,13 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import { WristbandJwtValidator, createWristbandJwtValidator } from '@wristband/typescript-jwt';
-import { AuthService } from '../../../src/auth-service';
-import { AuthConfig, AuthMiddlewareConfig } from '../../../src/types';
 
-// Mock dependencies
+import {
+  createWristbandAuth,
+  type AuthConfig,
+  type AuthMiddlewareConfig,
+  type WristbandAuth,
+} from '../../../src/index';
+
 jest.mock('@wristband/typescript-jwt');
 
-describe('AuthService - JWT Strategy', () => {
-  let authService: AuthService;
+describe('createAuthMiddleware - JWT Strategy', () => {
+  let wristbandAuth: WristbandAuth;
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
   let mockNext: NextFunction;
@@ -30,17 +34,15 @@ describe('AuthService - JWT Strategy', () => {
     };
     mockNext = jest.fn();
 
-    // Mock JWT validator
     mockJwtValidator = {
       extractBearerToken: jest.fn(),
       validate: jest.fn(),
       decode: jest.fn(),
     } as any;
 
-    // Mock the factory function to return our mock validator
     (createWristbandJwtValidator as jest.Mock).mockReturnValue(mockJwtValidator);
 
-    authService = new AuthService(authConfig);
+    wristbandAuth = createWristbandAuth(authConfig);
   });
 
   afterEach(() => {
@@ -53,9 +55,8 @@ describe('AuthService - JWT Strategy', () => {
     };
 
     it('should authenticate successfully with valid JWT', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
-      // Mock valid JWT
       const mockPayload = {
         sub: 'user-123',
         tnt_id: 'tenant-456',
@@ -65,7 +66,6 @@ describe('AuthService - JWT Strategy', () => {
       };
 
       mockReq.headers = { authorization: 'Bearer valid-token' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
@@ -79,10 +79,9 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should return 401 when Authorization header is missing', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
       mockReq.headers = {};
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue(null!);
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
@@ -95,10 +94,9 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should return 401 when Authorization header is not a string', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
       mockReq.headers = { authorization: ['Bearer token'] as any };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue(null!);
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
@@ -110,10 +108,9 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should return 401 when bearer token cannot be extracted', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
       mockReq.headers = { authorization: 'InvalidFormat token' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue(null!);
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
@@ -126,10 +123,9 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should return 401 when JWT validation fails', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
       mockReq.headers = { authorization: 'Bearer invalid-token' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('invalid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: false, payload: null! });
 
@@ -143,10 +139,9 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should return 500 when JWT validation throws unexpected error', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
       mockReq.headers = { authorization: 'Bearer valid-token' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockRejectedValue(new Error('Network error'));
 
@@ -159,7 +154,7 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should attach full JWT payload to req.auth', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
       const mockPayload = {
         sub: 'user-123',
@@ -174,7 +169,6 @@ describe('AuthService - JWT Strategy', () => {
       };
 
       mockReq.headers = { authorization: 'Bearer valid-token' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
@@ -192,13 +186,11 @@ describe('AuthService - JWT Strategy', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(customConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(customConfig);
 
       const mockPayload = { sub: 'user-123', tnt_id: 'tenant-456' };
       mockReq.headers = { authorization: 'Bearer valid-token' };
 
-      // Trigger validator initialization
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
@@ -215,12 +207,11 @@ describe('AuthService - JWT Strategy', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(customConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(customConfig);
 
       const mockPayload = { sub: 'user-123', tnt_id: 'tenant-456' };
       mockReq.headers = { authorization: 'Bearer valid-token' };
 
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
@@ -230,15 +221,13 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should initialize req.auth as empty object before authentication', async () => {
-      const middleware = authService.createAuthMiddleware(jwtConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(jwtConfig);
 
       mockReq.headers = {};
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue(null!);
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // req.auth should be initialized as empty object
       expect((mockReq as any).auth).toBeDefined();
       expect((mockReq as any).auth).toEqual({});
     });
@@ -246,31 +235,30 @@ describe('AuthService - JWT Strategy', () => {
 
   describe('JWT Authentication for Multiple Protected Routes', () => {
     it('should authenticate successfully for different API endpoints', async () => {
-      const middleware = authService.createAuthMiddleware({
+      const middleware = wristbandAuth.createAuthMiddleware({
         authStrategies: ['JWT'],
       });
 
       const mockPayload = { sub: 'user-123', tnt_id: 'tenant-456' };
       mockReq.headers = { authorization: 'Bearer valid-token' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
-      // Test first endpoint
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalled();
       expect((mockReq as any).auth).toEqual({ ...mockPayload, jwt: 'valid-token' });
 
       jest.clearAllMocks();
+      mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
+      mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
-      // Test second endpoint - should reuse validator
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalled();
       expect((mockReq as any).auth).toEqual({ ...mockPayload, jwt: 'valid-token' });
     });
 
     it('should handle concurrent requests with same JWT', async () => {
-      const middleware = authService.createAuthMiddleware({
+      const middleware = wristbandAuth.createAuthMiddleware({
         authStrategies: ['JWT'],
       });
 
@@ -282,11 +270,9 @@ describe('AuthService - JWT Strategy', () => {
       mockReq.headers = { authorization: 'Bearer token1' };
       (mockReq2 as any).headers = { authorization: 'Bearer token1' };
 
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('token1');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
-      // Concurrent requests
       await Promise.all([
         middleware(mockReq as Request, mockRes as Response, mockNext),
         middleware(mockReq2 as Request, mockRes2 as Response, mockNext2),
@@ -299,13 +285,12 @@ describe('AuthService - JWT Strategy', () => {
 
   describe('JWT with different Authorization header formats', () => {
     it('should handle lowercase "bearer" prefix', async () => {
-      const middleware = authService.createAuthMiddleware({
+      const middleware = wristbandAuth.createAuthMiddleware({
         authStrategies: ['JWT'],
       });
 
       const mockPayload = { sub: 'user-123' };
       mockReq.headers = { authorization: 'bearer lowercase-token' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('lowercase-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: mockPayload });
 
@@ -316,12 +301,11 @@ describe('AuthService - JWT Strategy', () => {
     });
 
     it('should handle Authorization header with extra whitespace', async () => {
-      const middleware = authService.createAuthMiddleware({
+      const middleware = wristbandAuth.createAuthMiddleware({
         authStrategies: ['JWT'],
       });
 
       mockReq.headers = { authorization: '  Bearer   token-with-spaces  ' };
-      (authService as any).jwtValidator = mockJwtValidator;
       mockJwtValidator.extractBearerToken.mockReturnValue('token-with-spaces');
       mockJwtValidator.validate.mockResolvedValue({
         isValid: true,
@@ -331,67 +315,6 @@ describe('AuthService - JWT Strategy', () => {
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-    });
-  });
-
-  describe('getJwtValidator - lazy initialization', () => {
-    it('should create JWT validator on first call', () => {
-      const jwtConfig = {
-        jwksCacheMaxSize: 30,
-        jwksCacheTtl: 90000,
-      };
-
-      expect((authService as any).jwtValidator).toBeUndefined();
-
-      const validator = (authService as any).getJwtValidator(jwtConfig);
-
-      expect(validator).toBeDefined();
-      expect((authService as any).jwtValidator).toBe(validator);
-      expect(createWristbandJwtValidator).toHaveBeenCalledWith({
-        wristbandApplicationVanityDomain: 'auth.example.com',
-        jwksCacheMaxSize: 30,
-        jwksCacheTtl: 90000,
-      });
-    });
-
-    it('should reuse existing JWT validator on subsequent calls', () => {
-      const jwtConfig = {
-        jwksCacheMaxSize: 30,
-      };
-
-      const firstValidator = (authService as any).getJwtValidator(jwtConfig);
-      const secondValidator = (authService as any).getJwtValidator(jwtConfig);
-
-      expect(firstValidator).toBe(secondValidator);
-      expect(createWristbandJwtValidator).toHaveBeenCalledTimes(1);
-    });
-
-    it('should create validator with default config when no jwtConfig provided', () => {
-      const jwtConfig = {};
-
-      const validator = (authService as any).getJwtValidator(jwtConfig);
-
-      expect(validator).toBeDefined();
-      expect(createWristbandJwtValidator).toHaveBeenCalledWith({
-        wristbandApplicationVanityDomain: 'auth.example.com',
-        jwksCacheMaxSize: undefined,
-        jwksCacheTtl: undefined,
-      });
-    });
-
-    it('should create validator with wristbandApplicationVanityDomain from config', () => {
-      const jwtConfig = {
-        jwksCacheMaxSize: 20,
-      };
-
-      (authService as any).getJwtValidator(jwtConfig);
-
-      expect(createWristbandJwtValidator).toHaveBeenCalledWith({
-        wristbandApplicationVanityDomain: 'auth.example.com',
-        jwksCacheMaxSize: 20,
-        jwksCacheTtl: undefined,
-      });
-      expect((authService as any).jwtValidator).toBeDefined();
     });
   });
 });

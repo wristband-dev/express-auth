@@ -1,12 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { Session } from '@wristband/typescript-session';
 
-import { AuthService } from '../../../src/auth-service';
-import { AuthConfig, AuthMiddlewareConfig, TokenData } from '../../../src/types';
-import { WristbandAuthImpl } from '../../../src/wristband-auth';
+import {
+  createWristbandAuth,
+  type AuthConfig,
+  type AuthMiddlewareConfig,
+  type WristbandAuth,
+} from '../../../src/index';
+import { expectTokenNotCalled, mockWristbandFetch } from '../../helpers/mock-fetch';
 
-describe('AuthService - SESSION Strategy - Additional Coverage', () => {
-  let authService: AuthService;
+const MOCK_REFRESH_TOKENS = {
+  access_token: 'new-access-token',
+  refresh_token: 'new-refresh-token',
+  expires_in: 3600,
+  id_token: 'new-id-token',
+  token_type: 'bearer',
+};
+
+describe('createAuthMiddleware - SESSION Strategy', () => {
+  let wristbandAuth: WristbandAuth;
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
   let mockNext: NextFunction;
@@ -40,17 +52,16 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
 
     mockNext = jest.fn();
 
-    authService = new AuthService(authConfig);
+    wristbandAuth = createWristbandAuth(authConfig);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
-  describe('WristbandAuthImpl Delegation', () => {
-    it('should delegate createAuthMiddleware call to AuthService', async () => {
-      const wristbandAuth = new WristbandAuthImpl(authConfig);
-
+  describe('Delegation', () => {
+    it('should create middleware that authenticates SESSION requests', async () => {
       const config: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -60,7 +71,6 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
 
       const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // Verify middleware works
       mockSession.isAuthenticated = true;
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -79,7 +89,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       const customSession = {
         isAuthenticated: true,
@@ -100,13 +110,14 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
 
       expect(mockNext).toHaveBeenCalled();
       expect(customSession.save).toHaveBeenCalled();
-      // Verify custom fields are preserved
       expect((mockReq as any).session.userId).toBe('user-123');
       expect((mockReq as any).session.email).toBe('test@example.com');
       expect((mockReq as any).session.roles).toEqual(['admin', 'user']);
     });
 
     it('should handle custom session data during token refresh', async () => {
+      mockWristbandFetch({ tokens: MOCK_REFRESH_TOKENS });
+
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -116,13 +127,13 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       const customSession = {
         isAuthenticated: true,
         csrfToken: undefined,
         refreshToken: 'refresh-token',
-        expiresAt: Date.now() - 1000, // Expired
+        expiresAt: Date.now() - 1000,
         accessToken: 'old-token',
         userId: 'user-123',
         email: 'test@example.com',
@@ -132,22 +143,10 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
 
       (mockReq as any).session = customSession as any;
 
-      const newTokenData: TokenData = {
-        accessToken: 'new-access-token',
-        refreshToken: 'new-refresh-token',
-        expiresAt: Date.now() + 3600000,
-        expiresIn: 3600,
-        idToken: 'new-id-token',
-      };
-
-      jest.spyOn(authService, 'refreshTokenIfExpired').mockResolvedValue(newTokenData);
-
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(authService.refreshTokenIfExpired).toHaveBeenCalled();
       expect(customSession.accessToken).toBe('new-access-token');
       expect(customSession.refreshToken).toBe('new-refresh-token');
-      // Custom fields should be preserved
       expect((mockReq as any).session.userId).toBe('user-123');
       expect((mockReq as any).session.email).toBe('test@example.com');
       expect(mockNext).toHaveBeenCalled();
@@ -165,7 +164,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = false;
 
@@ -186,7 +185,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.csrfToken = 'valid-token';
@@ -208,7 +207,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       (mockSession.save as jest.Mock).mockRejectedValue(new Error('Database connection failed'));
@@ -220,6 +219,11 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
     });
 
     it('should return "Unauthorized" for token refresh failures', async () => {
+      mockWristbandFetch({
+        tokenStatus: 400,
+        tokens: { error: 'invalid_grant', error_description: 'Invalid refresh token' },
+      });
+
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -229,13 +233,11 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = 'expired-refresh';
       mockSession.expiresAt = Date.now() - 1000;
-
-      jest.spyOn(authService, 'refreshTokenIfExpired').mockRejectedValue(new Error('Invalid refresh token'));
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -246,6 +248,8 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
 
   describe('Session Edge Cases', () => {
     it('should handle null refreshToken explicitly', async () => {
+      mockWristbandFetch();
+
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -255,21 +259,21 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = null as any;
-      mockSession.expiresAt = Date.now() - 1000; // Expired
-
-      const refreshSpy = jest.spyOn(authService, 'refreshTokenIfExpired');
+      mockSession.expiresAt = Date.now() - 1000;
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(refreshSpy).not.toHaveBeenCalled();
+      expectTokenNotCalled();
       expect(mockNext).toHaveBeenCalled();
     });
 
     it('should handle empty string refreshToken', async () => {
+      mockWristbandFetch();
+
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -279,22 +283,19 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = '' as any;
       mockSession.expiresAt = Date.now() - 1000;
 
-      const refreshSpy = jest.spyOn(authService, 'refreshTokenIfExpired');
-
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // Empty string is falsy, should skip refresh
-      expect(refreshSpy).not.toHaveBeenCalled();
+      expectTokenNotCalled();
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it('should handle expiresAt as 0', async () => {
+    it('should return 401 when expiresAt is 0', async () => {
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -304,23 +305,19 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = 'refresh-token';
-      mockSession.expiresAt = 0; // Edge case: epoch time
-
-      const refreshSpy = jest.spyOn(authService, 'refreshTokenIfExpired');
+      mockSession.expiresAt = 0;
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // 0 is falsy but should still call refresh since it's technically a timestamp
-      // However, based on the code: if (refreshToken && expiresAt !== undefined)
-      // 0 is defined, so it SHOULD call refresh
-      expect(refreshSpy).toHaveBeenCalledWith('refresh-token', 0);
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
-    it('should handle negative expiresAt', async () => {
+    it('should return 401 when expiresAt is negative', async () => {
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -330,18 +327,16 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = 'refresh-token';
-      mockSession.expiresAt = -1000; // Negative timestamp
-
-      jest.spyOn(authService, 'refreshTokenIfExpired').mockResolvedValue(null);
+      mockSession.expiresAt = -1000;
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(authService.refreshTokenIfExpired).toHaveBeenCalledWith('refresh-token', -1000);
-      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
   });
 
@@ -356,11 +351,10 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.csrfToken = undefined;
-      // No refresh token or expiry
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -369,6 +363,8 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
     });
 
     it('should call session.save() after successful token refresh', async () => {
+      mockWristbandFetch({ tokens: MOCK_REFRESH_TOKENS });
+
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -378,21 +374,11 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = 'refresh-token';
       mockSession.expiresAt = Date.now() - 1000;
-
-      const newTokenData: TokenData = {
-        accessToken: 'new-token',
-        refreshToken: 'new-refresh',
-        expiresAt: Date.now() + 3600000,
-        expiresIn: 3600,
-        idToken: 'new-id',
-      };
-
-      jest.spyOn(authService, 'refreshTokenIfExpired').mockResolvedValue(newTokenData);
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -410,7 +396,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = false;
 
@@ -431,7 +417,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.csrfToken = 'valid-token';
@@ -444,6 +430,11 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
     });
 
     it('should NOT call session.save() when token refresh fails', async () => {
+      mockWristbandFetch({
+        tokenStatus: 400,
+        tokens: { error: 'invalid_grant', error_description: 'Refresh failed' },
+      });
+
       const sessionConfig: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -453,13 +444,11 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = 'expired-token';
       mockSession.expiresAt = Date.now() - 1000;
-
-      jest.spyOn(authService, 'refreshTokenIfExpired').mockRejectedValue(new Error('Refresh failed'));
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -479,18 +468,16 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
       mockSession.isAuthenticated = true;
 
-      // First request
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
       expect(mockSession.save).toHaveBeenCalledTimes(1);
 
       jest.clearAllMocks();
 
-      // Second request - same session
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
       expect(mockSession.save).toHaveBeenCalledTimes(1);
@@ -506,16 +493,14 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(sessionConfig);
+      const middleware = wristbandAuth.createAuthMiddleware(sessionConfig);
 
-      // First request - authenticated
       mockSession.isAuthenticated = true;
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
 
       jest.clearAllMocks();
 
-      // Second request - session expired
       mockSession.isAuthenticated = false;
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockRes.status).toHaveBeenCalledWith(401);

@@ -31,6 +31,8 @@ export interface WristbandFetchMockConfig {
   revokeStatus?: number;
   /** Body returned by the `/oauth2/token` endpoint. */
   tokens?: unknown;
+  /** Status returned by the `/oauth2/token` endpoint. Defaults to `200`. */
+  tokenStatus?: number;
   /** Body returned by the `/oauth2/userinfo` endpoint. */
   userinfo?: unknown;
 }
@@ -43,14 +45,21 @@ export interface WristbandFetchMockConfig {
  * @returns The installed jest mock, for call assertions.
  */
 export function mockWristbandFetch(config: WristbandFetchMockConfig = {}): jest.Mock {
-  const { tenantCustomDomainValid = true, validateStatus = 200, revokeStatus = 200, tokens, userinfo } = config;
+  const {
+    tenantCustomDomainValid = true,
+    validateStatus = 200,
+    revokeStatus = 200,
+    tokens,
+    tokenStatus = 200,
+    userinfo,
+  } = config;
 
   const fetchMock = jest.fn().mockImplementation((url: string) => {
     if (url.includes('/custom-domains/validate')) {
       return toFetchResponse({ status: validateStatus, body: { valid: tenantCustomDomainValid } });
     }
     if (url.includes('/oauth2/token')) {
-      return toFetchResponse({ status: 200, body: tokens });
+      return toFetchResponse({ status: tokenStatus, body: tokens });
     }
     if (url.includes('/oauth2/userinfo')) {
       return toFetchResponse({ status: 200, body: userinfo });
@@ -81,4 +90,11 @@ export function expectValidateCalled(vanityDomain: string, tenantCustomDomain: s
  */
 export function expectValidateNotCalled(): void {
   expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining('/custom-domains/validate'), expect.anything());
+}
+
+/**
+ * Asserts that the token endpoint was never called.
+ */
+export function expectTokenNotCalled(): void {
+  expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining('/oauth2/token'), expect.anything());
 }

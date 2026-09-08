@@ -1,5 +1,4 @@
-import { WristbandAuth } from '../../src/wristband-auth';
-import { createWristbandAuth, WristbandError } from '../../src/index';
+import { createWristbandAuth, WristbandError, type WristbandAuth } from '../../src/index';
 
 const CLIENT_ID = 'test-client-id';
 const CLIENT_SECRET = 'test-client-secret';
