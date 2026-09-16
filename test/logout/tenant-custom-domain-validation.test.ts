@@ -1,7 +1,6 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { FetchError } from '../../src/error';
 import { expectValidateCalled, expectValidateNotCalled, mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';
@@ -176,7 +175,7 @@ describe('Logout - Tenant Custom Domain Validation', () => {
       }) as any;
       const mockExpressRes = httpMocks.createResponse() as any;
 
-      await expect(wristbandAuth.logout(mockExpressReq, mockExpressRes)).rejects.toThrow(FetchError);
+      await expect(wristbandAuth.logout(mockExpressReq, mockExpressRes)).rejects.toThrow('Fetch Error');
     });
 
     test('Revokes the refresh token before validating the query param', async () => {

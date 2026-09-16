@@ -3,7 +3,6 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { FetchError } from '../../src/error';
 import { expectValidateCalled, expectValidateNotCalled, mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';
@@ -138,6 +137,6 @@ describe('Login - Tenant Custom Domain Validation', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    await expect(wristbandAuth.login(mockExpressReq, mockExpressRes)).rejects.toThrow(FetchError);
+    await expect(wristbandAuth.login(mockExpressReq, mockExpressRes)).rejects.toThrow('Fetch Error');
   });
 });

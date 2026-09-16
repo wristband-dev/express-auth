@@ -1,9 +1,8 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { CallbackResult, LoginState } from '../../src/types';
-import { encryptLoginState } from '../../src/utils';
-import { FetchError } from '../../src/error';
+import { CallbackResult } from '../../src/types';
+import { encryptLoginState, type LoginState } from '../helpers/login-state';
 import { expectValidateCalled, expectValidateNotCalled, mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';
@@ -150,6 +149,6 @@ describe('Callback - Tenant Custom Domain Validation', () => {
     }) as any;
     const mockExpressRes = httpMocks.createResponse() as any;
 
-    await expect(wristbandAuth.callback(mockExpressReq, mockExpressRes)).rejects.toThrow(FetchError);
+    await expect(wristbandAuth.callback(mockExpressReq, mockExpressRes)).rejects.toThrow('Fetch Error');
   });
 });

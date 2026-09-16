@@ -1,12 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
 import { createWristbandJwtValidator, WristbandJwtValidator } from '@wristband/typescript-jwt';
-import { AuthService } from '../../../src/auth-service';
-import { AuthConfig, AuthMiddlewareConfig } from '../../../src/types';
+
+import {
+  createWristbandAuth,
+  type AuthConfig,
+  type AuthMiddlewareConfig,
+  type WristbandAuth,
+} from '../../../src/index';
+import { expectTokenNotCalled, mockWristbandFetch } from '../../helpers/mock-fetch';
 
 jest.mock('@wristband/typescript-jwt');
 
-describe('AuthService - Multi-Strategy - Additional Coverage', () => {
-  let authService: AuthService;
+const MOCK_REFRESH_TOKENS = {
+  access_token: 'new-token',
+  refresh_token: 'new-refresh',
+  expires_in: 3600,
+  id_token: 'new-id',
+  token_type: 'bearer',
+};
+
+describe('createAuthMiddleware - Multi-Strategy', () => {
+  let wristbandAuth: WristbandAuth;
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
   let mockNext: NextFunction;
@@ -45,11 +59,12 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
     (createWristbandJwtValidator as jest.Mock).mockReturnValue(mockJwtValidator);
 
-    authService = new AuthService(authConfig);
+    wristbandAuth = createWristbandAuth(authConfig);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Strategy Execution Order Verification', () => {
@@ -61,30 +76,18 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      const executionOrder: string[] = [];
-
-      // Track SESSION execution
       mockSession.isAuthenticated = false;
-      mockSession.save = jest.fn().mockImplementation(() => {
-        executionOrder.push('SESSION');
-        return Promise.resolve();
-      });
 
-      // Track JWT execution
       mockReq.headers = { authorization: 'Bearer token' };
-      mockJwtValidator.extractBearerToken.mockImplementation(() => {
-        executionOrder.push('JWT');
-        return 'token';
-      });
+      mockJwtValidator.extractBearerToken.mockReturnValue('token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: { sub: 'user-123' } });
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // Verify SESSION was attempted first (even though it didn't call save)
-      // JWT should be attempted second
       expect(mockJwtValidator.extractBearerToken).toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalled();
     });
 
     it('should execute strategies in exact configured order [JWT, SESSION]', async () => {
@@ -95,21 +98,17 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // JWT fails
       mockReq.headers = { authorization: 'Bearer invalid-token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('invalid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: false, payload: null! });
 
-      // SESSION succeeds
       mockSession.isAuthenticated = true;
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // JWT should be tried first
       expect(mockJwtValidator.validate).toHaveBeenCalled();
-      // Then SESSION
       expect(mockSession.save).toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalled();
     });
@@ -122,21 +121,17 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // SESSION succeeds
       mockSession.isAuthenticated = true;
 
-      // JWT would also succeed
       mockReq.headers = { authorization: 'Bearer valid-token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: { sub: 'user-123' } });
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // SESSION should succeed
       expect(mockSession.save).toHaveBeenCalled();
-      // JWT should NOT be attempted
       expect(mockJwtValidator.extractBearerToken).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalled();
     });
@@ -148,14 +143,12 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         authStrategies: ['JWT'],
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // Setup first request
       const mockReq1: Partial<Request> = { headers: { authorization: 'Bearer token1' } };
       const mockRes1: Partial<Response> = { status: jest.fn().mockReturnThis(), json: jest.fn() };
       const mockNext1 = jest.fn();
 
-      // Setup second request
       const mockReq2: Partial<Request> = { headers: { authorization: 'Bearer token2' } };
       const mockRes2: Partial<Response> = { status: jest.fn().mockReturnThis(), json: jest.fn() };
       const mockNext2 = jest.fn();
@@ -175,7 +168,6 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         payload: { sub: 'user' },
       });
 
-      // Execute concurrently
       await Promise.all([
         middleware(mockReq1 as Request, mockRes1 as Response, mockNext1),
         middleware(mockReq2 as Request, mockRes2 as Response, mockNext2),
@@ -191,7 +183,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         authStrategies: ['JWT'],
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
       mockReq.headers = { authorization: 'Bearer token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('token');
@@ -200,15 +192,12 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         payload: { sub: 'user-123' },
       });
 
-      // Make 5 rapid sequential requests
       for (let i = 0; i < 5; i += 1) {
         // eslint-disable-next-line no-await-in-loop
         await middleware(mockReq as Request, mockRes as Response, mockNext);
       }
 
-      // JWT validator should be created only once (lazy init)
       expect(createWristbandJwtValidator).toHaveBeenCalledTimes(1);
-      // But validate should be called 5 times
       expect(mockJwtValidator.validate).toHaveBeenCalledTimes(5);
       expect(mockNext).toHaveBeenCalledTimes(5);
     });
@@ -221,21 +210,19 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // Request 1: SESSION auth
       mockSession.isAuthenticated = true;
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
       expect(mockSession.save).toHaveBeenCalledTimes(1);
 
       jest.clearAllMocks();
-
-      // Request 2: JWT auth (session not authenticated)
-      mockSession.isAuthenticated = false;
-      mockReq.headers = { authorization: 'Bearer token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: { sub: 'user' } });
+
+      mockSession.isAuthenticated = false;
+      mockReq.headers = { authorization: 'Bearer token' };
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
@@ -243,7 +230,6 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       jest.clearAllMocks();
 
-      // Request 3: SESSION auth again
       mockSession.isAuthenticated = true;
       delete mockReq.headers!.authorization;
 
@@ -262,9 +248,8 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // Both strategies fail
       mockSession.isAuthenticated = false;
       mockReq.headers = { authorization: 'Bearer invalid' };
       mockJwtValidator.extractBearerToken.mockReturnValue('invalid');
@@ -287,7 +272,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
       mockSession.isAuthenticated = true;
       mockSession.csrfToken = 'valid-token';
@@ -307,7 +292,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
       mockSession.isAuthenticated = true;
       (mockSession.save as jest.Mock).mockRejectedValue(new Error('Database error'));
@@ -319,6 +304,11 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
     });
 
     it('should return 401 for token_refresh_failed when refresh fails', async () => {
+      mockWristbandFetch({
+        tokenStatus: 400,
+        tokens: { error: 'invalid_grant', error_description: 'Token refresh service unavailable' },
+      });
+
       const config: AuthMiddlewareConfig = {
         authStrategies: ['SESSION'],
         sessionConfig: {
@@ -326,15 +316,11 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = 'refresh-token';
-      mockSession.expiresAt = Date.now() - 1000; // Expired
-
-      jest
-        .spyOn(authService, 'refreshTokenIfExpired')
-        .mockRejectedValue(new Error('Token refresh service unavailable'));
+      mockSession.expiresAt = Date.now() - 1000;
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -349,11 +335,9 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         { reason: 'token_refresh_failed', expectedStatus: 401, expectedMessage: 'Unauthorized' },
       ];
 
-      // Test each case sequentially to avoid state conflicts
       const runTestCase = async (testCase: (typeof testCases)[0]) => {
         jest.clearAllMocks();
 
-        // Reset mock session for each test case
         mockSession = {
           isAuthenticated: false,
           save: jest.fn().mockResolvedValue(undefined),
@@ -368,9 +352,8 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
           },
         };
 
-        const middleware = authService.createAuthMiddleware(config);
+        const middleware = wristbandAuth.createAuthMiddleware(config);
 
-        // Setup different failure scenarios
         if (testCase.reason === 'not_authenticated') {
           mockSession.isAuthenticated = false;
         } else if (testCase.reason === 'csrf_failed') {
@@ -378,10 +361,13 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
           mockSession.csrfToken = 'valid-token';
           mockReq.headers = { 'x-csrf-token': 'wrong-token' };
         } else if (testCase.reason === 'token_refresh_failed') {
+          mockWristbandFetch({
+            tokenStatus: 400,
+            tokens: { error: 'invalid_grant', error_description: 'Refresh failed' },
+          });
           mockSession.isAuthenticated = true;
           mockSession.refreshToken = 'refresh-token';
           mockSession.expiresAt = Date.now() - 1000;
-          jest.spyOn(authService, 'refreshTokenIfExpired').mockRejectedValue(new Error('Refresh failed'));
         }
 
         await middleware(mockReq as Request, mockRes as Response, mockNext);
@@ -390,7 +376,6 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         expect(mockRes.json).toHaveBeenCalledWith({ error: testCase.expectedMessage });
       };
 
-      // Run all test cases sequentially
       await testCases.reduce((promise, testCase) => {
         return promise.then(() => {
           return runTestCase(testCase);
@@ -412,24 +397,23 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // SESSION fails (not authenticated)
       mockSession.isAuthenticated = false;
 
-      // JWT succeeds
       mockReq.headers = { authorization: 'Bearer valid-token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: { sub: 'user' } });
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // JWT succeeded, so CSRF was never checked
       expect(mockNext).toHaveBeenCalled();
       expect(mockRes.status).not.toHaveBeenCalled();
     });
 
     it('should not refresh tokens when JWT strategy succeeds', async () => {
+      mockWristbandFetch();
+
       const config: AuthMiddlewareConfig = {
         authStrategies: ['SESSION', 'JWT'],
         sessionConfig: {
@@ -437,32 +421,25 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // SESSION has expired token
-      mockSession.isAuthenticated = true;
-      mockSession.refreshToken = 'refresh-token';
-      mockSession.expiresAt = Date.now() - 1000; // Expired
-
-      // But JWT succeeds, so we fallback before trying to refresh
-      // Actually, SESSION would try to refresh first...
-      // Let's make SESSION fail authentication instead
       mockSession.isAuthenticated = false;
+      mockSession.refreshToken = 'refresh-token';
+      mockSession.expiresAt = Date.now() - 1000;
 
       mockReq.headers = { authorization: 'Bearer valid-token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: { sub: 'user' } });
 
-      const refreshSpy = jest.spyOn(authService, 'refreshTokenIfExpired');
-
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // Token refresh should NOT have been attempted because SESSION failed auth
-      expect(refreshSpy).not.toHaveBeenCalled();
+      expectTokenNotCalled();
       expect(mockNext).toHaveBeenCalled();
     });
 
     it('should refresh tokens when SESSION strategy succeeds in multi-strategy', async () => {
+      mockWristbandFetch({ tokens: MOCK_REFRESH_TOKENS });
+
       const config: AuthMiddlewareConfig = {
         authStrategies: ['SESSION', 'JWT'],
         sessionConfig: {
@@ -470,25 +447,15 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
-      // SESSION has expired token
       mockSession.isAuthenticated = true;
       mockSession.refreshToken = 'refresh-token';
-      mockSession.expiresAt = Date.now() - 1000; // Expired
+      mockSession.expiresAt = Date.now() - 1000;
       mockSession.accessToken = 'old-token';
-
-      jest.spyOn(authService, 'refreshTokenIfExpired').mockResolvedValue({
-        accessToken: 'new-token',
-        refreshToken: 'new-refresh',
-        expiresAt: Date.now() + 3600000,
-        expiresIn: 3600,
-        idToken: 'new-id',
-      });
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(authService.refreshTokenIfExpired).toHaveBeenCalled();
       expect(mockSession.accessToken).toBe('new-token');
       expect(mockNext).toHaveBeenCalled();
     });
@@ -501,7 +468,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
       };
 
       expect(() => {
-        return authService.createAuthMiddleware(config);
+        return wristbandAuth.createAuthMiddleware(config);
       }).toThrow('authStrategies must contain at least one strategy');
     });
 
@@ -514,7 +481,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
       };
 
       expect(() => {
-        return authService.createAuthMiddleware(config);
+        return wristbandAuth.createAuthMiddleware(config);
       }).toThrow("authStrategies contains duplicate strategy: 'SESSION'");
     });
 
@@ -524,7 +491,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
       };
 
       expect(() => {
-        return authService.createAuthMiddleware(config);
+        return wristbandAuth.createAuthMiddleware(config);
       }).toThrow("Invalid auth strategies: 'INVALID'. Valid strategies are: 'SESSION', 'JWT'");
     });
 
@@ -533,7 +500,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         authStrategies: ['JWT'],
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
       mockReq.headers = {};
 
@@ -551,7 +518,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
       (mockReq as any).session = undefined;
 
@@ -570,7 +537,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         },
       };
 
-      const middleware = authService.createAuthMiddleware(config);
+      const middleware = wristbandAuth.createAuthMiddleware(config);
 
       (mockReq as any).session = undefined;
 

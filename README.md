@@ -1853,6 +1853,10 @@ async function makeAuthenticatedRequest(url: string, options: RequestInit = {}) 
 
 This SDK builds upon and integrates with other Wristband SDKs to provide a complete authentication solution:
 
+**[@wristband/typescript-auth](https://github.com/wristband-dev/typescript-auth)**
+
+Since version 6.4.0, this SDK is a thin Express adapter over the framework-agnostic Wristband TypeScript Auth SDK. The core SDK implements the login, callback, logout, token refresh, and SESSION/JWT authentication logic against framework-neutral request and response objects. This package binds those capabilities to Express request/response objects, `req.session`, and Express middleware. The public API of this package is unchanged, so no code changes are required when upgrading.
+
 **[@wristband/typescript-session](https://github.com/wristband-dev/typescript-session)**
 
 This SDK leverages the Wristband TypeScript Session SDK for encrypted cookie-based session management. It provides the underlying session infrastructure including encryption, cookie handling, and session lifecycle management. Refer to that GitHub repository for more information on session configuration options and advanced usage.

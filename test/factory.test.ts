@@ -1,6 +1,8 @@
 import { createWristbandAuth, discoverWristbandAuth } from '../src/factory';
-import { WristbandError } from '../src/error';
-import { TENANT_DOMAIN_PLACEHOLDER, TENANT_NAME_PLACEHOLDER } from '../src/utils/constants';
+import { WristbandError } from '../src/index';
+
+const TENANT_DOMAIN_PLACEHOLDER = '{tenant_domain}';
+const TENANT_NAME_PLACEHOLDER = '{tenant_name}';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
