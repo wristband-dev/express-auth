@@ -63,7 +63,8 @@ export async function decryptLoginState(loginStateCookie: string, loginStateSecr
 export function getAndClearLoginStateCookie(
   req: Request,
   res: Response,
-  dangerouslyDisableSecureCookies: boolean
+  dangerouslyDisableSecureCookies: boolean,
+  domain?: string
 ): string {
   const { state } = req.query;
   const paramState = state ? state.toString() : '';
@@ -80,7 +81,7 @@ export function getAndClearLoginStateCookie(
   if (matchingLoginCookieNames.length > 0) {
     const cookieName = matchingLoginCookieNames[0];
     loginStateCookie = cookies[cookieName];
-    clearCookie(res, cookieName, dangerouslyDisableSecureCookies);
+    clearCookie(res, cookieName, dangerouslyDisableSecureCookies, domain);
   }
 
   return loginStateCookie;
@@ -133,7 +134,8 @@ export function createLoginState(req: Request, redirectUri: string, config: Logi
 export function clearOldestLoginStateCookie(
   req: Request,
   res: Response,
-  dangerouslyDisableSecureCookies: boolean
+  dangerouslyDisableSecureCookies: boolean,
+  domain?: string
 ): void {
   const cookies = parseCookies(req);
 
@@ -156,7 +158,7 @@ export function clearOldestLoginStateCookie(
     allLoginCookieNames.forEach((cookieName: string) => {
       const timestamp: string = cookieName.split(LOGIN_STATE_COOKIE_SEPARATOR)[2];
       if (!mostRecentTimestamps.includes(timestamp)) {
-        clearCookie(res, cookieName, dangerouslyDisableSecureCookies);
+        clearCookie(res, cookieName, dangerouslyDisableSecureCookies, domain);
       }
     });
   }
@@ -166,29 +168,41 @@ export function createLoginStateCookie(
   res: Response,
   state: string,
   encryptedLoginState: string,
-  dangerouslyDisableSecureCookies: boolean
+  dangerouslyDisableSecureCookies: boolean,
+  domain?: string
 ): void {
   // Add the new login state cookie (1 hour max age).
   const cookieName = `${LOGIN_STATE_COOKIE_PREFIX}${state}${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now().valueOf()}`;
-  setCookie(res, cookieName, encryptedLoginState, { maxAge: 3600, dangerouslyDisableSecureCookies });
+  setCookie(res, cookieName, encryptedLoginState, { maxAge: 3600, dangerouslyDisableSecureCookies, domain });
 }
 
-export function getOAuthAuthorizeUrl(
+export function getAppLevelLoginUrl(
+  wristbandApplicationVanityDomain: string,
+  clientId: string,
+  customApplicationLoginPageUrl?: string
+): string {
+  // Safety check: this should never happen.
+  if (!wristbandApplicationVanityDomain) {
+    throw new Error('wristbandApplicationVanityDomain cannot be null or undefined');
+  }
+  if (!clientId) {
+    throw new Error('clientId cannot be null or undefined');
+  }
+
+  const apploginUrl = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
+  return `${apploginUrl}?client_id=${clientId}`;
+}
+
+export function getAuthorizationUrlParams(
   req: Request,
   config: {
     clientId: string;
     codeVerifier: string;
-    defaultTenantCustomDomain?: string;
-    defaultTenantName?: string;
     redirectUri: string;
     scopes: string[];
     state: string;
-    tenantCustomDomain?: string;
-    tenantName?: string;
-    isApplicationCustomDomainActive?: boolean;
-    wristbandApplicationVanityDomain: string;
   }
-): string {
+): URLSearchParams {
   const { idp_hint: idpHint, login_hint: loginHint } = req.query;
 
   if (!!idpHint && typeof idpHint !== 'string') {
@@ -199,7 +213,7 @@ export function getOAuthAuthorizeUrl(
     throw new TypeError('More than one [login_hint] query parameter was encountered');
   }
 
-  const queryParams = new URLSearchParams({
+  return new URLSearchParams({
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: 'code',
@@ -211,7 +225,53 @@ export function getOAuthAuthorizeUrl(
     ...(!!idpHint && typeof idpHint === 'string' ? { idp_hint: idpHint } : {}),
     ...(!!loginHint && typeof loginHint === 'string' ? { login_hint: loginHint } : {}),
   });
+}
 
+export function getAppLevelAuthorizationUrl(
+  wristbandApplicationVanityDomain: string,
+  authorizationParams: URLSearchParams
+): string {
+  // Safety check: this should never happen.
+  if (!wristbandApplicationVanityDomain) {
+    throw new Error('wristbandApplicationVanityDomain cannot be null or undefined');
+  }
+  if (!authorizationParams || authorizationParams.size === 0) {
+    throw new Error('authorizationParams cannot be null or empty');
+  }
+
+  return `https://${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${authorizationParams.toString()}`;
+}
+
+export function getTenantLevelAuthorizationUrl(
+  wristbandApplicationVanityDomain: string,
+  authorizationParams: URLSearchParams,
+  config: {
+    defaultTenantCustomDomain?: string;
+    defaultTenantName?: string;
+    tenantCustomDomain?: string;
+    tenantName?: string;
+    isApplicationCustomDomainActive?: boolean;
+  }
+): string {
+  // Safety check: this should never happen.
+  if (!wristbandApplicationVanityDomain) {
+    throw new Error('wristbandApplicationVanityDomain cannot be null or undefined');
+  }
+  if (!authorizationParams || authorizationParams.size === 0) {
+    throw new Error('authorizationParams cannot be null or empty');
+  }
+
+  // Safety check: this should never happen.
+  if (
+    !config.defaultTenantCustomDomain &&
+    !config.defaultTenantName &&
+    !config.tenantCustomDomain &&
+    !config.tenantName
+  ) {
+    throw new Error('No tenant name or tenant custom domain was provided');
+  }
+
+  const queryString = authorizationParams.toString();
   const separator = config.isApplicationCustomDomainActive ? '.' : '-';
 
   // Domain priority order resolution:
@@ -221,15 +281,15 @@ export function getOAuthAuthorizeUrl(
   // 3)  defaultTenantCustomDomain login config
   // 4)  defaultTenantName login config
   if (config.tenantCustomDomain) {
-    return `https://${config.tenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+    return `https://${config.tenantCustomDomain}/api/v1/oauth2/authorize?${queryString}`;
   }
   if (config.tenantName) {
-    return `https://${config.tenantName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+    return `https://${config.tenantName}${separator}${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryString}`;
   }
   if (config.defaultTenantCustomDomain) {
-    return `https://${config.defaultTenantCustomDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+    return `https://${config.defaultTenantCustomDomain}/api/v1/oauth2/authorize?${queryString}`;
   }
-  return `https://${config.defaultTenantName}${separator}${config.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryParams.toString()}`;
+  return `https://${config.defaultTenantName}${separator}${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryString}`;
 }
 
 export function isExpired(expiresAt: number): boolean {

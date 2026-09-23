@@ -8,26 +8,30 @@ import type { SessionOptions } from '@wristband/typescript-session';
  * Represents the configuration for Wristband authentication.
  *
  * @typedef {Object} AuthConfig
+ * @property {boolean} [applicationAuthorizationRequestsEnabled] Flag indicating whether application-level authorization requests are enabled. Defaults to false. If true, for login and logout scenarios where neither a tenant name nor a tenant custom domain can be deduced, then the user will get redirected to the Wristband Authorize Endpoint using the application vanity domain to initiate an app-level authorization request.
  * @property {boolean} [autoConfigureEnabled] Flag that tells the SDK to automatically set some of the SDK configuration values by calling to Wristband's SDK Auto-Configuration Endpoint. Any manually provided configurations will take precedence over the configs returned from the endpoint. Auto-configure is enabled by default. When disabled, if manual configurations are not provided, then an error will be thrown.
  * @property {string} clientId The client ID for the application.
  * @property {string} clientSecret The client secret for the application.
  * @property {string} [customApplicationLoginPageUrl] Custom application login (tenant discovery) page URL if you are self-hosting the application login/tenant discovery UI.
  * @property {string} [dangerouslyDisableSecureCookies] If set to true, the "Secure" attribute will not be included in any cookie settings. This should only be done when testing in local development (if necessary).
+ * @property {string} [fallbackLoginUrl] Fallback login URL to redirect to in the event the `{tenant_name}` token in your `loginUrl` cannot be resolved. Only applicable when `applicationAuthorizationRequestsEnabled` is true. This value is auto-configured via the SDK Auto-Configuration Endpoint when not manually provided.
  * @property {boolean} [isApplicationCustomDomainActive] Indicates whether an application-level custom domain is active in your Wristband application.
  * @property {string} [loginStateSecret] A secret (32 or more characters in length) used for encryption and decryption of login state cookies. If not provided, it will default to using the client secret. For enhanced security, it is recommended to provide a value that is unique from the client secret.
  * @property {string} loginUrl The URL for initiating the login request.
- * @property {string} [parseTenantFromRootDomain] The root domain for your application from which to parse out the tenant name. Indicates whether tenant subdomains are used for authentication.
+ * @property {string} [parseTenantFromRootDomain] The root domain for your application from which to parse out the tenant name. Indicates whether tenant subdomains are used for authentication. This value is auto-configured via the SDK Auto-Configuration Endpoint when not manually provided.
  * @property {string} redirectUri The redirect URI for callback after authentication.
  * @property {string[]} [scopes] The scopes required for authentication.
  * @property {number} [tokenExpirationBuffer] Buffer time (in seconds) to subtract from the access token’s expiration time. This causes the token to be treated as expired before its actual expiration, helping to avoid token expiration during API calls.
  * @property {string} wristbandApplicationVanityDomain The vanity domain of the Wristband application.
  */
 export type AuthConfig = {
+  applicationAuthorizationRequestsEnabled?: boolean;
   autoConfigureEnabled?: boolean;
   clientId: string;
   clientSecret: string;
   customApplicationLoginPageUrl?: string;
   dangerouslyDisableSecureCookies?: boolean;
+  fallbackLoginUrl?: string;
   isApplicationCustomDomainActive?: boolean;
   loginStateSecret?: string;
   loginUrl?: string;
@@ -371,14 +375,18 @@ export interface AuthMiddlewareConfig {
  * These values are typically auto-configured by calling the Wristband API, but can also be manually provided
  * to override auto-discovered settings.
  * @typedef {Object} SdkConfiguration
+ * @property {boolean} applicationAuthorizationRequestsEnabled Flag indicating whether application-level authorization requests are enabled. If true, for login and logout scenarios where neither a tenant name nor a tenant custom domain cannot be deduced, then the user will get redirected to the Wristband Authorize Endpoint using the application vanity domain to initiate an app-level authorization request.
  * @property {string|null} customApplicationLoginPageUrl Custom Application-Level Login Page URL (i.e. Tenant Discovery Page URL). This value is only needed if you are self-hosting the application login page. When null, the SDK will use your Wristband-hosted Application-Level Login page URL.
+ * @property {string|null} fallbackLoginUrl Fallback login URL to redirect to when the `{tenant_name}` token in your configured `loginUrl` cannot be resolved. Only applicable when `applicationAuthorizationRequestsEnabled` is true. When null, no fallback is applied.
  * @property {boolean} isApplicationCustomDomainActive Indicates whether your Wristband application is configured with an application-level custom domain that is active. This tells the SDK which URL format to use when constructing the Wristband Authorize Endpoint URL.
- * @property {string} loginUrl The URL of your application's login endpoint that redirects to Wristband to initialize the login flow. If using tenant subdomains, this value must contain the `{tenant_domain}` token.
+ * @property {string} loginUrl The URL of your application's login endpoint that redirects to Wristband to initialize the login flow. If using tenant subdomains, this value must contain the `{tenant_name}` token.
  * @property {string|null} loginUrlTenantDomainSuffix The domain suffix used when constructing login URLs with tenant subdomains. This value is null when tenant subdomains are not being used.
- * @property {string} redirectUri The URI that Wristband will redirect to after authenticating a user. This should point to your application's callback endpoint. If using tenant subdomains, this value must contain the `{tenant_domain}` token.
+ * @property {string} redirectUri The URI that Wristband will redirect to after authenticating a user. This should point to your application's callback endpoint. If using tenant subdomains, this value must contain the `{tenant_name}` token.
  */
 export type SdkConfiguration = {
+  applicationAuthorizationRequestsEnabled: boolean;
   customApplicationLoginPageUrl: string | null;
+  fallbackLoginUrl: string | null;
   isApplicationCustomDomainActive: boolean;
   loginUrl: string;
   loginUrlTenantDomainSuffix: string | null;

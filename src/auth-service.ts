@@ -13,7 +13,10 @@ import {
   decryptLoginState,
   encryptLoginState,
   getAndClearLoginStateCookie,
-  getOAuthAuthorizeUrl,
+  getAppLevelAuthorizationUrl,
+  getAppLevelLoginUrl,
+  getAuthorizationUrlParams,
+  getTenantLevelAuthorizationUrl,
   isExpired,
   resolveTenantCustomDomainParam,
   resolveTenantName,
@@ -78,23 +81,6 @@ export class AuthService {
   }
 
   /**
-   * Resolves a tenant custom domain to itself when it is verified and belongs to your Wristband
-   * application. Resolves to an empty string otherwise, so the caller skips over it and falls through
-   * to the next domain in its resolution precedence order.
-   *
-   * @param {string} tenantCustomDomain - The tenant custom domain to validate.
-   * @returns {Promise<string>} The tenant custom domain when valid, otherwise an empty string.
-   */
-  private async resolveValidTenantCustomDomain(tenantCustomDomain: string): Promise<string> {
-    if (!tenantCustomDomain) {
-      return '';
-    }
-
-    const isValid = await this.wristbandService.validateTenantCustomDomain(tenantCustomDomain);
-    return isValid ? tenantCustomDomain : '';
-  }
-
-  /**
    * Initiates a login request by constructing a redirect URL to Wristband's authorization endpoint.
    *
    * @param {Request} req - The Express request object.
@@ -107,6 +93,8 @@ export class AuthService {
     res.header('Pragma', 'no-cache');
 
     // Fetch our SDK configs
+    const applicationAuthorizationRequestsEnabled =
+      await this.configResolver.getApplicationAuthorizationRequestsEnabled();
     const clientId = this.configResolver.getClientId();
     const customApplicationLoginPageUrl = await this.configResolver.getCustomApplicationLoginPageUrl();
     const dangerouslyDisableSecureCookies = this.configResolver.getDangerouslyDisableSecureCookies();
@@ -123,31 +111,42 @@ export class AuthService {
     const defaultTenantCustomDomain: string = config.defaultTenantCustomDomain || '';
     const defaultTenantName: string = config.defaultTenantName || '';
 
-    // In the event we cannot determine either a tenant custom domain or subdomain, send the user to app-level login.
-    if (!tenantCustomDomain && !tenantName && !defaultTenantCustomDomain && !defaultTenantName) {
-      const apploginUrl = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
-      return `${apploginUrl}?client_id=${clientId}`;
-    }
-
     // Create the login state which will be cached in a cookie so that it can be accessed in the callback.
     const customState =
       !!config.customState && !!Object.keys(config.customState).length ? config.customState : undefined;
     const loginState: LoginState = createLoginState(req, redirectUri, { customState, returnUrl: config.returnUrl });
 
-    // Clear any stale login state cookies and add a new one fo rthe current request.
+    // Create the authroization request params needed, regardless if using app-level or tenant-level Authorize Endpoint.
+    const { codeVerifier, state } = loginState;
+    const authorizationParamConfig = { clientId, codeVerifier, redirectUri, scopes, state };
+
+    // In the event we cannot determine either a tenant custom domain or subdomain, deduce the right app-level URL.
+    if (!tenantCustomDomain && !tenantName && !defaultTenantCustomDomain && !defaultTenantName) {
+      if (applicationAuthorizationRequestsEnabled) {
+        // Clear any stale login state cookies and add a new one for the current request.
+        const domain = parseTenantFromRootDomain ? `.${parseTenantFromRootDomain}` : undefined;
+        clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies, domain);
+        const encryptedLoginState: string = await encryptLoginState(loginState, loginStateSecret);
+        createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies, domain);
+
+        // Send users to the app-level Authorize Endpoint with a login state cookie instead of going to login URL.
+        const authorizationParams = getAuthorizationUrlParams(req, authorizationParamConfig);
+        return getAppLevelAuthorizationUrl(wristbandApplicationVanityDomain, authorizationParams);
+      }
+
+      // For the login URL scenario, we don't actually want to touch any login state cookies.
+      return getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, customApplicationLoginPageUrl);
+    }
+
+    // Clear any stale login state cookies and add a new one for the current request.
     clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies);
     const encryptedLoginState: string = await encryptLoginState(loginState, loginStateSecret);
     createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies);
 
-    // Return the Wristband Authorize Endpoint URL which the user will get redirectd to.
-    return getOAuthAuthorizeUrl(req, {
-      wristbandApplicationVanityDomain,
+    // Return the tenant-level Wristband Authorize Endpoint URL which the user will get redirectd to.
+    const authorizationParams = getAuthorizationUrlParams(req, authorizationParamConfig);
+    return getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, authorizationParams, {
       isApplicationCustomDomainActive,
-      clientId,
-      redirectUri,
-      state: loginState.state,
-      codeVerifier: loginState.codeVerifier,
-      scopes,
       tenantCustomDomain,
       tenantName,
       defaultTenantCustomDomain,
@@ -171,6 +170,8 @@ export class AuthService {
     res.header('Pragma', 'no-cache');
 
     // Fetch our SDK configs
+    const applicationAuthorizationRequestsEnabled =
+      await this.configResolver.getApplicationAuthorizationRequestsEnabled();
     const dangerouslyDisableSecureCookies = this.configResolver.getDangerouslyDisableSecureCookies();
     const loginStateSecret = this.configResolver.getLoginStateSecret();
     const loginUrl = await this.configResolver.getLoginUrl();
@@ -226,7 +227,11 @@ export class AuthService {
     }
 
     // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
-    const loginStateCookie: string = getAndClearLoginStateCookie(req, res, dangerouslyDisableSecureCookies);
+    const domain =
+      applicationAuthorizationRequestsEnabled && parseTenantFromRootDomain
+        ? `.${parseTenantFromRootDomain}`
+        : undefined;
+    const loginStateCookie: string = getAndClearLoginStateCookie(req, res, dangerouslyDisableSecureCookies, domain);
     if (!loginStateCookie) {
       return { type: 'redirect_required', redirectUrl: tenantLoginUrl, reason: 'missing_login_state' };
     }
@@ -308,9 +313,13 @@ export class AuthService {
     res.header('Pragma', 'no-cache');
 
     // Fetch our SDK configs
+    const applicationAuthorizationRequestsEnabled =
+      await this.configResolver.getApplicationAuthorizationRequestsEnabled();
     const clientId = this.configResolver.getClientId();
     const customApplicationLoginPageUrl = await this.configResolver.getCustomApplicationLoginPageUrl();
+    const fallbackLoginUrl = await this.configResolver.getFallbackLoginUrl();
     const isApplicationCustomDomainActive = await this.configResolver.getIsApplicationCustomDomainActive();
+    const loginUrl = await this.configResolver.getLoginUrl();
     const parseTenantFromRootDomain = await this.configResolver.getParseTenantFromRootDomain();
     const wristbandApplicationVanityDomain = this.configResolver.getWristbandApplicationVanityDomain();
 
@@ -360,9 +369,20 @@ export class AuthService {
       return `https://${tenantName}${separator}${wristbandApplicationVanityDomain}${logoutPath}`;
     }
 
-    // Fallback to the appropriate Application-Level Login or Redirect URL if tenant cannot be resolved.
-    const appLoginUrl: string = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
-    return config.redirectUrl || `${appLoginUrl}?client_id=${clientId}`;
+    // 5) First try falling back to the Logout Redirect URL (if the LogoutConfig has it) when tenant cannot be resolved.
+    if (config.redirectUrl) {
+      return config.redirectUrl;
+    }
+
+    // 6) If app-level authorization requests are enabled, then redirect to appropriate app-level Login Endpoint
+    // to start a new app-level Authorize Endpoint flow.
+    if (applicationAuthorizationRequestsEnabled) {
+      return TENANT_PLACEHOLDER_REGEX.test(loginUrl) ? fallbackLoginUrl : loginUrl;
+    }
+
+    // 7a) If a custom page URL is set, fallback to that appropriate Application-Level Login when tenant cannot be resolved.
+    // 7b) Finally, fallback to the Wristband-hosted Application-Level Login Page when tenant cannot be resolved.
+    return getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, customApplicationLoginPageUrl);
   }
 
   /**
@@ -531,6 +551,23 @@ export class AuthService {
       // Authentication succeeded - continue
       next();
     };
+  }
+
+  /**
+   * Resolves a tenant custom domain to itself when it is verified and belongs to your Wristband
+   * application. Resolves to an empty string otherwise, so the caller skips over it and falls through
+   * to the next domain in its resolution precedence order.
+   *
+   * @param {string} tenantCustomDomain - The tenant custom domain to validate.
+   * @returns {Promise<string>} The tenant custom domain when valid, otherwise an empty string.
+   */
+  private async resolveValidTenantCustomDomain(tenantCustomDomain: string): Promise<string> {
+    if (!tenantCustomDomain) {
+      return '';
+    }
+
+    const isValid = await this.wristbandService.validateTenantCustomDomain(tenantCustomDomain);
+    return isValid ? tenantCustomDomain : '';
   }
 
   /**

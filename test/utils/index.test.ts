@@ -13,9 +13,12 @@ import {
   createLoginState,
   clearOldestLoginStateCookie,
   createLoginStateCookie,
-  getOAuthAuthorizeUrl,
-  isExpired,
   encodeBase64,
+  getAuthorizationUrlParams,
+  getTenantLevelAuthorizationUrl,
+  getAppLevelLoginUrl,
+  getAppLevelAuthorizationUrl,
+  isExpired,
 } from '../../src/utils';
 import { LoginState, LoginStateMapConfig } from '../../src/types';
 
@@ -257,7 +260,7 @@ describe('Auth Utils', () => {
       // Check that clear cookie was called
       const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
       expect(setCookieHeaders).toContain(
-        `login#${state}#1234567890=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure`
+        `login#${state}#1234567890=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure`
       );
     });
 
@@ -301,7 +304,7 @@ describe('Auth Utils', () => {
       getAndClearLoginStateCookie(req, res, true);
 
       const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
-      expect(setCookieHeaders).toContain(`login#${state}#1234567890=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`);
+      expect(setCookieHeaders).toContain(`login#${state}#1234567890=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
     });
 
     test('Handles array state query parameter', () => {
@@ -316,6 +319,22 @@ describe('Auth Utils', () => {
       const result = getAndClearLoginStateCookie(req, res, false);
 
       expect(result).toBe('encrypted-value');
+    });
+
+    test('Passes domain through when clearing the matched cookie', () => {
+      const state = 'test-state-domain';
+      const req = httpMocks.createRequest({
+        query: { state },
+        headers: { cookie: `login#${state}#1234567890=encrypted-value` },
+      }) as any;
+      const res = httpMocks.createResponse() as any;
+
+      getAndClearLoginStateCookie(req, res, false, '.example.com');
+
+      const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
+      expect(setCookieHeaders).toContain(
+        `login#${state}#1234567890=; HttpOnly; Domain=.example.com; Path=/; Max-Age=0; SameSite=Lax; Secure`
+      );
     });
   });
 
@@ -508,7 +527,7 @@ describe('Auth Utils', () => {
 
       const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
       // Should clear the oldest cookie (state1 with timestamp 1000000000)
-      expect(setCookieHeaders).toContain('login#state1#1000000000=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+      expect(setCookieHeaders).toContain('login#state1#1000000000=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
       // Should not clear the newer cookies
       expect(setCookieHeaders).not.toContain(
         'login#state2#2000000000=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure'
@@ -547,7 +566,7 @@ describe('Auth Utils', () => {
       clearOldestLoginStateCookie(req, res, true);
 
       const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
-      expect(setCookieHeaders).toContain('login#state1#1000000000=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
+      expect(setCookieHeaders).toContain('login#state1#1000000000=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
     });
 
     test('Handles exactly 3 cookies by clearing the oldest', () => {
@@ -605,6 +624,26 @@ describe('Auth Utils', () => {
         })
       ).toBe(true);
     });
+
+    test('Passes domain through when clearing the oldest cookie', () => {
+      const req = httpMocks.createRequest({
+        headers: {
+          cookie: [
+            'login#state1#1000000000=value1',
+            'login#state2#2000000000=value2',
+            'login#state3#3000000000=value3',
+          ].join('; '),
+        },
+      }) as any;
+      const res = httpMocks.createResponse() as any;
+
+      clearOldestLoginStateCookie(req, res, false, '.example.com');
+
+      const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
+      expect(setCookieHeaders).toContain(
+        'login#state1#1000000000=; HttpOnly; Domain=.example.com; Path=/; Max-Age=0; SameSite=Lax; Secure'
+      );
+    });
   });
 
   describe('createLoginStateCookie', () => {
@@ -644,27 +683,239 @@ describe('Auth Utils', () => {
 
       jest.restoreAllMocks();
     });
+
+    test('Passes domain through to the login state cookie when provided', () => {
+      const res = httpMocks.createResponse() as any;
+      const state = 'test-state';
+      const encryptedValue = 'encrypted-login-state';
+
+      const mockTimestamp = 1234567890000;
+      jest.spyOn(Date, 'now').mockReturnValue(mockTimestamp);
+
+      createLoginStateCookie(res, state, encryptedValue, false, 'example.com');
+
+      const setCookieHeader = res.getHeader('Set-Cookie') as string;
+      expect(setCookieHeader).toBe(
+        `login#${state}#${mockTimestamp}=${encryptedValue}; HttpOnly; Domain=example.com; Path=/; Max-Age=3600; SameSite=Lax; Secure`
+      );
+
+      jest.restoreAllMocks();
+    });
+
+    test('Passes domain through along with dangerouslyDisableSecureCookies', () => {
+      const res = httpMocks.createResponse() as any;
+      const state = 'test-state';
+      const encryptedValue = 'encrypted-login-state';
+
+      const mockTimestamp = 1234567890000;
+      jest.spyOn(Date, 'now').mockReturnValue(mockTimestamp);
+
+      createLoginStateCookie(res, state, encryptedValue, true, '.example.com');
+
+      const setCookieHeader = res.getHeader('Set-Cookie') as string;
+      expect(setCookieHeader).toBe(
+        `login#${state}#${mockTimestamp}=${encryptedValue}; HttpOnly; Domain=.example.com; Path=/; Max-Age=3600; SameSite=Lax`
+      );
+
+      jest.restoreAllMocks();
+    });
   });
 
-  describe('getOAuthAuthorizeUrl', () => {
-    const baseConfig = {
+  describe('getAppLevelLoginUrl', () => {
+    const wristbandApplicationVanityDomain = 'auth.example.com';
+    const clientId = 'test-client-id';
+
+    test('Returns Wristband-hosted app login URL when no custom URL provided', () => {
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId);
+
+      expect(result).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${clientId}`);
+    });
+
+    test('Returns custom application login page URL with client_id appended when provided', () => {
+      const result = getAppLevelLoginUrl(
+        wristbandApplicationVanityDomain,
+        clientId,
+        'https://custom.example.com/login'
+      );
+
+      expect(result).toBe(`https://custom.example.com/login?client_id=${clientId}`);
+    });
+
+    test('Throws error when wristbandApplicationVanityDomain is missing', () => {
+      expect(() => {
+        return getAppLevelLoginUrl('', clientId);
+      }).toThrow('wristbandApplicationVanityDomain cannot be null or undefined');
+    });
+
+    test('Throws error when clientId is missing', () => {
+      expect(() => {
+        return getAppLevelLoginUrl(wristbandApplicationVanityDomain, '');
+      }).toThrow('clientId cannot be null or undefined');
+    });
+  });
+
+  describe('getAuthorizationUrlParams', () => {
+    const baseParamsConfig = {
       clientId: 'test-client-id',
       codeVerifier: 'test-code-verifier',
       redirectUri: 'https://example.com/callback',
       scopes: ['openid', 'offline_access', 'email'],
       state: 'test-state',
-      wristbandApplicationVanityDomain: 'auth.example.com',
     };
 
-    test('Creates authorize URL with tenant custom domain', () => {
+    test('Includes all required OAuth parameters', () => {
       const req = httpMocks.createRequest() as any;
+      const result = getAuthorizationUrlParams(req, baseParamsConfig);
 
-      const config = {
-        ...baseConfig,
-        tenantCustomDomain: 'tenant.custom.com',
-      };
+      expect(result.get('client_id')).toBe('test-client-id');
+      expect(result.get('redirect_uri')).toBe('https://example.com/callback');
+      expect(result.get('response_type')).toBe('code');
+      expect(result.get('state')).toBe('test-state');
+      expect(result.get('scope')).toBe('openid offline_access email');
+      expect(result.get('code_challenge')).toBeTruthy();
+      expect(result.get('code_challenge_method')).toBe('S256');
+      expect(result.get('nonce')).toBeTruthy();
+    });
 
-      const result = getOAuthAuthorizeUrl(req, config);
+    test('Does not include idp_hint or login_hint when absent from query', () => {
+      const req = httpMocks.createRequest() as any;
+      const result = getAuthorizationUrlParams(req, baseParamsConfig);
+
+      expect(result.has('idp_hint')).toBe(false);
+      expect(result.has('login_hint')).toBe(false);
+    });
+
+    test('Includes login hint when provided in query', () => {
+      const req = httpMocks.createRequest({ query: { login_hint: 'user@example.com' } }) as any;
+      const result = getAuthorizationUrlParams(req, baseParamsConfig);
+
+      expect(result.get('login_hint')).toBe('user@example.com');
+    });
+
+    test('Throws error for multiple login_hint query parameters', () => {
+      const req = httpMocks.createRequest({ query: { login_hint: ['hint1', 'hint2'] } }) as any;
+
+      expect(() => {
+        return getAuthorizationUrlParams(req, baseParamsConfig);
+      }).toThrow('More than one [login_hint] query parameter was encountered');
+    });
+
+    test('Includes idp hint when provided in query', () => {
+      const req = httpMocks.createRequest({ query: { idp_hint: 'google' } }) as any;
+      const result = getAuthorizationUrlParams(req, baseParamsConfig);
+
+      expect(result.get('idp_hint')).toBe('google');
+    });
+
+    test('Throws error for multiple idp_hint query parameters', () => {
+      const req = httpMocks.createRequest({ query: { idp_hint: ['google', 'github'] } }) as any;
+
+      expect(() => {
+        return getAuthorizationUrlParams(req, baseParamsConfig);
+      }).toThrow('More than one [idp_hint] query parameter was encountered');
+    });
+
+    test('Generates different code_challenge and nonce on multiple calls', () => {
+      const req = httpMocks.createRequest() as any;
+      const result1 = getAuthorizationUrlParams(req, { ...baseParamsConfig, codeVerifier: 'verifier-1' });
+      const result2 = getAuthorizationUrlParams(req, { ...baseParamsConfig, codeVerifier: 'verifier-2' });
+
+      expect(result1.get('code_challenge')).not.toBe(result2.get('code_challenge'));
+      expect(result1.get('nonce')).not.toBe(result2.get('nonce'));
+    });
+  });
+
+  describe('getAppLevelAuthorizationUrl', () => {
+    const wristbandApplicationVanityDomain = 'auth.example.com';
+
+    const buildParams = () => {
+      return new URLSearchParams({
+        client_id: 'test-client-id',
+        redirect_uri: 'https://example.com/callback',
+        response_type: 'code',
+        state: 'test-state',
+        scope: 'openid offline_access email',
+        code_challenge: 'test-challenge',
+        code_challenge_method: 'S256',
+        nonce: 'test-nonce',
+      });
+    };
+
+    test('Creates app-level authorize URL with the vanity domain', () => {
+      const params = buildParams();
+      const result = getAppLevelAuthorizationUrl(wristbandApplicationVanityDomain, params);
+
+      expect(result).toBe(`https://${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${params.toString()}`);
+    });
+
+    test('Includes all provided authorization params in the query string', () => {
+      const params = buildParams();
+      const result = getAppLevelAuthorizationUrl(wristbandApplicationVanityDomain, params);
+
+      expect(result).toContain('client_id=test-client-id');
+      expect(result).toContain('redirect_uri=https%3A%2F%2Fexample.com%2Fcallback');
+      expect(result).toContain('response_type=code');
+      expect(result).toContain('state=test-state');
+      expect(result).toContain('code_challenge=test-challenge');
+      expect(result).toContain('code_challenge_method=S256');
+      expect(result).toContain('nonce=test-nonce');
+    });
+
+    test('Throws error when wristbandApplicationVanityDomain is missing', () => {
+      const params = buildParams();
+
+      expect(() => {
+        return getAppLevelAuthorizationUrl('', params);
+      }).toThrow('wristbandApplicationVanityDomain cannot be null or undefined');
+    });
+
+    test('Throws error when authorizationParams is empty', () => {
+      const emptyParams = new URLSearchParams();
+
+      expect(() => {
+        return getAppLevelAuthorizationUrl(wristbandApplicationVanityDomain, emptyParams);
+      }).toThrow('authorizationParams cannot be null or empty');
+    });
+  });
+
+  describe('getTenantLevelAuthorizationUrl', () => {
+    const wristbandApplicationVanityDomain = 'auth.example.com';
+
+    const buildParams = (overrides: Record<string, string> = {}) => {
+      return new URLSearchParams({
+        client_id: 'test-client-id',
+        redirect_uri: 'https://example.com/callback',
+        response_type: 'code',
+        state: 'test-state',
+        scope: 'openid offline_access email',
+        code_challenge: 'test-challenge',
+        code_challenge_method: 'S256',
+        nonce: 'test-nonce',
+        ...overrides,
+      });
+    };
+
+    test('Throws error when wristbandApplicationVanityDomain is missing', () => {
+      const params = buildParams();
+      const config = { tenantName: 'tenant' };
+
+      expect(() => {
+        return getTenantLevelAuthorizationUrl('', params, config);
+      }).toThrow('wristbandApplicationVanityDomain cannot be null or undefined');
+    });
+
+    test('Throws error when no tenant name or tenant custom domain is provided', () => {
+      const params = buildParams();
+
+      expect(() => {
+        return getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, {});
+      }).toThrow('No tenant name or tenant custom domain was provided');
+    });
+
+    test('Creates authorize URL with tenant custom domain', () => {
+      const params = buildParams();
+      const config = { tenantCustomDomain: 'tenant.custom.com' };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
 
       expect(result).toContain('https://tenant.custom.com/api/v1/oauth2/authorize');
       expect(result).toContain('client_id=test-client-id');
@@ -673,169 +924,90 @@ describe('Auth Utils', () => {
     });
 
     test('Creates authorize URL with tenant name (hyphen separator)', () => {
-      const req = httpMocks.createRequest() as any;
+      const params = buildParams();
+      const config = { tenantName: 'tenant', isApplicationCustomDomainActive: false };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
 
-      const config = {
-        ...baseConfig,
-        tenantName: 'tenant',
-        isApplicationCustomDomainActive: false,
-      };
-
-      const result = getOAuthAuthorizeUrl(req, config);
-
-      expect(result).toContain(`https://tenant-${baseConfig.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
+      expect(result).toContain(`https://tenant-${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
     });
 
     test('Creates authorize URL with tenant name (dot separator)', () => {
-      const req = httpMocks.createRequest() as any;
+      const params = buildParams();
+      const config = { tenantName: 'tenant', isApplicationCustomDomainActive: true };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
 
-      const config = {
-        ...baseConfig,
-        tenantName: 'tenant',
-        isApplicationCustomDomainActive: true,
-      };
-
-      const result = getOAuthAuthorizeUrl(req, config);
-
-      expect(result).toContain(`https://tenant.${baseConfig.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
+      expect(result).toContain(`https://tenant.${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
     });
 
     test('Creates authorize URL with default tenant custom domain', () => {
-      const req = httpMocks.createRequest() as any;
-
-      const config = {
-        ...baseConfig,
-        defaultTenantCustomDomain: 'default.custom.com',
-      };
-
-      const result = getOAuthAuthorizeUrl(req, config);
+      const params = buildParams();
+      const config = { defaultTenantCustomDomain: 'default.custom.com' };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
 
       expect(result).toContain('https://default.custom.com/api/v1/oauth2/authorize');
     });
 
     test('Creates authorize URL with default tenant name', () => {
-      const req = httpMocks.createRequest() as any;
+      const params = buildParams();
+      const config = { defaultTenantName: 'default-tenant', isApplicationCustomDomainActive: false };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
 
-      const config = {
-        ...baseConfig,
-        defaultTenantName: 'default-tenant',
-        isApplicationCustomDomainActive: false,
-      };
-
-      const result = getOAuthAuthorizeUrl(req, config);
-
-      expect(result).toContain(
-        `https://default-tenant-${baseConfig.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`
-      );
+      expect(result).toContain(`https://default-tenant-${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
     });
 
-    test('Includes login hint when provided in query', () => {
-      const req = httpMocks.createRequest({
-        query: { login_hint: 'user@example.com' },
-      }) as any;
+    test('Includes all provided authorization params in the query string', () => {
+      const params = buildParams();
+      const config = { tenantCustomDomain: 'tenant.custom.com' };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
 
-      const config = {
-        ...baseConfig,
-        tenantCustomDomain: 'tenant.custom.com',
-      };
-
-      const result = getOAuthAuthorizeUrl(req, config);
-
-      expect(result).toContain('login_hint=user%40example.com');
-    });
-
-    test('Throws error for multiple login_hint query parameters', () => {
-      const req = httpMocks.createRequest({
-        query: { login_hint: ['hint1', 'hint2'] },
-      }) as any;
-
-      const config = {
-        ...baseConfig,
-        tenantCustomDomain: 'tenant.custom.com',
-      };
-
-      expect(() => {
-        return getOAuthAuthorizeUrl(req, config);
-      }).toThrow('More than one [login_hint] query parameter was encountered');
-    });
-
-    test('Includes idp hint when provided in query', () => {
-      const req = httpMocks.createRequest({
-        query: { idp_hint: 'google' },
-      }) as any;
-
-      const config = {
-        ...baseConfig,
-        tenantCustomDomain: 'tenant.custom.com',
-      };
-
-      const result = getOAuthAuthorizeUrl(req, config);
-
-      expect(result).toContain('idp_hint=google');
-    });
-
-    test('Throws error for multiple idp_hint query parameters', () => {
-      const req = httpMocks.createRequest({
-        query: { idp_hint: ['google', 'github'] },
-      }) as any;
-
-      const config = {
-        ...baseConfig,
-        tenantCustomDomain: 'tenant.custom.com',
-      };
-
-      expect(() => {
-        return getOAuthAuthorizeUrl(req, config);
-      }).toThrow('More than one [idp_hint] query parameter was encountered');
-    });
-
-    test('Includes all required OAuth parameters', () => {
-      const req = httpMocks.createRequest() as any;
-
-      const config = {
-        ...baseConfig,
-        tenantCustomDomain: 'tenant.custom.com',
-      };
-
-      const result = getOAuthAuthorizeUrl(req, config);
-
-      expect(result).toContain('client_id=test-client-id');
       expect(result).toContain('redirect_uri=https%3A%2F%2Fexample.com%2Fcallback');
       expect(result).toContain('response_type=code');
-      expect(result).toContain('state=test-state');
-      expect(result).toContain('scope=openid+offline_access+email');
-      expect(result).toContain('code_challenge=');
+      expect(result).toContain('code_challenge=test-challenge');
       expect(result).toContain('code_challenge_method=S256');
-      expect(result).toContain('nonce=');
+      expect(result).toContain('nonce=test-nonce');
     });
 
     test('Domain priority: tenant custom domain takes precedence', () => {
-      const req = httpMocks.createRequest() as any;
+      const params = buildParams();
       const config = {
-        ...baseConfig,
         tenantCustomDomain: 'priority.custom.com',
         tenantName: 'tenant',
         defaultTenantCustomDomain: 'default.custom.com',
         defaultTenantName: 'default-tenant',
       };
-      const result = getOAuthAuthorizeUrl(req, config);
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
+
       expect(result).toContain('https://priority.custom.com/api/v1/oauth2/authorize');
     });
 
     test('Domain priority: tenant name takes precedence over defaults', () => {
-      const req = httpMocks.createRequest() as any;
-
+      const params = buildParams();
       const config = {
-        ...baseConfig,
         tenantName: 'tenant',
         defaultTenantCustomDomain: 'default.custom.com',
         defaultTenantName: 'default-tenant',
         isApplicationCustomDomainActive: false,
       };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
 
-      const result = getOAuthAuthorizeUrl(req, config);
+      expect(result).toContain(`https://tenant-${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
+    });
 
-      expect(result).toContain(`https://tenant-${baseConfig.wristbandApplicationVanityDomain}/api/v1/oauth2/authorize`);
+    test('Domain priority: default tenant custom domain takes precedence over default tenant name', () => {
+      const params = buildParams();
+      const config = { defaultTenantCustomDomain: 'default.custom.com', defaultTenantName: 'default-tenant' };
+      const result = getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, params, config);
+
+      expect(result).toContain('https://default.custom.com/api/v1/oauth2/authorize');
+    });
+
+    test('Throws error when authorizationParams is empty', () => {
+      const emptyParams = new URLSearchParams();
+      const config = { tenantCustomDomain: 'tenant.custom.com' };
+
+      expect(() => {
+        return getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, emptyParams, config);
+      }).toThrow();
     });
   });
 
