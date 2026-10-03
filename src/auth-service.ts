@@ -12,7 +12,7 @@ import {
   createLoginStateCookie,
   decryptLoginState,
   encryptLoginState,
-  getAndClearLoginStateCookie,
+  getLoginStateCookie,
   getAppLevelAuthorizationUrl,
   getAppLevelLoginUrl,
   getAuthorizationUrlParams,
@@ -40,6 +40,7 @@ import {
 import { FetchError, InvalidGrantError, WristbandError } from './error';
 import { ConfigResolver } from './config-resolver';
 import { isValidCsrf, normalizeAuthMiddlewareConfig, sendAuthFailureResponse } from './utils/middleware';
+import { clearCookie } from './utils/cookies';
 
 /**
  * Core service class that handles Wristband authentication operations.
@@ -126,6 +127,9 @@ export class AuthService {
         // Clear any stale login state cookies and add a new one for the current request.
         const domain = parseTenantFromRootDomain ? `.${parseTenantFromRootDomain}` : undefined;
         clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies, domain);
+
+        // Need to retain the domain (if set) for the callback
+        loginState.domain = domain;
         const encryptedLoginState: string = await encryptLoginState(loginState, loginStateSecret);
         createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies, domain);
 
@@ -170,8 +174,6 @@ export class AuthService {
     res.header('Pragma', 'no-cache');
 
     // Fetch our SDK configs
-    const applicationAuthorizationRequestsEnabled =
-      await this.configResolver.getApplicationAuthorizationRequestsEnabled();
     const dangerouslyDisableSecureCookies = this.configResolver.getDangerouslyDisableSecureCookies();
     const loginStateSecret = this.configResolver.getLoginStateSecret();
     const loginUrl = await this.configResolver.getLoginUrl();
@@ -226,17 +228,16 @@ export class AuthService {
       tenantLoginUrl = `${tenantLoginUrl}${parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomain}`;
     }
 
-    // Make sure the login state cookie exists, extract it, and set it to be cleared by the server.
-    const domain =
-      applicationAuthorizationRequestsEnabled && parseTenantFromRootDomain
-        ? `.${parseTenantFromRootDomain}`
-        : undefined;
-    const loginStateCookie: string = getAndClearLoginStateCookie(req, res, dangerouslyDisableSecureCookies, domain);
-    if (!loginStateCookie) {
+    // Make sure the login state cookie exists and extract it.
+    const { cookieName, loginStateCookie } = getLoginStateCookie(req);
+    if (!cookieName || !loginStateCookie) {
       return { type: 'redirect_required', redirectUrl: tenantLoginUrl, reason: 'missing_login_state' };
     }
     const loginState: LoginState = await decryptLoginState(loginStateCookie, loginStateSecret);
-    const { codeVerifier, customState, redirectUri, returnUrl, state: cookieState } = loginState;
+    const { codeVerifier, customState, domain, redirectUri, returnUrl, state: cookieState } = loginState;
+
+    // Now clear the cookie using the exact domain it was created with (if one was set in login()).
+    clearCookie(res, cookieName, dangerouslyDisableSecureCookies, domain);
 
     // Check for any potential error conditions
     if (paramState !== cookieState) {

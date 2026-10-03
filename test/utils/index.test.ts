@@ -7,7 +7,7 @@ import {
   base64URLEncode,
   encryptLoginState,
   decryptLoginState,
-  getAndClearLoginStateCookie,
+  getLoginStateCookie,
   resolveTenantCustomDomainParam,
   resolveTenantName,
   createLoginState,
@@ -225,6 +225,20 @@ describe('Auth Utils', () => {
       expect(decrypted).toEqual(loginState);
     });
 
+    test('Encrypts and decrypts login state with domain', async () => {
+      const loginState: LoginState = {
+        state: 'test-state',
+        codeVerifier: 'test-verifier',
+        redirectUri: 'https://example.com/callback',
+        domain: '.business.example.com',
+      };
+
+      const encrypted = await encryptLoginState(loginState, loginStateSecret);
+      const decrypted = await decryptLoginState(encrypted, loginStateSecret);
+
+      expect(decrypted).toEqual(loginState);
+    });
+
     test('Throws error when encrypted state exceeds 4kB', async () => {
       const largeCustomState = {
         data: 'x'.repeat(5000), // Large data to exceed 4kB
@@ -243,8 +257,8 @@ describe('Auth Utils', () => {
     });
   });
 
-  describe('getAndClearLoginStateCookie', () => {
-    test('Finds and clears matching login state cookie', () => {
+  describe('getLoginStateCookie', () => {
+    test('Finds matching login state cookie by name and value, without clearing it', () => {
       const state = 'test-state-123';
       const req = httpMocks.createRequest({
         query: { state },
@@ -252,59 +266,49 @@ describe('Auth Utils', () => {
           cookie: `login#${state}#1234567890=encrypted-value; other=cookie`,
         },
       }) as any;
-      const res = httpMocks.createResponse() as any;
 
-      const result = getAndClearLoginStateCookie(req, res, false);
+      const result = getLoginStateCookie(req);
 
-      expect(result).toBe('encrypted-value');
-      // Check that clear cookie was called
-      const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
-      expect(setCookieHeaders).toContain(
-        `login#${state}#1234567890=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure`
-      );
+      expect(result.cookieName).toBe(`login#${state}#1234567890`);
+      expect(result.loginStateCookie).toBe('encrypted-value');
     });
 
-    test('Returns empty string when no matching cookie found', () => {
+    test('Returns empty cookieName and loginStateCookie when no matching cookie found', () => {
       const req = httpMocks.createRequest({
         query: { state: 'non-existent-state' },
         headers: {
           cookie: 'login#different-state#1234567890=encrypted-value',
         },
       }) as any;
-      const res = httpMocks.createResponse() as any;
 
-      const result = getAndClearLoginStateCookie(req, res, false);
+      const result = getLoginStateCookie(req);
 
-      expect(result).toBe('');
+      expect(result.cookieName).toBe('');
+      expect(result.loginStateCookie).toBe('');
     });
 
-    test('Returns empty string when no state in query', () => {
+    test('Returns empty cookieName and loginStateCookie when no state in query', () => {
       const req = httpMocks.createRequest({
         headers: {
           cookie: 'login#some-state#1234567890=encrypted-value',
         },
       }) as any;
-      const res = httpMocks.createResponse() as any;
 
-      const result = getAndClearLoginStateCookie(req, res, false);
+      const result = getLoginStateCookie(req);
 
-      expect(result).toBe('');
+      expect(result.cookieName).toBe('');
+      expect(result.loginStateCookie).toBe('');
     });
 
-    test('Uses dangerouslyDisableSecureCookies flag when clearing', () => {
-      const state = 'test-state';
+    test('Returns empty cookieName and loginStateCookie when no cookies are present at all', () => {
       const req = httpMocks.createRequest({
-        query: { state },
-        headers: {
-          cookie: `login#${state}#1234567890=encrypted-value`,
-        },
+        query: { state: 'test-state' },
       }) as any;
-      const res = httpMocks.createResponse() as any;
 
-      getAndClearLoginStateCookie(req, res, true);
+      const result = getLoginStateCookie(req);
 
-      const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
-      expect(setCookieHeaders).toContain(`login#${state}#1234567890=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
+      expect(result.cookieName).toBe('');
+      expect(result.loginStateCookie).toBe('');
     });
 
     test('Handles array state query parameter', () => {
@@ -314,27 +318,28 @@ describe('Auth Utils', () => {
           cookie: 'login#state1,state2#1234567890=encrypted-value',
         },
       }) as any;
-      const res = httpMocks.createResponse() as any;
 
-      const result = getAndClearLoginStateCookie(req, res, false);
+      const result = getLoginStateCookie(req);
 
-      expect(result).toBe('encrypted-value');
+      expect(result.cookieName).toBe('login#state1,state2#1234567890');
+      expect(result.loginStateCookie).toBe('encrypted-value');
     });
 
-    test('Passes domain through when clearing the matched cookie', () => {
-      const state = 'test-state-domain';
+    test('Never calls any cookie-clearing behavior (no Set-Cookie header involved)', () => {
+      // getLoginStateCookie is lookup-only now; clearing the cookie is the caller's
+      // responsibility (done separately via clearCookie once the domain is known).
+      const state = 'test-state';
       const req = httpMocks.createRequest({
         query: { state },
-        headers: { cookie: `login#${state}#1234567890=encrypted-value` },
+        headers: {
+          cookie: `login#${state}#1234567890=encrypted-value`,
+        },
       }) as any;
-      const res = httpMocks.createResponse() as any;
 
-      getAndClearLoginStateCookie(req, res, false, '.example.com');
+      // No Response object is even needed/accepted by this function anymore.
+      const result = getLoginStateCookie(req);
 
-      const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
-      expect(setCookieHeaders).toContain(
-        `login#${state}#1234567890=; HttpOnly; Domain=.example.com; Path=/; Max-Age=0; SameSite=Lax; Secure`
-      );
+      expect(result.loginStateCookie).toBe('encrypted-value');
     });
   });
 

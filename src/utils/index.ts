@@ -42,7 +42,7 @@ export function base64URLEncode(str: string): string {
 }
 
 export async function encryptLoginState(loginState: LoginState, loginStateSecret: string): Promise<string> {
-  // @ts-expect-error - TODO: Upgrade to iron-webcrypto v2.x
+  // @ts-expect-error - TODO: use our own encryption lib
   const encryptedLoginState: string = await seal(crypto, loginState, loginStateSecret, defaults);
 
   if (encryptedLoginState.length > 4096) {
@@ -55,17 +55,12 @@ export async function encryptLoginState(loginState: LoginState, loginStateSecret
 }
 
 export async function decryptLoginState(loginStateCookie: string, loginStateSecret: string): Promise<LoginState> {
-  // @ts-expect-error - TODO: Upgrade to iron-webcrypto v2.x
+  // @ts-expect-error - TODO: use our own encryption lib
   const loginState: unknown = await unseal(crypto, loginStateCookie, loginStateSecret, defaults);
   return loginState as LoginState;
 }
 
-export function getAndClearLoginStateCookie(
-  req: Request,
-  res: Response,
-  dangerouslyDisableSecureCookies: boolean,
-  domain?: string
-): string {
+export function getLoginStateCookie(req: Request): { cookieName: string; loginStateCookie: string } {
   const { state } = req.query;
   const paramState = state ? state.toString() : '';
   const cookies = parseCookies(req);
@@ -76,15 +71,12 @@ export function getAndClearLoginStateCookie(
     return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}${paramState}${LOGIN_STATE_COOKIE_SEPARATOR}`);
   });
 
-  let loginStateCookie = '';
-
   if (matchingLoginCookieNames.length > 0) {
     const cookieName = matchingLoginCookieNames[0];
-    loginStateCookie = cookies[cookieName];
-    clearCookie(res, cookieName, dangerouslyDisableSecureCookies, domain);
+    return { cookieName, loginStateCookie: cookies[cookieName] };
   }
 
-  return loginStateCookie;
+  return { cookieName: '', loginStateCookie: '' };
 }
 
 export function resolveTenantName(req: Request, parseTenantFromRootDomain: string): string {

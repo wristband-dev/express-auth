@@ -144,6 +144,10 @@ describe('Login - App-Level Authorization Requests', () => {
       const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
+
+      // No parseTenantFromRootDomain configured, so loginState.domain must stay undefined even
+      // though this request went through the app-level (no-tenant-resolvable) branch.
+      expect(loginState.domain).toBeUndefined();
     });
 
     test('Ignores customApplicationLoginPageUrl when applicationAuthorizationRequestsEnabled is true', async () => {
@@ -300,6 +304,12 @@ describe('Login - App-Level Authorization Requests', () => {
       const cookies = extractCookiesFromHeaders(headers);
       expect(cookies.length).toBe(1);
       expect(cookies[0].attributes.domain).toBe(`.${parseTenantFromRootDomain}`);
+
+      // The same domain value written onto the cookie's Domain attribute must also be persisted
+      // inside the encrypted loginState payload itself, since callback() reads loginState.domain
+      // (not the cookie attribute) to know which domain to use when clearing the cookie later.
+      const loginState: LoginState = await decryptLoginState(cookies[0].value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.domain).toBe(`.${parseTenantFromRootDomain}`);
     });
 
     test('Clears stale login state cookies with the matching Domain attribute', async () => {
@@ -383,6 +393,14 @@ describe('Login - App-Level Authorization Requests', () => {
 
       // Should hit the tenant-level Authorize Endpoint (hyphen-separated), not the app-level one
       expect(new URL(location).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
+
+      // This request took the normal tenant-level branch (not the no-tenant-resolvable app-level
+      // branch), so loginState.domain must never be set here, regardless of parseTenantFromRootDomain.
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      const loginState: LoginState = await decryptLoginState(cookies[0].value, LOGIN_STATE_COOKIE_SECRET);
+      expect(loginState.domain).toBeUndefined();
     });
   });
 });

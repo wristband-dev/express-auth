@@ -407,6 +407,7 @@ export type ValidateTenantCustomDomainResponse = {
  * @typedef {Object} LoginState
  * @property {string} codeVerifier The code verifier for PKCE.
  * @property {Object.<string, any>} [customState] Custom state data for the login state.
+ * @property {string} [domain] The cookie domain that was used when the login state cookie was created, needed so the callback can use the same domain when locating and clearing that cookie. Only set when app-level authorization requests are enabled AND no tenant can be deduced during login().
  * @property {string} redirectUri The redirect URI for callback after authentication.
  * @property {string} [returnUrl] The URL to return to after authentication.
  * @property {string} state The state of the login process.
@@ -414,6 +415,7 @@ export type ValidateTenantCustomDomainResponse = {
 export type LoginState = {
   codeVerifier: string;
   customState?: Record<string, unknown>;
+  domain?: string;
   redirectUri: string;
   returnUrl?: string;
   state: string;
