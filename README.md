@@ -625,7 +625,7 @@ login(req: Request, res: Response, config?: LoginConfig): Promise<string>;
 const loginUrl = await login(req, res);
 ```
 
-Wristband requires that your application specify a Tenant-Level domain when redirecting to the Wristband Authorize Endpoint when initiating an auth request. When the frontend of your application redirects the user to your Express Login Endpoint, there are two ways to accomplish getting the `tenantName` information: passing a query parameter or using tenant subdomains.
+Wristband requires that your application specify a Tenant-Level domain when redirecting to the Wristband Authorize Endpoint when initiating an auth request. If `applicationAuthorizationRequestsEnabled` is set to `true`, an App-Level domain can also be used. When the frontend of your application redirects the user to your Express Login Endpoint, there are two ways to accomplish getting the `tenantName` information: passing a query parameter or using tenant subdomains.
 
 The `login()` function can also take optional configuration if your application needs custom behavior:
 
@@ -638,7 +638,7 @@ The `login()` function can also take optional configuration if your application 
 
 #### Which Domains Are Used in the Authorize URL?
 
-Wristband supports various tenant domain configurations, including subdomains and custom domains. The SDK automatically determines the appropriate domain configuration when constructing the Wristband Authorize URL, which your login endpoint will redirect users to during the login flow. The selection follows this precedence order:
+Wristband supports various tenant domain configurations, including subdomains and custom domains. The SDK automatically determines the appropriate domain configuration when constructing the Wristband Authorize URL, which your login endpoint will redirect users to during the login flow. The selection follows this precedence order, where the first five options all resolve to a Tenant-Level domain:
 
 1. `tenant_custom_domain` query parameter: If provided, this takes top priority.
 2. Tenant subdomain in the URL: Used if `parseTenantFromRootDomain` is specified and there is a subdomain present in the host.
@@ -646,17 +646,13 @@ Wristband supports various tenant domain configurations, including subdomains an
 4. `defaultTenantCustomDomain` in LoginConfig: Used if none of the above are present.
 5. `defaultTenantName` in LoginConfig: Used as the final fallback.
 
-If none of these are specified, what happens next depends on your `applicationAuthorizationRequestsEnabled` configuration:
+If none of these resolve a Tenant-Level domain, what happens next depends on your `applicationAuthorizationRequestsEnabled` configuration:
 
 - **Disabled (default):** The SDK redirects users to the appropriate Application-Level Login (Tenant Discovery) Page. This is either the Wristband-hosted page (the default), or the `customApplicationLoginPageUrl` if you configured a URL for self-hosting that page.
 - **Enabled:** The SDK redirects users directly to the Wristband Authorize Endpoint using your application's vanity domain, letting Wristband handle tenant discovery as part of the same authorization flow. See [Application-Level Authorization Requests](#application-level-authorization-requests) below.
 
-If none of these are specified, the SDK redirects users to the Application-Level Login (Tenant Discovery) Page.
-
 > [!NOTE]
-> The `tenant_custom_domain` query parameter (#1) is validated against the Wristband tenant custom domain
-> validation API. If the value is not a valid tenant custom domain for your application, it is ignored and
-> skipped over during evaluation, and the SDK continues on to the next entry in the precedence order above.
+> The `tenant_custom_domain` query parameter (#1) is validated against the Wristband Tenant Custom Domain Validation API. If the value is not a valid tenant custom domain for your application, it is ignored and skipped over during evaluation, and the SDK continues on to the next entry in the precedence order above.
 
 #### Application-Level Authorization Requests
 
@@ -664,7 +660,7 @@ By default, the SDK constructs a different Wristband Authorize Endpoint URL for 
 
 Enabling `applicationAuthorizationRequestsEnabled` addresses this by allowing OIDC authorization requests through your application's vanity domain, in addition to tenant vanity domains. This gives one fixed, static Authorization Endpoint URL to hand off to your third-party integration. This setting is configured on your Application in the Wristband Dashboard.
 
-When enabled, this setting only changes behavior in the one case where `login()` cannot resolve a tenant custom domain or tenant name from the request. Instead of redirecting to the Application-Level Login (Tenant Discovery) Page, the SDK sends the user directly to the Wristband Authorize Endpoint using your application's vanity domain, and Wristband handles tenant discovery as part of that same authorization flow.
+When enabled, this setting only changes behavior in the one case where `login()` cannot resolve a Tenant-level domain from the request. Instead of redirecting to the Application-Level Login (Tenant Discovery) Page, the SDK sends the user directly to the Wristband Authorize Endpoint using your application's vanity domain, and Wristband handles tenant discovery as part of that same authorization flow.
 
 **Without tenant subdomains**
  
@@ -836,7 +832,10 @@ The return URL is stored in the Login State Cookie, and it is available to you i
 
 ##### Return URL Preservation During Tenant Discovery
 
-When the `login()` method cannot resolve a tenant domain from the request (subdomain, query parameters, or defaults), the SDK redirects users to the Application-Level Login (Tenant Discovery) Page. To ensure a seamless user experience, any provided return URL values are automatically preserved by appending them to the `state` query parameter. This allows the return URL to be propagated back to the Login Endpoint once tenant discovery is complete, ensuring users land at their originally intended destination after authentication.
+When the `login()` method cannot resolve a tenant domain from the request (subdomain, query parameters, or defaults), what happens next depends on your `applicationAuthorizationRequestsEnabled` configuration:
+
+- **Disabled (default):** The SDK redirects users to the Application-Level Login (Tenant Discovery) Page. To ensure a seamless user experience, any provided return URL values are automatically preserved by appending them to the `state` query parameter. This allows the return URL to be propagated back to the Login Endpoint once tenant discovery is complete, ensuring users land at their originally intended destination after authentication.
+- **Enabled:** The SDK redirects users directly to the Wristband Authorize Endpoint, and the return URL is preserved as part of the Login State Cookie for that request, the same way it is for a resolvable tenant-level login — no additional propagation step through a Tenant Discovery Page is needed.
 
 <br>
 
@@ -1003,7 +1002,7 @@ If your application created a session, it should destroy it before invoking the 
 
 #### Which Domains Are Used in the Logout URL?
 
-Wristband supports various tenant domain configurations, including subdomains and custom domains. The SDK automatically determines the appropriate domain configuration when constructing the Wristband Logout URL, which your login endpoint will redirect users to during the logout flow. The selection follows this precedence order:
+Wristband supports various tenant domain configurations, including subdomains and custom domains. The SDK automatically determines the appropriate domain configuration when constructing the Wristband Logout URL, which your login endpoint will redirect users to during the logout flow. The selection follows this precedence order, where the first five options all resolve to a Tenant-Level domain:
 
 1. `tenantCustomDomain` in LogoutConfig: If provided, this takes top priority.
 2. `tenantName` in LogoutConfig: This takes the next priority if `tenantCustomDomain` is not present.
@@ -1011,17 +1010,15 @@ Wristband supports various tenant domain configurations, including subdomains an
 4. Tenant subdomain in the URL: Used if none of the above are present, and `parseTenantFromRootDomain` is specified, and the subdomain is present in the host.
 5. `tenant_name` query parameter: Used as the final fallback.
 
-If none of these are specified, the SDK checks whether a `redirectUrl` was provided in `LogoutConfig`. If so, it is returned immediately as the destination, with no Wristband Logout Endpoint URL constructed.
+If none of these resolve a Tenant-Level domain, the SDK checks whether a `redirectUrl` was provided in `LogoutConfig`. If so, it is returned immediately as the destination, with no Wristband Logout Endpoint URL constructed.
 
-When `redirectUrl` is not provided does what happens next depend on your `applicationAuthorizationRequestsEnabled` configuration:
+When `redirectUrl` is not provided, what happens depends on your `applicationAuthorizationRequestsEnabled` configuration:
  
 - **Disabled (default):** The SDK redirects users to the Application-Level Login (Tenant Discovery) Page. This is either the Wristband-hosted page (the default), or the `customApplicationLoginPageUrl` if you configured a URL for self-hosting that page.
 - **Enabled:** The SDK redirects users back to your application's own Login Endpoint instead to start a new app-level authorization flow. The exact location will be either the `fallbackLoginUrl` if `loginUrl` contains the `{tenant_name}` placeholder, or it will be the `loginUrl` otherwise.
 
 > [!NOTE]
-> The `tenant_custom_domain` query parameter (#3) is validated against the Wristband tenant custom domain
-> validation API. If the value is not a valid tenant custom domain for your application, it is ignored and
-> skipped over during evaluation, and the SDK continues on to the next entry in the precedence order above.
+> The `tenant_custom_domain` query parameter (#3) is validated against the Wristband tenant custom domain validation API. If the value is not a valid tenant custom domain for your application, it is ignored and skipped over during evaluation, and the SDK continues on to the next entry in the precedence order above.
 
 #### Revoking Refresh Tokens
 

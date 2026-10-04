@@ -328,7 +328,7 @@ export class AuthService {
     if (config.refreshToken) {
       try {
         await this.wristbandService.revokeRefreshToken(config.refreshToken);
-      } catch (error) {
+      } catch {
         // No need to block logout execution if revoking fails
         // Silently continue - the refresh token will eventually expire and can be revoked by admin
       }
@@ -613,7 +613,7 @@ export class AuthService {
               req.session.expiresAt = tokenData.expiresAt;
               req.session.refreshToken = tokenData.refreshToken;
             }
-          } catch (error) {
+          } catch {
             return { authenticated: false, reason: 'token_refresh_failed' };
           }
         }
@@ -621,7 +621,7 @@ export class AuthService {
         // Save session (for rolling expiration)
         await req.session.save();
         return { authenticated: true, usedStrategy: 'SESSION' };
-      } catch (error) {
+      } catch {
         return { authenticated: false, reason: 'unexpected_error' };
       }
     }
@@ -649,7 +649,7 @@ export class AuthService {
         (req as any).auth.jwt = bearerToken;
 
         return { authenticated: true, usedStrategy: 'JWT' };
-      } catch (error) {
+      } catch {
         return { authenticated: false, reason: 'unexpected_error' };
       }
     }
