@@ -832,9 +832,9 @@ The return URL is stored in the Login State Cookie, and it is available to you i
 
 ##### Return URL Preservation During Tenant Discovery
 
-When the `login()` method cannot resolve a tenant domain from the request (subdomain, query parameters, or defaults), what happens next depends on your `applicationAuthorizationRequestsEnabled` configuration:
+When the `login()` method cannot resolve a Tenant-level domain from the request (via subdomain, query parameters, or defaults), what happens next depends on your `applicationAuthorizationRequestsEnabled` configuration:
 
-- **Disabled (default):** The SDK redirects users to the Application-Level Login (Tenant Discovery) Page. To ensure a seamless user experience, any provided return URL values are automatically preserved by appending them to the `state` query parameter. This allows the return URL to be propagated back to the Login Endpoint once tenant discovery is complete, ensuring users land at their originally intended destination after authentication.
+- **Disabled (default):** The SDK redirects users to the Application-Level Login (Tenant Discovery) Page. Any provided return URL value is not currently preserved through this flow. Once the user completes tenant discovery and lands back at your Login Endpoint, the original return URL is lost. If you need to preserve it, you could manually encode it into a `state` query param value yourself, though this has size limitations for long URLs (max: 512 characters).
 - **Enabled:** The SDK redirects users directly to the Wristband Authorize Endpoint, and the return URL is preserved as part of the Login State Cookie for that request, the same way it is for a resolvable tenant-level login — no additional propagation step through a Tenant Discovery Page is needed.
 
 <br>
