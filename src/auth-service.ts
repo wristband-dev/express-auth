@@ -117,7 +117,7 @@ export class AuthService {
       !!config.customState && !!Object.keys(config.customState).length ? config.customState : undefined;
     const loginState: LoginState = createLoginState(req, redirectUri, { customState, returnUrl: config.returnUrl });
 
-    // Create the authroization request params needed, regardless if using app-level or tenant-level Authorize Endpoint.
+    // Create the authorization request params needed, regardless if using app-level or tenant-level Authorize Endpoint.
     const { codeVerifier, state } = loginState;
     const authorizationParamConfig = { clientId, codeVerifier, redirectUri, scopes, state };
 
@@ -155,7 +155,7 @@ export class AuthService {
     const encryptedLoginState: string = await encryptLoginState(loginState, loginStateSecret);
     createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies, cookieDomain);
 
-    // Return the tenant-level Wristband Authorize Endpoint URL which the user will get redirectd to.
+    // Return the tenant-level Wristband Authorize Endpoint URL which the user will get redirected to.
     const authorizationParams = getAuthorizationUrlParams(req, authorizationParamConfig);
     return getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, authorizationParams, {
       isApplicationCustomDomainActive,
