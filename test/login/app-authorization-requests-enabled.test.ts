@@ -144,10 +144,6 @@ describe('Login - App-Level Authorization Requests', () => {
       const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
-
-      // No parseTenantFromRootDomain configured, so loginState.domain must stay undefined even
-      // though this request went through the app-level (no-tenant-resolvable) branch.
-      expect(loginState.domain).toBeUndefined();
     });
 
     test('Ignores customApplicationLoginPageUrl when applicationAuthorizationRequestsEnabled is true', async () => {
@@ -267,6 +263,14 @@ describe('Login - App-Level Authorization Requests', () => {
       });
       expect(oldCookieHeader).toBeTruthy();
       expect(oldCookieHeader).toContain('Max-Age=0');
+
+      // No parseTenantFromRootDomain configured, so neither the clear nor the new cookie gets a Domain attribute
+      expect(oldCookieHeader).not.toContain('Domain=');
+      const newCookieHeader = setCookieHeaders.find((h: string) => {
+        return !h.startsWith('login#++state01#1111111111=');
+      });
+      expect(newCookieHeader).toBeTruthy();
+      expect(newCookieHeader).not.toContain('Domain=');
     });
   });
 
@@ -304,12 +308,6 @@ describe('Login - App-Level Authorization Requests', () => {
       const cookies = extractCookiesFromHeaders(headers);
       expect(cookies.length).toBe(1);
       expect(cookies[0].attributes.domain).toBe(`.${parseTenantFromRootDomain}`);
-
-      // The same domain value written onto the cookie's Domain attribute must also be persisted
-      // inside the encrypted loginState payload itself, since callback() reads loginState.domain
-      // (not the cookie attribute) to know which domain to use when clearing the cookie later.
-      const loginState: LoginState = await decryptLoginState(cookies[0].value, LOGIN_STATE_COOKIE_SECRET);
-      expect(loginState.domain).toBe(`.${parseTenantFromRootDomain}`);
     });
 
     test('Clears stale login state cookies with the matching Domain attribute', async () => {
@@ -337,6 +335,90 @@ describe('Login - App-Level Authorization Requests', () => {
       const mockExpressReq = httpMocks.createRequest({
         headers: {
           host: parseTenantFromRootDomain,
+          cookie: [
+            `login#++state01#1111111111=${encryptedLoginState01}`,
+            `login#state02#2222222222=${encryptedLoginState02}`,
+            `login#state03#3333333333=${encryptedLoginState03}`,
+          ].join('; '),
+        },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+      const setCookieHeaders = mockExpressRes._getHeaders()['set-cookie'];
+      expect(Array.isArray(setCookieHeaders)).toBe(true);
+      expect(setCookieHeaders.length).toBe(2);
+
+      const oldCookieHeader = setCookieHeaders.find((h: string) => {
+        return h.startsWith('login#++state01#1111111111=');
+      });
+      expect(oldCookieHeader).toBeTruthy();
+      expect(oldCookieHeader).toContain('Max-Age=0');
+      expect(oldCookieHeader).toContain(`Domain=.${parseTenantFromRootDomain}`);
+
+      const newCookieHeader = setCookieHeaders.find((h: string) => {
+        return !h.startsWith('login#++state01#1111111111=');
+      });
+      expect(newCookieHeader).toContain(`Domain=.${parseTenantFromRootDomain}`);
+    });
+
+    test('Sets the login state cookie with the root Domain attribute in the tenant-level flow when the tenant is resolved from the subdomain', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        parseTenantFromRootDomain,
+        wristbandApplicationVanityDomain,
+        applicationAuthorizationRequestsEnabled: true,
+        fallbackLoginUrl: `https://${wristbandApplicationVanityDomain}/login`,
+        autoConfigureEnabled: false,
+      });
+
+      // Subdomain present on the host, so tenant resolves to "devs4you"
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `devs4you.${parseTenantFromRootDomain}` },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      const location = await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+      // Tenant-level Authorize Endpoint (hyphen-separated), not the app-level one
+      expect(new URL(location).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
+
+      const headers = mockExpressRes._getHeaders();
+      const cookies = extractCookiesFromHeaders(headers);
+      expect(cookies.length).toBe(1);
+      expect(cookies[0].attributes.domain).toBe(`.${parseTenantFromRootDomain}`);
+    });
+
+    test('Clears stale login state cookies with the matching Domain attribute in the tenant-level flow', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        parseTenantFromRootDomain,
+        wristbandApplicationVanityDomain,
+        applicationAuthorizationRequestsEnabled: true,
+        fallbackLoginUrl: `https://${wristbandApplicationVanityDomain}/login`,
+        autoConfigureEnabled: false,
+      });
+
+      const loginState01: LoginState = { codeVerifier: 'codeVerifier', redirectUri, state: '++state01' };
+      const loginState02: LoginState = { codeVerifier: 'codeVerifier', redirectUri, state: 'state02' };
+      const loginState03: LoginState = { codeVerifier: 'codeVerifier', redirectUri, state: 'state03' };
+      const encryptedLoginState01 = await encryptLoginState(loginState01, LOGIN_STATE_COOKIE_SECRET);
+      const encryptedLoginState02 = await encryptLoginState(loginState02, LOGIN_STATE_COOKIE_SECRET);
+      const encryptedLoginState03 = await encryptLoginState(loginState03, LOGIN_STATE_COOKIE_SECRET);
+
+      // Subdomain present, so tenant resolves and this hits the tenant-level branch
+      const mockExpressReq = httpMocks.createRequest({
+        headers: {
+          host: `devs4you.${parseTenantFromRootDomain}`,
           cookie: [
             `login#++state01#1111111111=${encryptedLoginState01}`,
             `login#state02#2222222222=${encryptedLoginState02}`,
@@ -394,13 +476,70 @@ describe('Login - App-Level Authorization Requests', () => {
       // Should hit the tenant-level Authorize Endpoint (hyphen-separated), not the app-level one
       expect(new URL(location).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
 
-      // This request took the normal tenant-level branch (not the no-tenant-resolvable app-level
-      // branch), so loginState.domain must never be set here, regardless of parseTenantFromRootDomain.
+      // parseTenantFromRootDomain is not configured here, so the cookie stays host-only.
       const headers = mockExpressRes._getHeaders();
       const cookies = extractCookiesFromHeaders(headers);
       expect(cookies.length).toBe(1);
-      const loginState: LoginState = await decryptLoginState(cookies[0].value, LOGIN_STATE_COOKIE_SECRET);
-      expect(loginState.domain).toBeUndefined();
+      expect(cookies[0].attributes.domain).toBeUndefined();
+    });
+
+    test('Clears stale login state cookies without a Domain attribute when a tenant_name is resolvable and parseTenantFromRootDomain is not set', async () => {
+      const parseTenantFromRootDomain = 'business.invotastic.com';
+      const loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
+      const redirectUri = `https://${parseTenantFromRootDomain}/api/auth/callback`;
+
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        applicationAuthorizationRequestsEnabled: true,
+        autoConfigureEnabled: false,
+      });
+
+      const loginState01: LoginState = { codeVerifier: 'codeVerifier', redirectUri, state: '++state01' };
+      const loginState02: LoginState = { codeVerifier: 'codeVerifier', redirectUri, state: 'state02' };
+      const loginState03: LoginState = { codeVerifier: 'codeVerifier', redirectUri, state: 'state03' };
+      const encryptedLoginState01 = await encryptLoginState(loginState01, LOGIN_STATE_COOKIE_SECRET);
+      const encryptedLoginState02 = await encryptLoginState(loginState02, LOGIN_STATE_COOKIE_SECRET);
+      const encryptedLoginState03 = await encryptLoginState(loginState03, LOGIN_STATE_COOKIE_SECRET);
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: {
+          host: parseTenantFromRootDomain,
+          cookie: [
+            `login#++state01#1111111111=${encryptedLoginState01}`,
+            `login#state02#2222222222=${encryptedLoginState02}`,
+            `login#state03#3333333333=${encryptedLoginState03}`,
+          ].join('; '),
+        },
+        query: { tenant_name: 'devs4you' },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      const location = await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+      // Tenant-level Authorize Endpoint (hyphen-separated), not the app-level one
+      expect(new URL(location).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
+
+      const setCookieHeaders = mockExpressRes._getHeaders()['set-cookie'];
+      expect(Array.isArray(setCookieHeaders)).toBe(true);
+      expect(setCookieHeaders.length).toBe(2);
+
+      const oldCookieHeader = setCookieHeaders.find((h: string) => {
+        return h.startsWith('login#++state01#1111111111=');
+      });
+      expect(oldCookieHeader).toBeTruthy();
+      expect(oldCookieHeader).toContain('Max-Age=0');
+      expect(oldCookieHeader).not.toContain('Domain=');
+
+      const newCookieHeader = setCookieHeaders.find((h: string) => {
+        return !h.startsWith('login#++state01#1111111111=');
+      });
+      expect(newCookieHeader).toBeTruthy();
+      expect(newCookieHeader).not.toContain('Domain=');
     });
   });
 });

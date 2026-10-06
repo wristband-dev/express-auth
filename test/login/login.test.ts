@@ -278,6 +278,10 @@ describe('Multi Tenant Login', () => {
         const headers = mockExpressRes._getHeaders();
         const cookies = extractCookiesFromHeaders(headers);
         expect(cookies.length).toBe(1);
+
+        // App-level authorization requests are not enabled, so the cookie stays host-only
+        // even though parseTenantFromRootDomain is set.
+        expect(String(headers['set-cookie'])).not.toContain('Domain=');
         const loginCookie = cookies[0];
 
         // Validate login state cookie key
@@ -742,12 +746,14 @@ describe('Multi Tenant Login', () => {
       expect(oldCookieHeader).toContain('Max-Age=0');
       expect(oldCookieHeader).toContain('Path=/');
       expect(oldCookieHeader).toContain('HttpOnly');
+      expect(oldCookieHeader).not.toContain('Domain=');
 
       // Validate new login state cookie
       const newCookieHeader = setCookieHeaders?.find((header: any) => {
         return !header.startsWith('login#++state01#1111111111=');
       });
       expect(newCookieHeader).toBeTruthy();
+      expect(newCookieHeader).not.toContain('Domain=');
       const newCookieMatch = newCookieHeader?.match(/^([^=]+)=([^;]+)/);
       expect(newCookieMatch).toBeTruthy();
       const newCookieName = newCookieMatch ? newCookieMatch[1] : '';
@@ -825,6 +831,9 @@ describe('Multi Tenant Login', () => {
         const location: string = mockExpressRes._getRedirectUrl();
         expect(location).toBeTruthy();
         expect(location).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
+
+        // App-level authorization requests are not enabled, so the login state cookie is never touched.
+        expect(mockExpressRes._getHeaders()['set-cookie']).toBeUndefined();
       });
 
       test('Custom application login URL redirect', async () => {

@@ -121,17 +121,25 @@ export class AuthService {
     const { codeVerifier, state } = loginState;
     const authorizationParamConfig = { clientId, codeVerifier, redirectUri, scopes, state };
 
+    // Determine whether to use the root domain for the login state cookie.
+    const cookieDomain =
+      applicationAuthorizationRequestsEnabled && parseTenantFromRootDomain
+        ? `.${parseTenantFromRootDomain}`
+        : undefined;
+
     // In the event we cannot determine either a tenant custom domain or subdomain, deduce the right app-level URL.
     if (!tenantCustomDomain && !tenantName && !defaultTenantCustomDomain && !defaultTenantName) {
       if (applicationAuthorizationRequestsEnabled) {
         // Clear any stale login state cookies and add a new one for the current request.
-        const domain = parseTenantFromRootDomain ? `.${parseTenantFromRootDomain}` : undefined;
-        clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies, domain);
-
-        // Need to retain the domain (if set) for the callback
-        loginState.domain = domain;
+        clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies, cookieDomain);
         const encryptedLoginState: string = await encryptLoginState(loginState, loginStateSecret);
-        createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies, domain);
+        createLoginStateCookie(
+          res,
+          loginState.state,
+          encryptedLoginState,
+          dangerouslyDisableSecureCookies,
+          cookieDomain
+        );
 
         // Send users to the app-level Authorize Endpoint with a login state cookie instead of going to login URL.
         const authorizationParams = getAuthorizationUrlParams(req, authorizationParamConfig);
@@ -143,9 +151,9 @@ export class AuthService {
     }
 
     // Clear any stale login state cookies and add a new one for the current request.
-    clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies);
+    clearOldestLoginStateCookie(req, res, dangerouslyDisableSecureCookies, cookieDomain);
     const encryptedLoginState: string = await encryptLoginState(loginState, loginStateSecret);
-    createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies);
+    createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies, cookieDomain);
 
     // Return the tenant-level Wristband Authorize Endpoint URL which the user will get redirectd to.
     const authorizationParams = getAuthorizationUrlParams(req, authorizationParamConfig);
@@ -174,6 +182,8 @@ export class AuthService {
     res.header('Pragma', 'no-cache');
 
     // Fetch our SDK configs
+    const applicationAuthorizationRequestsEnabled =
+      await this.configResolver.getApplicationAuthorizationRequestsEnabled();
     const dangerouslyDisableSecureCookies = this.configResolver.getDangerouslyDisableSecureCookies();
     const loginStateSecret = this.configResolver.getLoginStateSecret();
     const loginUrl = await this.configResolver.getLoginUrl();
@@ -228,16 +238,22 @@ export class AuthService {
       tenantLoginUrl = `${tenantLoginUrl}${parseTenantFromRootDomain ? '?' : '&'}tenant_custom_domain=${tenantCustomDomain}`;
     }
 
-    // Make sure the login state cookie exists and extract it.
+    // Make sure the login state cookie exists.
     const { cookieName, loginStateCookie } = getLoginStateCookie(req);
     if (!cookieName || !loginStateCookie) {
       return { type: 'redirect_required', redirectUrl: tenantLoginUrl, reason: 'missing_login_state' };
     }
-    const loginState: LoginState = await decryptLoginState(loginStateCookie, loginStateSecret);
-    const { codeVerifier, customState, domain, redirectUri, returnUrl, state: cookieState } = loginState;
 
-    // Now clear the cookie using the exact domain it was created with (if one was set in login()).
-    clearCookie(res, cookieName, dangerouslyDisableSecureCookies, domain);
+    // Determine whether to use the root domain for clearing the login state cookie.
+    const cookieDomain =
+      applicationAuthorizationRequestsEnabled && parseTenantFromRootDomain
+        ? `.${parseTenantFromRootDomain}`
+        : undefined;
+    clearCookie(res, cookieName, dangerouslyDisableSecureCookies, cookieDomain);
+
+    // Extract the login state from the cookie.
+    const loginState: LoginState = await decryptLoginState(loginStateCookie, loginStateSecret);
+    const { codeVerifier, customState, redirectUri, returnUrl, state: cookieState } = loginState;
 
     // Check for any potential error conditions
     if (paramState !== cookieState) {
