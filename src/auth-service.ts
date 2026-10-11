@@ -5,7 +5,7 @@ import {
   WristbandJwtValidator,
 } from '@wristband/typescript-jwt';
 
-import { LOGIN_REQUIRED_ERROR, TENANT_PLACEHOLDER_REGEX } from './utils/constants';
+import { LOGIN_REQUIRED_ERROR, STATE_PARAM_MAX_CHAR_LENGTH, TENANT_PLACEHOLDER_REGEX } from './utils/constants';
 import {
   clearOldestLoginStateCookie,
   createLoginState,
@@ -20,6 +20,8 @@ import {
   isExpired,
   resolveTenantCustomDomainParam,
   resolveTenantName,
+  validateReturnUrl,
+  resolveRedirectUrl,
 } from './utils';
 import { WristbandService } from './wristband-service';
 import {
@@ -113,9 +115,11 @@ export class AuthService {
     const defaultTenantName: string = config.defaultTenantName || '';
 
     // Create the login state which will be cached in a cookie so that it can be accessed in the callback.
-    const customState =
-      !!config.customState && !!Object.keys(config.customState).length ? config.customState : undefined;
-    const loginState: LoginState = createLoginState(req, redirectUri, { customState, returnUrl: config.returnUrl });
+    const resolvedReturnUrl = resolveRedirectUrl(req, config);
+    const loginState: LoginState = createLoginState(redirectUri, {
+      customState: config.customState,
+      returnUrl: resolvedReturnUrl,
+    });
 
     // Create the authorization request params needed, regardless if using app-level or tenant-level Authorize Endpoint.
     const { codeVerifier, state } = loginState;
@@ -147,7 +151,10 @@ export class AuthService {
       }
 
       // For the login URL scenario, we don't actually want to touch any login state cookies.
-      return getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, customApplicationLoginPageUrl);
+      return getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, {
+        customApplicationLoginPageUrl,
+        returnUrl: resolvedReturnUrl,
+      });
     }
 
     // Clear any stale login state cookies and add a new one for the current request.
@@ -299,6 +306,15 @@ export class AuthService {
     const resolvedExpiresIn = expiresIn - (tokenExpirationBuffer || 0);
     const resolvedExpiresAt = Date.now() + resolvedExpiresIn * 1000;
 
+    // Prevent open redirects by validating the returnUrl against allowed hosts.
+    const validatedReturnUrl = validateReturnUrl(
+      req,
+      returnUrl,
+      resolvedTenantName,
+      applicationAuthorizationRequestsEnabled,
+      parseTenantFromRootDomain
+    );
+
     const callbackData: CallbackData = {
       accessToken,
       ...(!!customState && { customState }),
@@ -306,7 +322,7 @@ export class AuthService {
       expiresIn: resolvedExpiresIn,
       idToken,
       ...(!!refreshToken && { refreshToken }),
-      ...(!!returnUrl && { returnUrl }),
+      ...(!!validatedReturnUrl && { returnUrl: validatedReturnUrl }),
       ...(!!tenantCustomDomain && { tenantCustomDomain }),
       tenantName: resolvedTenantName,
       userinfo,
@@ -323,7 +339,7 @@ export class AuthService {
    * @param {Response} res - The Express response object.
    * @param {LogoutConfig} [config={ tenantCustomDomain: '' }] - Optional configuration for logout.
    * @returns {Promise<string>} A Promise containing the redirect URL to Wristband's Logout Endpoint.
-   * @throws {TypeError} When query parameters are invalid or state exceeds 512 characters.
+   * @throws {TypeError} When query parameters are invalid or state exceeds the max allowed characters.
    */
   async logout(req: Request, res: Response, config: LogoutConfig = { tenantCustomDomain: '' }): Promise<string> {
     res.header('Cache-Control', 'no-store');
@@ -350,8 +366,8 @@ export class AuthService {
       }
     }
 
-    if (config.state && config.state.length > 512) {
-      throw new TypeError('The [state] logout config cannot exceed 512 characters.');
+    if (config.state && config.state.length > STATE_PARAM_MAX_CHAR_LENGTH) {
+      throw new TypeError(`The [state] logout config cannot exceed ${STATE_PARAM_MAX_CHAR_LENGTH} characters.`);
     }
 
     // The client ID is always required by the Wristband Logout Endpoint.
@@ -399,7 +415,7 @@ export class AuthService {
 
     // 7a) If a custom page URL is set, fallback to that appropriate Application-Level Login when tenant cannot be resolved.
     // 7b) Finally, fallback to the Wristband-hosted Application-Level Login Page when tenant cannot be resolved.
-    return getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, customApplicationLoginPageUrl);
+    return getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, { customApplicationLoginPageUrl });
   }
 
   /**

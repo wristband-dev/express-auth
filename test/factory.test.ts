@@ -182,6 +182,7 @@ describe('createWristbandAuth Instantiation Errors', () => {
           wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
           parseTenantFromRootDomain: ROOT_DOMAIN,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
       }).not.toThrow();
     });
@@ -197,6 +198,7 @@ describe('createWristbandAuth Instantiation Errors', () => {
           wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
           parseTenantFromRootDomain: ROOT_DOMAIN,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
       }).not.toThrow();
     });

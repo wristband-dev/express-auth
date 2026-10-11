@@ -205,6 +205,7 @@ describe('ConfigResolver', () => {
         loginUrl: `https://${placeholder}.test.com/login`,
         redirectUri: `https://${placeholder}.test.com/callback`,
         parseTenantFromRootDomain: 'test.com',
+        applicationAuthorizationRequestsEnabled: false,
       };
       expect(() => {
         return new ConfigResolver(config);
@@ -285,7 +286,11 @@ describe('ConfigResolver', () => {
   });
 
   describe('Mixed Placeholder Support', () => {
-    const disabledConfig = { ...validAuthConfig, autoConfigureEnabled: false };
+    const disabledConfig = {
+      ...validAuthConfig,
+      autoConfigureEnabled: false,
+      applicationAuthorizationRequestsEnabled: false,
+    };
 
     it('should accept tenant_domain in loginUrl and tenant_name in redirectUri', () => {
       const config = {
@@ -511,6 +516,7 @@ describe('ConfigResolver', () => {
           customApplicationLoginPageUrl: 'https://manual.com/custom-login',
           isApplicationCustomDomainActive: true,
           parseTenantFromRootDomain: 'manual.com',
+          applicationAuthorizationRequestsEnabled: false,
         };
         resolver = new ConfigResolver(config);
       });
@@ -569,8 +575,8 @@ describe('ConfigResolver', () => {
         expect(await resolver.getRedirectUri()).toBe('https://manual.com/callback');
       });
 
-      it('should return false for missing applicationAuthorizationRequestsEnabled', async () => {
-        expect(await resolver.getApplicationAuthorizationRequestsEnabled()).toBe(false);
+      it('should return true for missing applicationAuthorizationRequestsEnabled', async () => {
+        expect(await resolver.getApplicationAuthorizationRequestsEnabled()).toBe(true);
       });
 
       it('should return manually provided applicationAuthorizationRequestsEnabled', async () => {

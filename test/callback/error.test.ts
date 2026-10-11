@@ -371,6 +371,7 @@ describe('Callback Errors', () => {
       parseTenantFromRootDomain,
       wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
       autoConfigureEnabled: false,
+      applicationAuthorizationRequestsEnabled: false,
     });
 
     const loginState: LoginState = {
@@ -474,6 +475,7 @@ describe('Callback Errors', () => {
         parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({

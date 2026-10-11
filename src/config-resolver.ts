@@ -135,7 +135,7 @@ export class ConfigResolver {
     }
 
     if (
-      this.authConfig.applicationAuthorizationRequestsEnabled &&
+      this.authConfig.applicationAuthorizationRequestsEnabled !== false &&
       TENANT_PLACEHOLDER_REGEX.test(this.authConfig.loginUrl) &&
       (!this.authConfig.fallbackLoginUrl || !this.authConfig.fallbackLoginUrl.trim())
     ) {
@@ -191,7 +191,7 @@ export class ConfigResolver {
     const applicationAuthorizationRequestsEnabled =
       this.authConfig.applicationAuthorizationRequestsEnabled ??
       sdkConfiguration.applicationAuthorizationRequestsEnabled ??
-      false;
+      true;
     const fallbackLoginUrl = this.authConfig.fallbackLoginUrl || sdkConfiguration.fallbackLoginUrl || '';
 
     // Validate that required fields are present in the SDK config response
@@ -371,11 +371,11 @@ export class ConfigResolver {
     // 2. If auto-configure is enabled, get from SDK config
     if (this.getAutoConfigureEnabled()) {
       const sdkConfig = await this.loadSdkConfig();
-      return sdkConfig.applicationAuthorizationRequestsEnabled ?? false;
+      return sdkConfig.applicationAuthorizationRequestsEnabled ?? true;
     }
 
     // 3. Default fallback
-    return false;
+    return true;
   }
 
   public async getFallbackLoginUrl(): Promise<string> {

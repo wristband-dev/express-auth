@@ -1,7 +1,7 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { CallbackResult, LoginState } from '../../src/types';
+import { CallbackData, CallbackResult, LoginState } from '../../src/types';
 import { encryptLoginState } from '../../src/utils';
 import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 
@@ -85,8 +85,11 @@ describe('Multi Tenant Callback', () => {
         query: { state: 'state', code: 'code', tenant_name: 'devs4you' },
         headers: {
           cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+          host: parseTenantFromRootDomain,
         },
       }) as any;
+      // node-mocks-http leaves req.protocol undefined, so set it to match a real HTTPS request.
+      mockExpressReq.protocol = 'https';
       const mockExpressRes = httpMocks.createResponse() as any;
 
       const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
@@ -99,7 +102,8 @@ describe('Multi Tenant Callback', () => {
         expect(callbackData.idToken).toBe('idToken');
         expect(callbackData.refreshToken).toBe('refreshToken');
         expect(callbackData.customState).toEqual({ test: 'abc' });
-        expect(callbackData.returnUrl).toBe('https://reddit.com');
+        // Off-site returnUrl is rejected by open redirect validation.
+        expect(callbackData.returnUrl).toBeUndefined();
         expect(callbackData.tenantName).toBe('devs4you');
         expect(callbackData.userinfo).toBeTruthy();
         expect(callbackData.userinfo.userId).toBe('5q6j4qe2cva3dm3cbdvjoxvuze');
@@ -159,6 +163,7 @@ describe('Multi Tenant Callback', () => {
           parseTenantFromRootDomain,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockTokens = {
@@ -230,6 +235,7 @@ describe('Multi Tenant Callback', () => {
           isApplicationCustomDomainActive: true,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockTokens = {
@@ -281,6 +287,144 @@ describe('Multi Tenant Callback', () => {
         expect(global.fetch).toHaveBeenCalledTimes(2);
       });
     });
+
+    describe('Return URL Validation', () => {
+      const rootDomain = 'business.invotastic.com';
+
+      // Runs a successful callback with the given returnUrl in the login state and returns the callback data.
+      // With tenant subdomains, the tenant comes from the host; without, it comes from the tenant_name query param.
+      async function runCallbackWithReturnUrl(
+        returnUrl: string,
+        useTenantSubdomains: boolean,
+        applicationAuthorizationRequestsEnabled: boolean = false
+      ): Promise<CallbackData | undefined> {
+        const host = useTenantSubdomains ? `devs4you.${rootDomain}` : rootDomain;
+        const callbackLoginUrl = useTenantSubdomains
+          ? `https://{tenant_name}.${rootDomain}/api/auth/login`
+          : `https://${rootDomain}/api/auth/login`;
+        const callbackRedirectUri = useTenantSubdomains
+          ? `https://{tenant_name}.${rootDomain}/api/auth/callback`
+          : `https://${rootDomain}/api/auth/callback`;
+
+        const authConfig = {
+          clientId: CLIENT_ID,
+          clientSecret: CLIENT_SECRET,
+          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+          loginUrl: callbackLoginUrl,
+          redirectUri: callbackRedirectUri,
+          ...(useTenantSubdomains && { parseTenantFromRootDomain: rootDomain }),
+          applicationAuthorizationRequestsEnabled,
+          // Required by config validation when app-level authorization requests are enabled
+          // and loginUrl contains the {tenant_name} placeholder.
+          ...(applicationAuthorizationRequestsEnabled && { fallbackLoginUrl: `https://${rootDomain}/api/auth/login` }),
+          wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
+        };
+        wristbandAuth = createWristbandAuth(authConfig);
+
+        const mockTokens = {
+          access_token: 'accessToken',
+          expires_in: 1800,
+          id_token: 'idToken',
+          refresh_token: 'refreshToken',
+          token_type: 'bearer',
+        };
+        const mockUserinfo = {
+          sub: '5q6j4qe2cva3dm3cbdvjoxvuze',
+          tnt_id: 'fr2vishnqjdvfbcijxa3a4adhe',
+          app_id: 'dy42gabu5jebreq6jajskk2n34',
+          idp_name: 'wristband',
+          email: 'test@wristband.dev',
+          email_verified: true,
+        };
+        mockFetchCallbackEndpoints(wristbandApplicationVanityDomain, mockTokens, mockUserinfo);
+
+        const loginState: LoginState = {
+          codeVerifier: 'codeVerifier',
+          redirectUri: callbackRedirectUri,
+          state: 'state',
+          returnUrl,
+        };
+        const encryptedLoginState: string = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+
+        const mockExpressReq = httpMocks.createRequest({
+          query: useTenantSubdomains
+            ? { state: 'state', code: 'code' }
+            : { state: 'state', code: 'code', tenant_name: 'devs4you' },
+          headers: {
+            cookie: `login#state#1234567890=${encodeURIComponent(encryptedLoginState)}`,
+            host,
+          },
+        }) as any;
+        // node-mocks-http leaves req.protocol undefined, so set it to match a real HTTPS request.
+        mockExpressReq.protocol = 'https';
+        const mockExpressRes = httpMocks.createResponse() as any;
+
+        const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+        expect(callbackResult.type).toBe('completed');
+        return callbackResult.callbackData;
+      }
+
+      test('Allows a relative path returnUrl', async () => {
+        const callbackData = await runCallbackWithReturnUrl('/settings?tab=billing', false);
+        expect(callbackData?.returnUrl).toBe('/settings?tab=billing');
+      });
+
+      test('Allows an absolute returnUrl on the request host', async () => {
+        const callbackData = await runCallbackWithReturnUrl(`https://${rootDomain}/dashboard`, false);
+        expect(callbackData?.returnUrl).toBe(`https://${rootDomain}/dashboard`);
+      });
+
+      test('Rejects an off-site returnUrl', async () => {
+        const callbackData = await runCallbackWithReturnUrl('https://evil.com/phish', false);
+        expect(callbackData?.returnUrl).toBeUndefined();
+      });
+
+      test('Rejects a protocol-relative returnUrl to another host', async () => {
+        const callbackData = await runCallbackWithReturnUrl('//evil.com/phish', false);
+        expect(callbackData?.returnUrl).toBeUndefined();
+      });
+
+      test('Rejects a returnUrl with a mismatched protocol', async () => {
+        const callbackData = await runCallbackWithReturnUrl(`http://${rootDomain}/dashboard`, false);
+        expect(callbackData?.returnUrl).toBeUndefined();
+      });
+
+      test('Allows a returnUrl on the current tenant subdomain', async () => {
+        const callbackData = await runCallbackWithReturnUrl(`https://devs4you.${rootDomain}/dashboard`, true);
+        expect(callbackData?.returnUrl).toBe(`https://devs4you.${rootDomain}/dashboard`);
+      });
+
+      test('Rejects a returnUrl on a different tenant subdomain', async () => {
+        const callbackData = await runCallbackWithReturnUrl(`https://other.${rootDomain}/dashboard`, true);
+        expect(callbackData?.returnUrl).toBeUndefined();
+      });
+
+      test('Allows a root domain returnUrl unchanged when app-level authorization requests are disabled', async () => {
+        const callbackData = await runCallbackWithReturnUrl(`https://${rootDomain}/dashboard`, true, false);
+        expect(callbackData?.returnUrl).toBe(`https://${rootDomain}/dashboard`);
+      });
+
+      test('Rewrites a root domain returnUrl to the tenant subdomain when app-level authorization requests are enabled', async () => {
+        const callbackData = await runCallbackWithReturnUrl(`https://${rootDomain}/dashboard?x=1#top`, true, true);
+        expect(callbackData?.returnUrl).toBe(`https://devs4you.${rootDomain}/dashboard?x=1#top`);
+      });
+
+      test('Does not rewrite a returnUrl already on the tenant subdomain when app-level authorization requests are enabled', async () => {
+        const callbackData = await runCallbackWithReturnUrl(`https://devs4you.${rootDomain}/dashboard`, true, true);
+        expect(callbackData?.returnUrl).toBe(`https://devs4you.${rootDomain}/dashboard`);
+      });
+
+      test('Does not rewrite a relative path when app-level authorization requests are enabled', async () => {
+        const callbackData = await runCallbackWithReturnUrl('/dashboard', true, true);
+        expect(callbackData?.returnUrl).toBe('/dashboard');
+      });
+
+      test('Still rejects an off-site returnUrl when app-level authorization requests are enabled', async () => {
+        const callbackData = await runCallbackWithReturnUrl('https://evil.com/phish', true, true);
+        expect(callbackData?.returnUrl).toBeUndefined();
+      });
+    });
   });
 
   describe('Redirect to Tenant-level Login', () => {
@@ -330,6 +474,7 @@ describe('Multi Tenant Callback', () => {
           parseTenantFromRootDomain,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -403,6 +548,7 @@ describe('Multi Tenant Callback', () => {
           parseTenantFromRootDomain,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'state' };
@@ -476,6 +622,7 @@ describe('Multi Tenant Callback', () => {
           parseTenantFromRootDomain,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const loginState: LoginState = { codeVerifier: 'codeVerifier', redirectUri: redirectUri, state: 'bad_state' };

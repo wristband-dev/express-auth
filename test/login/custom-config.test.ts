@@ -100,6 +100,7 @@ describe('Custom Login Configurations', () => {
         wristbandApplicationVanityDomain,
         scopes: CUSTOM_SCOPES,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -148,6 +149,7 @@ describe('Custom Login Configurations', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -201,6 +203,7 @@ describe('Custom Login Configurations', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -406,6 +409,7 @@ describe('Custom Login Configurations', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -455,6 +459,7 @@ describe('Custom Login Configurations', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -508,6 +513,7 @@ describe('Custom Login Configurations', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({

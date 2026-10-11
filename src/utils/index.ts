@@ -3,9 +3,10 @@ import { Request, Response } from 'express';
 import { defaults, seal, unseal } from 'iron-webcrypto';
 import * as crypto from 'uncrypto';
 
-import { LOGIN_STATE_COOKIE_PREFIX, LOGIN_STATE_COOKIE_SEPARATOR } from './constants';
-import { LoginState, LoginStateMapConfig } from '../types';
+import { LOGIN_STATE_COOKIE_PREFIX, LOGIN_STATE_COOKIE_SEPARATOR, STATE_PARAM_MAX_CHAR_LENGTH } from './constants';
+import { LoginConfig, LoginState, LoginStateMapConfig } from '../types';
 import { clearCookie, parseCookies, setCookie } from './cookies';
+import { WristbandError } from '../error';
 
 export function encodeBase64(input: string) {
   const encoder = new TextEncoder();
@@ -103,24 +104,34 @@ export function resolveTenantCustomDomainParam(req: Request): string {
   return tenantCustomDomainParam || '';
 }
 
-export function createLoginState(req: Request, redirectUri: string, config: LoginStateMapConfig = {}): LoginState {
+export function resolveRedirectUrl(req: Request, config: LoginConfig = {}): string | undefined {
+  // The return URL from the LoginConfig takes priority over the query param.
+  if (config.returnUrl) {
+    return config.returnUrl;
+  }
+
   const { return_url: returnUrlParam } = req.query;
 
-  if (!!returnUrlParam && typeof returnUrlParam !== 'string') {
+  // If no return URL in either location, return undefined.
+  if (!returnUrlParam) {
+    return undefined;
+  }
+
+  if (typeof returnUrlParam !== 'string') {
     throw new TypeError('More than one [return_url] query parameter was encountered');
   }
 
-  const returnUrl = config.returnUrl ?? returnUrlParam;
+  return returnUrlParam;
+}
 
-  const loginStateData = {
+export function createLoginState(redirectUri: string, config: LoginStateMapConfig = {}): LoginState {
+  return {
     state: generateRandomString(32),
     codeVerifier: generateRandomString(32),
     redirectUri,
-    ...(!!returnUrl && typeof returnUrl === 'string' ? { returnUrl } : {}),
+    ...(!!config.returnUrl && typeof config.returnUrl === 'string' ? { returnUrl: config.returnUrl } : {}),
     ...(!!config.customState && !!Object.keys(config.customState).length ? { customState: config.customState } : {}),
   };
-
-  return config.customState ? { ...loginStateData, customState: config.customState } : loginStateData;
 }
 
 export function clearOldestLoginStateCookie(
@@ -171,7 +182,10 @@ export function createLoginStateCookie(
 export function getAppLevelLoginUrl(
   wristbandApplicationVanityDomain: string,
   clientId: string,
-  customApplicationLoginPageUrl?: string
+  options: {
+    customApplicationLoginPageUrl?: string;
+    returnUrl?: string;
+  } = {}
 ): string {
   // Safety check: this should never happen.
   if (!wristbandApplicationVanityDomain) {
@@ -181,8 +195,12 @@ export function getAppLevelLoginUrl(
     throw new Error('clientId cannot be null or undefined');
   }
 
+  const { customApplicationLoginPageUrl, returnUrl } = options;
+
   const apploginUrl = customApplicationLoginPageUrl || `https://${wristbandApplicationVanityDomain}/login`;
-  return `${apploginUrl}?client_id=${clientId}`;
+  const stateParam =
+    returnUrl && returnUrl.length <= STATE_PARAM_MAX_CHAR_LENGTH ? `&state=${encodeURIComponent(returnUrl)}` : '';
+  return `${apploginUrl}?client_id=${clientId}${stateParam}`;
 }
 
 export function getAuthorizationUrlParams(
@@ -287,4 +305,68 @@ export function getTenantLevelAuthorizationUrl(
 export function isExpired(expiresAt: number): boolean {
   const currentTime = Date.now().valueOf();
   return currentTime >= expiresAt;
+}
+
+/**
+ * Validates a user-supplied returnUrl to prevent open redirects. Without this,
+ * an attacker could craft a login link with returnUrl=https://evil.com so that
+ * a legitimate login ends with the user being sent to a site they don't control.
+ *
+ * Returns the validated URL, or undefined if the returnUrl is missing,
+ * malformed, or points to a host that isn't allowed.
+ */
+export function validateReturnUrl(
+  req: Request,
+  returnUrl: string | undefined,
+  tenantName: string,
+  applicationAuthorizationRequestsEnabled: boolean,
+  parseTenantFromRootDomain?: string
+): string | undefined {
+  // Safety check: should never happen.
+  if (!tenantName) {
+    throw new WristbandError('missing_tenant_name', 'Tenant name is required to validate returnUrl');
+  }
+
+  // Return URL is optional during login
+  if (!returnUrl) {
+    return undefined;
+  }
+
+  try {
+    // Resolve against the current request's origin so relative paths like "/settings"
+    // land on the user's current host. Absolute URLs ignore the base, and the parser
+    // normalizes tricks like "//evil.com" or "/\\evil.com" the same way the browser
+    // will, so the hostname check below runs against the real redirect target.
+    const url = new URL(returnUrl, `${req.protocol}://${req.get('host')}`);
+
+    // Only allow redirects to the root domain or the exact host that served
+    // this request, over the same protocol. Anything else is treated as
+    // untrusted and discarded. The protocol check blocks downgrades like
+    // https -> http.
+    if (
+      url.protocol !== `${req.protocol}:` ||
+      (url.hostname !== parseTenantFromRootDomain && url.hostname !== req.hostname)
+    ) {
+      return undefined;
+    }
+
+    if (
+      parseTenantFromRootDomain &&
+      applicationAuthorizationRequestsEnabled &&
+      url.hostname === parseTenantFromRootDomain
+    ) {
+      // The returnUrl points at the bare root domain, but the app expects
+      // tenant subdomains. Prepend the resolved tenant so the user lands on
+      // their tenant's host (e.g. myapp.com -> acme.myapp.com). Path, query,
+      // and port are preserved by the URL object.
+      url.hostname = `${tenantName}.${url.hostname}`;
+      return url.toString();
+    }
+
+    // Allowed host and no tenant rewrite needed, so pass the returnUrl through unchanged.
+    return returnUrl;
+  } catch {
+    // new URL() throws on malformed input. Treat anything unparseable as unsafe.
+    return undefined;
+  }
 }

@@ -270,6 +270,7 @@ describe('Multi Tenant Logout', () => {
             parseTenantFromRootDomain,
             wristbandApplicationVanityDomain,
             autoConfigureEnabled: false,
+            applicationAuthorizationRequestsEnabled: false,
           });
 
           const mockExpressReq = httpMocks.createRequest({
@@ -314,6 +315,7 @@ describe('Multi Tenant Logout', () => {
             isApplicationCustomDomainActive: true,
             wristbandApplicationVanityDomain,
             autoConfigureEnabled: false,
+            applicationAuthorizationRequestsEnabled: false,
           });
 
           const mockExpressReq = httpMocks.createRequest({
@@ -434,6 +436,7 @@ describe('Multi Tenant Logout', () => {
           redirectUri,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -462,6 +465,7 @@ describe('Multi Tenant Logout', () => {
           wristbandApplicationVanityDomain,
           customApplicationLoginPageUrl: customLoginUrl,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -585,6 +589,7 @@ describe('Multi Tenant Logout', () => {
           parseTenantFromRootDomain,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -644,6 +649,7 @@ describe('Multi Tenant Logout', () => {
           isApplicationCustomDomainActive: true,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -812,6 +818,7 @@ describe('Multi Tenant Logout', () => {
           isApplicationCustomDomainActive: true,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -867,6 +874,7 @@ describe('Multi Tenant Logout', () => {
           isApplicationCustomDomainActive: true,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         const mockExpressReq = httpMocks.createRequest({
@@ -924,6 +932,7 @@ describe('Multi Tenant Logout', () => {
         isApplicationCustomDomainActive: true,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       // Query param "tenant_custom_domain" takes precedence over "tenant_name"
@@ -1120,6 +1129,7 @@ describe('Multi Tenant Logout', () => {
         redirectUri,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -1158,6 +1168,7 @@ describe('Multi Tenant Logout', () => {
           isApplicationCustomDomainActive: true,
           wristbandApplicationVanityDomain,
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         // Subdomain is missing from host, which should redirect to app-level login.
@@ -1193,6 +1204,7 @@ describe('Multi Tenant Logout', () => {
           wristbandApplicationVanityDomain,
           customApplicationLoginPageUrl: 'https://google.com',
           autoConfigureEnabled: false,
+          applicationAuthorizationRequestsEnabled: false,
         });
 
         // Subdomain is missing from host, which should redirect to custom app-level login.
@@ -1232,6 +1244,7 @@ describe('Multi Tenant Logout', () => {
         wristbandApplicationVanityDomain,
         customApplicationLoginPageUrl: 'https://google.com',
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       // Subdomain is missing from host, which should redirect to logout redirectUrl.
@@ -1413,6 +1426,7 @@ describe('Multi Tenant Logout', () => {
         redirectUri,
         wristbandApplicationVanityDomain,
         autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
       });
 
       const mockExpressReq = httpMocks.createRequest({

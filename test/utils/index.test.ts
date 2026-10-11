@@ -10,6 +10,7 @@ import {
   getLoginStateCookie,
   resolveTenantCustomDomainParam,
   resolveTenantName,
+  resolveRedirectUrl,
   createLoginState,
   clearOldestLoginStateCookie,
   createLoginStateCookie,
@@ -19,8 +20,10 @@ import {
   getAppLevelLoginUrl,
   getAppLevelAuthorizationUrl,
   isExpired,
+  validateReturnUrl,
 } from '../../src/utils';
 import { LoginState, LoginStateMapConfig } from '../../src/types';
+import { STATE_PARAM_MAX_CHAR_LENGTH } from '../../src/utils/constants';
 
 describe('Auth Utils', () => {
   describe('parseTenantSubdomain', () => {
@@ -230,7 +233,6 @@ describe('Auth Utils', () => {
         state: 'test-state',
         codeVerifier: 'test-verifier',
         redirectUri: 'https://example.com/callback',
-        domain: '.business.example.com',
       };
 
       const encrypted = await encryptLoginState(loginState, loginStateSecret);
@@ -427,54 +429,49 @@ describe('Auth Utils', () => {
     });
   });
 
-  describe('createLoginState', () => {
-    const redirectUri = 'https://example.com/callback';
-
-    test('Creates basic login state', () => {
+  describe('resolveRedirectUrl', () => {
+    test('Returns undefined when no return URL is provided anywhere', () => {
       const req = httpMocks.createRequest() as any;
 
-      const result = createLoginState(req, redirectUri);
-
-      expect(result.state).toBeDefined();
-      expect(result.codeVerifier).toBeDefined();
-      expect(result.redirectUri).toBe(redirectUri);
-      expect(result.returnUrl).toBeUndefined();
-      expect(result.customState).toBeUndefined();
+      expect(resolveRedirectUrl(req)).toBeUndefined();
     });
 
-    test('Includes return URL from query parameter', () => {
+    test('Returns the return_url query parameter when no config is provided', () => {
       const req = httpMocks.createRequest({
         query: { return_url: 'https://example.com/dashboard' },
       }) as any;
 
-      const result = createLoginState(req, redirectUri);
-
-      expect(result.returnUrl).toBe('https://example.com/dashboard');
+      expect(resolveRedirectUrl(req)).toBe('https://example.com/dashboard');
     });
 
-    test('Includes return URL from config (takes precedence over query)', () => {
+    test('Returns LoginConfig.returnUrl when no query parameter is present', () => {
+      const req = httpMocks.createRequest() as any;
+
+      expect(resolveRedirectUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
+    });
+
+    test('LoginConfig.returnUrl takes precedence over the return_url query parameter', () => {
       const req = httpMocks.createRequest({
         query: { return_url: 'https://example.com/query' },
       }) as any;
 
-      const config: LoginStateMapConfig = {
-        returnUrl: 'https://example.com/config',
-      };
-
-      const result = createLoginState(req, redirectUri, config);
-
-      expect(result.returnUrl).toBe('https://example.com/config');
+      expect(resolveRedirectUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
     });
 
-    test('Includes custom state from config', () => {
-      const req = httpMocks.createRequest() as any;
+    test('Falls back to the query parameter when LoginConfig.returnUrl is an empty string', () => {
+      const req = httpMocks.createRequest({
+        query: { return_url: 'https://example.com/query' },
+      }) as any;
 
-      const customState = { userId: '123', feature: 'test' };
-      const config: LoginStateMapConfig = { customState };
+      expect(resolveRedirectUrl(req, { returnUrl: '' })).toBe('https://example.com/query');
+    });
 
-      const result = createLoginState(req, redirectUri, config);
+    test('Returns undefined when the return_url query parameter is an empty string', () => {
+      const req = httpMocks.createRequest({
+        query: { return_url: '' },
+      }) as any;
 
-      expect(result.customState).toEqual(customState);
+      expect(resolveRedirectUrl(req)).toBeUndefined();
     });
 
     test('Throws error for multiple return_url query parameters', () => {
@@ -483,31 +480,87 @@ describe('Auth Utils', () => {
       }) as any;
 
       expect(() => {
-        return createLoginState(req, redirectUri);
+        return resolveRedirectUrl(req);
       }).toThrow('More than one [return_url] query parameter was encountered');
     });
 
-    test('Includes empty custom state object', () => {
-      const req = httpMocks.createRequest() as any;
+    test('Does not throw for multiple return_url query parameters when LoginConfig.returnUrl is set', () => {
+      const req = httpMocks.createRequest({
+        query: { return_url: ['url1', 'url2'] },
+      }) as any;
 
+      expect(resolveRedirectUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
+    });
+  });
+
+  describe('createLoginState', () => {
+    const redirectUri = 'https://example.com/callback';
+
+    test('Creates basic login state', () => {
+      const result = createLoginState(redirectUri);
+
+      expect(result.state).toBeDefined();
+      expect(result.codeVerifier).toBeDefined();
+      expect(result.redirectUri).toBe(redirectUri);
+      expect(result.returnUrl).toBeUndefined();
+      expect(result.customState).toBeUndefined();
+    });
+
+    test('Does not include returnUrl or customState keys when not provided', () => {
+      const result = createLoginState(redirectUri, {});
+
+      expect(Object.keys(result).sort()).toEqual(['codeVerifier', 'redirectUri', 'state']);
+    });
+
+    test('Generates a different state and codeVerifier on each call', () => {
+      const result1 = createLoginState(redirectUri);
+      const result2 = createLoginState(redirectUri);
+
+      expect(result1.state).not.toBe(result2.state);
+      expect(result1.codeVerifier).not.toBe(result2.codeVerifier);
+    });
+
+    test('Includes return URL from config', () => {
+      const config: LoginStateMapConfig = { returnUrl: 'https://example.com/dashboard' };
+
+      const result = createLoginState(redirectUri, config);
+
+      expect(result.returnUrl).toBe('https://example.com/dashboard');
+    });
+
+    test('Excludes return URL when it is an empty string', () => {
+      const config: LoginStateMapConfig = { returnUrl: '' };
+
+      const result = createLoginState(redirectUri, config);
+
+      expect(result).not.toHaveProperty('returnUrl');
+    });
+
+    test('Includes custom state from config', () => {
+      const customState = { userId: '123', feature: 'test' };
+      const config: LoginStateMapConfig = { customState };
+
+      const result = createLoginState(redirectUri, config);
+
+      expect(result.customState).toEqual(customState);
+    });
+
+    test('Excludes empty custom state object', () => {
       const config: LoginStateMapConfig = { customState: {} };
 
-      const result = createLoginState(req, redirectUri, config);
+      const result = createLoginState(redirectUri, config);
 
-      // Based on the actual implementation, empty object is still included
-      expect(result.customState).toEqual({});
+      expect(result).not.toHaveProperty('customState');
     });
 
     test('Includes both return URL and custom state', () => {
-      const req = httpMocks.createRequest() as any;
-
       const customState = { userId: '123' };
       const config: LoginStateMapConfig = {
         returnUrl: 'https://example.com/dashboard',
         customState,
       };
 
-      const result = createLoginState(req, redirectUri, config);
+      const result = createLoginState(redirectUri, config);
 
       expect(result.returnUrl).toBe('https://example.com/dashboard');
       expect(result.customState).toEqual(customState);
@@ -730,20 +783,81 @@ describe('Auth Utils', () => {
     const wristbandApplicationVanityDomain = 'auth.example.com';
     const clientId = 'test-client-id';
 
-    test('Returns Wristband-hosted app login URL when no custom URL provided', () => {
+    test('Returns Wristband-hosted app login URL when no options are provided', () => {
       const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId);
 
       expect(result).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${clientId}`);
     });
 
+    test('Returns Wristband-hosted app login URL when an empty options object is provided', () => {
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, {});
+
+      expect(result).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${clientId}`);
+    });
+
     test('Returns custom application login page URL with client_id appended when provided', () => {
-      const result = getAppLevelLoginUrl(
-        wristbandApplicationVanityDomain,
-        clientId,
-        'https://custom.example.com/login'
-      );
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, {
+        customApplicationLoginPageUrl: 'https://custom.example.com/login',
+      });
 
       expect(result).toBe(`https://custom.example.com/login?client_id=${clientId}`);
+    });
+
+    test('Appends the return URL as the state query parameter', () => {
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, {
+        returnUrl: '/settings',
+      });
+
+      expect(result).toBe(
+        `https://${wristbandApplicationVanityDomain}/login?client_id=${clientId}&state=${encodeURIComponent('/settings')}`
+      );
+    });
+
+    test('URL-encodes the return URL so its own query params do not leak into the login URL', () => {
+      const returnUrl = 'https://app.example.com/settings?tab=billing&x=1#top';
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, { returnUrl });
+
+      const { searchParams } = new URL(result);
+      expect(searchParams.get('client_id')).toBe(clientId);
+      expect(searchParams.get('state')).toBe(returnUrl);
+      expect(searchParams.has('tab')).toBe(false);
+      expect(searchParams.has('x')).toBe(false);
+      expect(result).toContain(`&state=${encodeURIComponent(returnUrl)}`);
+    });
+
+    test('Appends the return URL to the custom application login page URL', () => {
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, {
+        customApplicationLoginPageUrl: 'https://custom.example.com/login',
+        returnUrl: '/dashboard',
+      });
+
+      expect(result).toBe(
+        `https://custom.example.com/login?client_id=${clientId}&state=${encodeURIComponent('/dashboard')}`
+      );
+    });
+
+    test('Includes the return URL when it is exactly the max state length', () => {
+      const returnUrl = `/${'a'.repeat(STATE_PARAM_MAX_CHAR_LENGTH - 1)}`;
+      expect(returnUrl).toHaveLength(STATE_PARAM_MAX_CHAR_LENGTH);
+
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, { returnUrl });
+
+      expect(new URL(result).searchParams.get('state')).toBe(returnUrl);
+    });
+
+    test('Drops the return URL when it exceeds the max state length', () => {
+      const returnUrl = `/${'a'.repeat(STATE_PARAM_MAX_CHAR_LENGTH)}`;
+      expect(returnUrl).toHaveLength(STATE_PARAM_MAX_CHAR_LENGTH + 1);
+
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, { returnUrl });
+
+      expect(result).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${clientId}`);
+    });
+
+    test('Does not append state when the return URL is an empty string', () => {
+      const result = getAppLevelLoginUrl(wristbandApplicationVanityDomain, clientId, { returnUrl: '' });
+
+      expect(result).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${clientId}`);
     });
 
     test('Throws error when wristbandApplicationVanityDomain is missing', () => {
@@ -1070,6 +1184,206 @@ describe('Auth Utils', () => {
     test('Produces valid base64 output', () => {
       const result = encodeBase64('test-input');
       expect(result).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    });
+  });
+
+  describe('validateReturnUrl', () => {
+    // Minimal request mock exposing only what validateReturnUrl reads.
+    const buildReq = (host: string, protocol: string = 'https') => {
+      return {
+        protocol,
+        hostname: host.split(':')[0],
+        get: (name: string) => {
+          return name.toLowerCase() === 'host' ? host : undefined;
+        },
+      } as any;
+    };
+
+    const rootDomain = 'myapp.com';
+    const tenantName = 'acme';
+
+    describe('Input guards', () => {
+      test('Throws when tenantName is empty', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(() => {
+          return validateReturnUrl(req, '/settings', '', true, rootDomain);
+        }).toThrow('Tenant name is required to validate returnUrl');
+      });
+
+      test('Throws when tenantName is empty even if returnUrl is missing', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(() => {
+          return validateReturnUrl(req, undefined, '', true, rootDomain);
+        }).toThrow('Tenant name is required to validate returnUrl');
+      });
+
+      test('Returns undefined when returnUrl is undefined', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, undefined, tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Returns undefined when returnUrl is an empty string', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, '', tenantName, true, rootDomain)).toBeUndefined();
+      });
+    });
+
+    describe('Allowed hosts', () => {
+      test('Allows a relative path and returns it unchanged', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, '/settings?tab=1#top', tenantName, true, rootDomain)).toBe('/settings?tab=1#top');
+      });
+
+      test('Allows an absolute URL on the same host as the request', () => {
+        const req = buildReq('acme.myapp.com');
+        const returnUrl = 'https://acme.myapp.com/dashboard';
+
+        expect(validateReturnUrl(req, returnUrl, tenantName, true, rootDomain)).toBe(returnUrl);
+      });
+
+      test('Ignores port when comparing hostnames', () => {
+        const req = buildReq('acme.myapp.com');
+        const returnUrl = 'https://acme.myapp.com:9999/dashboard';
+
+        expect(validateReturnUrl(req, returnUrl, tenantName, true, rootDomain)).toBe(returnUrl);
+      });
+
+      test('Allows same-host URLs when parseTenantFromRootDomain is not set', () => {
+        const req = buildReq('app.example.com');
+        const returnUrl = 'https://app.example.com/home';
+
+        expect(validateReturnUrl(req, returnUrl, tenantName, false)).toBe(returnUrl);
+      });
+    });
+
+    describe('Rejected hosts', () => {
+      test('Rejects a different domain', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'https://evil.com/phish', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Rejects a different tenant subdomain', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(
+          validateReturnUrl(req, 'https://other.myapp.com/dashboard', tenantName, true, rootDomain)
+        ).toBeUndefined();
+      });
+
+      test('Rejects a protocol-relative URL to another host', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, '//evil.com/phish', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Rejects a backslash-prefixed URL to another host', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, '/\\evil.com/phish', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Rejects a lookalike domain that starts with the root domain', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'https://myapp.com.evil.com/', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Rejects a URL using userinfo to disguise the real host', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(
+          validateReturnUrl(req, 'https://acme.myapp.com@evil.com/', tenantName, true, rootDomain)
+        ).toBeUndefined();
+      });
+
+      test('Rejects a javascript: URL', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'javascript:alert(1)', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Rejects the root domain when parseTenantFromRootDomain is not set', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'https://myapp.com/dashboard', tenantName, true)).toBeUndefined();
+      });
+
+      test('Returns undefined for a malformed URL', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'https://', tenantName, true, rootDomain)).toBeUndefined();
+      });
+    });
+
+    describe('Root domain tenant rewrite', () => {
+      test('Prepends the tenant subdomain to a root domain URL', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'https://myapp.com/dashboard?x=1#top', tenantName, true, rootDomain)).toBe(
+          'https://acme.myapp.com/dashboard?x=1#top'
+        );
+      });
+
+      test('Preserves the port when rewriting', () => {
+        const req = buildReq('acme.localhost:6001', 'http');
+
+        expect(validateReturnUrl(req, 'http://localhost:6001/home', tenantName, true, 'localhost')).toBe(
+          'http://acme.localhost:6001/home'
+        );
+      });
+
+      test('Does not rewrite when applicationAuthorizationRequestsEnabled is false', () => {
+        const req = buildReq('acme.myapp.com');
+        const returnUrl = 'https://myapp.com/dashboard';
+
+        expect(validateReturnUrl(req, returnUrl, tenantName, false, rootDomain)).toBe(returnUrl);
+      });
+
+      test('Does not rewrite a relative path even when rewrite is enabled', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, '/dashboard', tenantName, true, rootDomain)).toBe('/dashboard');
+      });
+    });
+
+    describe('Protocol matching', () => {
+      test('Rejects an http returnUrl when the request is https', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'http://acme.myapp.com/dashboard', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Rejects an https returnUrl when the request is http', () => {
+        const req = buildReq('acme.localhost:6001', 'http');
+
+        expect(
+          validateReturnUrl(req, 'https://acme.localhost:6001/home', tenantName, true, 'localhost')
+        ).toBeUndefined();
+      });
+
+      test('Rejects a root domain returnUrl with a mismatched protocol instead of rewriting it', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'http://myapp.com/dashboard', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Rejects a non-http protocol on an allowed host', () => {
+        const req = buildReq('acme.myapp.com');
+
+        expect(validateReturnUrl(req, 'ftp://acme.myapp.com/file', tenantName, true, rootDomain)).toBeUndefined();
+      });
+
+      test('Allows a relative path on an http request', () => {
+        const req = buildReq('acme.localhost:6001', 'http');
+
+        expect(validateReturnUrl(req, '/home', tenantName, true, 'localhost')).toBe('/home');
+      });
     });
   });
 });

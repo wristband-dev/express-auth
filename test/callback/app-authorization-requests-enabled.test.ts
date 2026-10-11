@@ -205,7 +205,6 @@ describe('Callback - App-Level Authorization Requests', () => {
     const loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
     const redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
-    // applicationAuthorizationRequestsEnabled intentionally omitted (defaults to false)
     wristbandAuth = createWristbandAuth({
       clientId: CLIENT_ID,
       clientSecret: CLIENT_SECRET,
@@ -216,6 +215,7 @@ describe('Callback - App-Level Authorization Requests', () => {
       isApplicationCustomDomainActive: true,
       wristbandApplicationVanityDomain,
       autoConfigureEnabled: false,
+      applicationAuthorizationRequestsEnabled: false,
     });
 
     // Login resolves the tenant subdomain normally here (tenant-level flow, not app-level)
