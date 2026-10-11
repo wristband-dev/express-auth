@@ -2,7 +2,7 @@ import { ConfigResolver } from '../src/config-resolver';
 import { WristbandService } from '../src/wristband-service';
 import { AuthConfig, SdkConfiguration } from '../src/types';
 import { WristbandError } from '../src/error';
-import { TENANT_DOMAIN_PLACEHOLDER, TENANT_NAME_PLACEHOLDER, TENANT_PLACEHOLDER_MSG } from '../src/utils/constants';
+import { TENANT_NAME_PLACEHOLDER, TENANT_PLACEHOLDER_MSG } from '../src/utils/constants';
 
 // Mock WristbandService
 jest.mock('../src/wristband-service');
@@ -126,10 +126,7 @@ describe('ConfigResolver', () => {
     });
   });
 
-  describe.each([
-    ['tenant_domain', TENANT_DOMAIN_PLACEHOLDER],
-    ['tenant_name', TENANT_NAME_PLACEHOLDER],
-  ])('Constructor - Auto-configure Disabled Validation with %s placeholder', (placeholderName, placeholder) => {
+  describe('Constructor - Auto-configure Disabled Validation', () => {
     const disabledConfig = { ...validAuthConfig, autoConfigureEnabled: false };
 
     it('should validate loginUrl is present when auto-configure disabled', () => {
@@ -145,7 +142,7 @@ describe('ConfigResolver', () => {
       }).toThrow('The [redirectUri] config must have a value when auto-configure is disabled.');
     });
 
-    it(`should validate ${placeholderName} placeholder when parseTenantFromRootDomain is provided`, () => {
+    it('should validate tenant_name placeholder when parseTenantFromRootDomain is provided', () => {
       const config = {
         ...disabledConfig,
         loginUrl: 'https://test.com/login',
@@ -159,10 +156,10 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate redirectUri has ${placeholderName} placeholder when parseTenantFromRootDomain is provided`, () => {
+    it('should validate redirectUri has tenant_name placeholder when parseTenantFromRootDomain is provided', () => {
       const config = {
         ...disabledConfig,
-        loginUrl: `https://${placeholder}.test.com/login`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
         redirectUri: 'https://test.com/callback',
         parseTenantFromRootDomain: 'test.com',
       };
@@ -173,10 +170,10 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate loginUrl does not have ${placeholderName} placeholder when parseTenantFromRootDomain absent`, () => {
+    it('should validate loginUrl does not have tenant_name placeholder when parseTenantFromRootDomain absent', () => {
       const config = {
         ...disabledConfig,
-        loginUrl: `https://${placeholder}.test.com/login`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
         redirectUri: 'https://test.com/callback',
       };
       expect(() => {
@@ -186,11 +183,11 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate redirectUri does not have ${placeholderName} placeholder when parseTenantFromRootDomain absent`, () => {
+    it('should validate redirectUri does not have tenant_name placeholder when parseTenantFromRootDomain absent', () => {
       const config = {
         ...disabledConfig,
         loginUrl: 'https://test.com/login',
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
       };
       expect(() => {
         return new ConfigResolver(config);
@@ -199,11 +196,11 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should pass validation with correct configuration using ${placeholderName}`, () => {
+    it('should pass validation with correct configuration using tenant_name', () => {
       const config = {
         ...disabledConfig,
-        loginUrl: `https://${placeholder}.test.com/login`,
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
         parseTenantFromRootDomain: 'test.com',
         applicationAuthorizationRequestsEnabled: false,
       };
@@ -292,30 +289,6 @@ describe('ConfigResolver', () => {
       applicationAuthorizationRequestsEnabled: false,
     };
 
-    it('should accept tenant_domain in loginUrl and tenant_name in redirectUri', () => {
-      const config = {
-        ...disabledConfig,
-        loginUrl: `https://${TENANT_DOMAIN_PLACEHOLDER}.test.com/login`,
-        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
-        parseTenantFromRootDomain: 'test.com',
-      };
-      expect(() => {
-        return new ConfigResolver(config);
-      }).not.toThrow();
-    });
-
-    it('should accept tenant_name in loginUrl and tenant_domain in redirectUri', () => {
-      const config = {
-        ...disabledConfig,
-        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
-        redirectUri: `https://${TENANT_DOMAIN_PLACEHOLDER}.test.com/callback`,
-        parseTenantFromRootDomain: 'test.com',
-      };
-      expect(() => {
-        return new ConfigResolver(config);
-      }).not.toThrow();
-    });
-
     it('should accept both tenant_name placeholders', () => {
       const config = {
         ...disabledConfig,
@@ -327,25 +300,10 @@ describe('ConfigResolver', () => {
         return new ConfigResolver(config);
       }).not.toThrow();
     });
-
-    it('should accept both tenant_domain placeholders (backward compatibility)', () => {
-      const config = {
-        ...disabledConfig,
-        loginUrl: `https://${TENANT_DOMAIN_PLACEHOLDER}.test.com/login`,
-        redirectUri: `https://${TENANT_DOMAIN_PLACEHOLDER}.test.com/callback`,
-        parseTenantFromRootDomain: 'test.com',
-      };
-      expect(() => {
-        return new ConfigResolver(config);
-      }).not.toThrow();
-    });
   });
 
-  describe.each([
-    ['tenant_domain', TENANT_DOMAIN_PLACEHOLDER],
-    ['tenant_name', TENANT_NAME_PLACEHOLDER],
-  ])('Constructor - Auto-configure Enabled Partial Validation with %s placeholder', (placeholderName, placeholder) => {
-    it(`should validate manually provided loginUrl with parseTenantFromRootDomain requires ${placeholderName}`, () => {
+  describe('Constructor - Auto-configure Enabled Partial Validation', () => {
+    it('should validate manually provided loginUrl with parseTenantFromRootDomain requires tenant_name', () => {
       const config = {
         ...validAuthConfig,
         loginUrl: 'https://test.com/login',
@@ -358,7 +316,7 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate manually provided redirectUri with parseTenantFromRootDomain requires ${placeholderName}`, () => {
+    it('should validate manually provided redirectUri with parseTenantFromRootDomain requires tenant_name', () => {
       const config = {
         ...validAuthConfig,
         redirectUri: 'https://test.com/callback',
@@ -371,8 +329,8 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate manually provided loginUrl without parseTenantFromRootDomain rejects ${placeholderName}`, () => {
-      const config = { ...validAuthConfig, loginUrl: `https://${placeholder}.test.com/login` };
+    it('should validate manually provided loginUrl without parseTenantFromRootDomain rejects tenant_name', () => {
+      const config = { ...validAuthConfig, loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login` };
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
@@ -380,8 +338,8 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate manually provided redirectUri without parseTenantFromRootDomain rejects ${placeholderName}`, () => {
-      const config = { ...validAuthConfig, redirectUri: `https://${placeholder}.test.com/callback` };
+    it('should validate manually provided redirectUri without parseTenantFromRootDomain rejects tenant_name', () => {
+      const config = { ...validAuthConfig, redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback` };
       expect(() => {
         return new ConfigResolver(config);
       }).toThrow(
@@ -389,10 +347,10 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should pass validation with correct manual overrides using ${placeholderName}`, () => {
+    it('should pass validation with correct manual overrides using tenant_name', () => {
       const config = {
         ...validAuthConfig,
-        loginUrl: `https://${placeholder}.test.com/login`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
         parseTenantFromRootDomain: 'test.com',
       };
       expect(() => {
@@ -511,8 +469,8 @@ describe('ConfigResolver', () => {
         const config = {
           ...validAuthConfig,
           autoConfigureEnabled: false,
-          loginUrl: `https://${TENANT_DOMAIN_PLACEHOLDER}.manual.com/login`,
-          redirectUri: `https://${TENANT_DOMAIN_PLACEHOLDER}.manual.com/callback`,
+          loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.manual.com/login`,
+          redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.manual.com/callback`,
           customApplicationLoginPageUrl: 'https://manual.com/custom-login',
           isApplicationCustomDomainActive: true,
           parseTenantFromRootDomain: 'manual.com',
@@ -530,7 +488,7 @@ describe('ConfigResolver', () => {
       });
 
       it('should return manual loginUrl', async () => {
-        expect(await resolver.getLoginUrl()).toBe(`https://${TENANT_DOMAIN_PLACEHOLDER}.manual.com/login`);
+        expect(await resolver.getLoginUrl()).toBe(`https://${TENANT_NAME_PLACEHOLDER}.manual.com/login`);
       });
 
       it('should return manual parseTenantFromRootDomain', async () => {
@@ -538,7 +496,7 @@ describe('ConfigResolver', () => {
       });
 
       it('should return manual redirectUri', async () => {
-        expect(await resolver.getRedirectUri()).toBe(`https://${TENANT_DOMAIN_PLACEHOLDER}.manual.com/callback`);
+        expect(await resolver.getRedirectUri()).toBe(`https://${TENANT_NAME_PLACEHOLDER}.manual.com/callback`);
       });
     });
 
@@ -791,10 +749,7 @@ describe('ConfigResolver', () => {
     });
   });
 
-  describe.each([
-    ['tenant_domain', TENANT_DOMAIN_PLACEHOLDER],
-    ['tenant_name', TENANT_NAME_PLACEHOLDER],
-  ])('validateAllDynamicConfigs with %s placeholder', (placeholderName, placeholder) => {
+  describe('validateAllDynamicConfigs', () => {
     let resolver: ConfigResolver;
 
     beforeEach(() => {
@@ -827,7 +782,7 @@ describe('ConfigResolver', () => {
       }).not.toThrow();
     });
 
-    it(`should validate resolved config with parseTenantFromRootDomain requires ${placeholderName}`, () => {
+    it('should validate resolved config with parseTenantFromRootDomain requires tenant_name', () => {
       const manualConfig = { ...validAuthConfig, parseTenantFromRootDomain: 'test.com' };
       resolver = new ConfigResolver(manualConfig);
 
@@ -848,14 +803,14 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate resolved redirectUri with parseTenantFromRootDomain requires ${placeholderName}`, () => {
+    it('should validate resolved redirectUri with parseTenantFromRootDomain requires tenant_name', () => {
       const manualConfig = { ...validAuthConfig, parseTenantFromRootDomain: 'test.com' };
       resolver = new ConfigResolver(manualConfig);
 
       const invalidSdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
-        loginUrl: `https://${placeholder}.test.com/login`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
         redirectUri: 'https://test.com/callback',
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
@@ -869,11 +824,11 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate resolved loginUrl config without parseTenantFromRootDomain rejects ${placeholderName}`, () => {
+    it('should validate resolved loginUrl config without parseTenantFromRootDomain rejects tenant_name', () => {
       const invalidSdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
-        loginUrl: `https://${placeholder}.test.com/login`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
         redirectUri: 'https://test.com/callback',
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
@@ -887,12 +842,12 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should validate resolved redirectUri without parseTenantFromRootDomain rejects ${placeholderName}`, () => {
+    it('should validate resolved redirectUri without parseTenantFromRootDomain rejects tenant_name', () => {
       const invalidSdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
         loginUrl: 'https://test.com/login',
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: null,
@@ -905,15 +860,15 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should pass validation with correct resolved config for manual parseTenantFromRootDomain using ${placeholderName}`, () => {
+    it('should pass validation with correct resolved config for manual parseTenantFromRootDomain using tenant_name', () => {
       const manualConfig = { ...validAuthConfig, parseTenantFromRootDomain: 'test.com' };
       resolver = new ConfigResolver(manualConfig);
 
       const sdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
-        loginUrl: `https://${placeholder}.test.com/login`,
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: 'test.com',
@@ -924,10 +879,10 @@ describe('ConfigResolver', () => {
       }).not.toThrow();
     });
 
-    it(`should use manual config values over SDK config values for validation with ${placeholderName}`, () => {
+    it('should use manual config values over SDK config values for validation with tenant_name', () => {
       const manualConfig = {
         ...validAuthConfig,
-        loginUrl: `https://${placeholder}.manual.com/login`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.manual.com/login`,
         parseTenantFromRootDomain: 'manual.com',
       };
       resolver = new ConfigResolver(manualConfig);
@@ -936,7 +891,7 @@ describe('ConfigResolver', () => {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
         loginUrl: 'https://sdk.com/login', // This would fail validation, but manual takes precedence
-        redirectUri: `https://${placeholder}.sdk.com/callback`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.sdk.com/callback`,
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: 'sdk.com',
@@ -947,7 +902,7 @@ describe('ConfigResolver', () => {
       }).not.toThrow();
     });
 
-    it(`should require resolved fallbackLoginUrl when applicationAuthorizationRequestsEnabled is true and resolved loginUrl has the ${placeholderName} placeholder`, () => {
+    it('should require resolved fallbackLoginUrl when applicationAuthorizationRequestsEnabled is true and resolved loginUrl has the tenant_name placeholder', () => {
       const manualConfig = {
         ...validAuthConfig,
         parseTenantFromRootDomain: 'test.com',
@@ -958,8 +913,8 @@ describe('ConfigResolver', () => {
       const sdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
-        loginUrl: `https://${placeholder}.test.com/login`,
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: 'test.com',
@@ -972,7 +927,7 @@ describe('ConfigResolver', () => {
       );
     });
 
-    it(`should not require resolved fallbackLoginUrl when applicationAuthorizationRequestsEnabled is false, using ${placeholderName}`, () => {
+    it('should not require resolved fallbackLoginUrl when applicationAuthorizationRequestsEnabled is false, using tenant_name', () => {
       const manualConfig = {
         ...validAuthConfig,
         parseTenantFromRootDomain: 'test.com',
@@ -983,8 +938,8 @@ describe('ConfigResolver', () => {
       const sdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
-        loginUrl: `https://${placeholder}.test.com/login`,
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: 'test.com',
@@ -995,15 +950,15 @@ describe('ConfigResolver', () => {
       }).not.toThrow();
     });
 
-    it(`should reject resolved fallbackLoginUrl containing the ${placeholderName} placeholder`, () => {
+    it('should reject resolved fallbackLoginUrl containing the tenant_name placeholder', () => {
       const manualConfig = { ...validAuthConfig, parseTenantFromRootDomain: 'test.com' };
       resolver = new ConfigResolver(manualConfig);
 
       const sdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
-        fallbackLoginUrl: `https://${placeholder}.test.com/fallback`,
-        loginUrl: `https://${placeholder}.test.com/login`,
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        fallbackLoginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/fallback`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: 'test.com',
@@ -1014,7 +969,7 @@ describe('ConfigResolver', () => {
       }).toThrow(`The resolved [fallbackLoginUrl] cannot contain the {tenant_name} placeholder.`);
     });
 
-    it(`should use manual fallbackLoginUrl over SDK fallbackLoginUrl for validation with ${placeholderName}`, () => {
+    it('should use manual fallbackLoginUrl over SDK fallbackLoginUrl for validation with tenant_name', () => {
       const manualConfig = {
         ...validAuthConfig,
         parseTenantFromRootDomain: 'test.com',
@@ -1026,8 +981,8 @@ describe('ConfigResolver', () => {
       const sdkConfig: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null, // Would fail the "must have a value" check, but manual takes precedence
-        loginUrl: `https://${placeholder}.test.com/login`,
-        redirectUri: `https://${placeholder}.test.com/callback`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.test.com/login`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.test.com/callback`,
         customApplicationLoginPageUrl: null,
         isApplicationCustomDomainActive: false,
         loginUrlTenantDomainSuffix: 'test.com',
@@ -1205,8 +1160,8 @@ describe('ConfigResolver', () => {
       const sdkConfigWithTenantSuffix: SdkConfiguration = {
         applicationAuthorizationRequestsEnabled: false,
         fallbackLoginUrl: null,
-        loginUrl: `https://${TENANT_DOMAIN_PLACEHOLDER}.example.com/login`,
-        redirectUri: `https://${TENANT_DOMAIN_PLACEHOLDER}.example.com/callback`,
+        loginUrl: `https://${TENANT_NAME_PLACEHOLDER}.example.com/login`,
+        redirectUri: `https://${TENANT_NAME_PLACEHOLDER}.example.com/callback`,
         customApplicationLoginPageUrl: 'https://example.com/custom-login',
         isApplicationCustomDomainActive: true,
         loginUrlTenantDomainSuffix: 'example.com',

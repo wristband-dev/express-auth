@@ -237,14 +237,11 @@ describe('Multi Tenant Login', () => {
       expect(loginState.returnUrl).toBeUndefined();
     });
 
-    describe.each([
-      ['tenant_domain', '{tenant_domain}'],
-      ['tenant_name', '{tenant_name}'],
-    ])('Tenant Subdomains Configuration with %s placeholder', (placeholderName, placeholder) => {
+    describe('Tenant Subdomains Configuration', () => {
       test('Successful redirect with tenant subdomain', async () => {
         parseTenantFromRootDomain = 'business.invotastic.com';
-        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -295,15 +292,12 @@ describe('Multi Tenant Login', () => {
       });
     });
 
-    describe.each([
-      ['tenant_domain', '{tenant_domain}'],
-      ['tenant_name', '{tenant_name}'],
-    ])('Custom Domains and Tenant Subdomains Configuration with %s placeholder', (placeholderName, placeholder) => {
+    describe('Custom Domains and Tenant Subdomains Configuration', () => {
       test('Successful redirect with custom domain', async () => {
         parseTenantFromRootDomain = 'business.invotastic.com';
         wristbandApplicationVanityDomain = 'auth.invotastic.com';
-        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -1162,15 +1156,12 @@ describe('Multi Tenant Login', () => {
       expect(location).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
     });
 
-    describe.each([
-      ['tenant_domain', '{tenant_domain}'],
-      ['tenant_name', '{tenant_name}'],
-    ])('Redirect to Application-level Login with %s placeholder', (placeholderName, placeholder) => {
+    describe('Redirect to Application-level Login', () => {
       test('Unresolved tenant subdomain', async () => {
         parseTenantFromRootDomain = 'business.invotastic.com';
         wristbandApplicationVanityDomain = 'auth.invotastic.com';
-        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -1207,8 +1198,8 @@ describe('Multi Tenant Login', () => {
       test('Custom application login URL redirect', async () => {
         parseTenantFromRootDomain = 'business.invotastic.com';
         wristbandApplicationVanityDomain = 'auth.invotastic.com';
-        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -1243,8 +1234,8 @@ describe('Multi Tenant Login', () => {
       test('Unresolved tenant subdomain with return_url query param passes state', async () => {
         parseTenantFromRootDomain = 'business.invotastic.com';
         wristbandApplicationVanityDomain = 'auth.invotastic.com';
-        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,
@@ -1278,8 +1269,8 @@ describe('Multi Tenant Login', () => {
       test('Custom application login URL with return URL passes state', async () => {
         parseTenantFromRootDomain = 'business.invotastic.com';
         wristbandApplicationVanityDomain = 'auth.invotastic.com';
-        loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-        redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+        loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+        redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
 
         wristbandAuth = createWristbandAuth({
           clientId: CLIENT_ID,

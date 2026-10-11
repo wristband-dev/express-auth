@@ -423,10 +423,7 @@ describe('Callback Errors', () => {
     }
   });
 
-  describe.each([
-    ['tenant_domain', '{tenant_domain}'],
-    ['tenant_name', '{tenant_name}'],
-  ])('Redirect to Application-level Login with %s placeholder', (placeholderName, placeholder) => {
+  describe('Redirect to Application-level Login', () => {
     test('Missing login state cookie, without subdomains, without tenant name query param', async () => {
       const parseTenantFromRootDomain = 'business.invotastic.com';
       const loginUrl = `https://${parseTenantFromRootDomain}/api/auth/login`;
@@ -460,10 +457,10 @@ describe('Callback Errors', () => {
       }
     });
 
-    test(`Missing login state cookie, with subdomains using ${placeholderName}, and without URL subdomain`, async () => {
+    test('Missing login state cookie, with subdomains using tenant_name, and without URL subdomain', async () => {
       const parseTenantFromRootDomain = 'business.invotastic.com';
-      const loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-      const redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
+      const loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+      const redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
       const wristbandApplicationVanityDomain = 'invotasticb2b-invotastic.dev.wristband.dev';
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,

@@ -21,37 +21,35 @@ describe('Logout - App-Level Authorization Requests', () => {
   });
 
   describe('Tenant subdomain configuration (loginUrl contains a placeholder)', () => {
-    describe.each([['{tenant_domain}'], ['{tenant_name}']])('with %s placeholder', (placeholder) => {
-      test('Falls back to fallbackLoginUrl when tenant cannot be resolved', async () => {
-        const parseTenantFromRootDomain = 'business.invotastic.com';
-        const wristbandApplicationVanityDomain = 'auth.invotastic.com';
-        const loginUrl = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/login`;
-        const redirectUri = `https://${placeholder}.${parseTenantFromRootDomain}/api/auth/callback`;
-        const fallbackLoginUrl = 'https://fallback.invotastic.com/login';
+    test('Falls back to fallbackLoginUrl when tenant cannot be resolved', async () => {
+      const parseTenantFromRootDomain = 'business.invotastic.com';
+      const wristbandApplicationVanityDomain = 'auth.invotastic.com';
+      const loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
+      const redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
+      const fallbackLoginUrl = 'https://fallback.invotastic.com/login';
 
-        wristbandAuth = createWristbandAuth({
-          clientId: CLIENT_ID,
-          clientSecret: CLIENT_SECRET,
-          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
-          loginUrl,
-          redirectUri,
-          parseTenantFromRootDomain,
-          wristbandApplicationVanityDomain,
-          applicationAuthorizationRequestsEnabled: true,
-          fallbackLoginUrl,
-          autoConfigureEnabled: false,
-        });
-
-        // No subdomain present on the host, so tenant cannot be resolved
-        const mockExpressReq = httpMocks.createRequest({
-          headers: { host: parseTenantFromRootDomain },
-        }) as any;
-        const mockExpressRes = httpMocks.createResponse() as any;
-
-        const logoutUrl = await wristbandAuth.logout(mockExpressReq, mockExpressRes);
-
-        expect(logoutUrl).toBe(fallbackLoginUrl);
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        parseTenantFromRootDomain,
+        wristbandApplicationVanityDomain,
+        applicationAuthorizationRequestsEnabled: true,
+        fallbackLoginUrl,
+        autoConfigureEnabled: false,
       });
+
+      // No subdomain present on the host, so tenant cannot be resolved
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      const logoutUrl = await wristbandAuth.logout(mockExpressReq, mockExpressRes);
+
+      expect(logoutUrl).toBe(fallbackLoginUrl);
     });
   });
 
