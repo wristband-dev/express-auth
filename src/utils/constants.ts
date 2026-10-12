@@ -11,5 +11,6 @@ export const API_RETRY_DELAY_MS: number = 100;
 export const API_RETRY_DELAY_MULTIPLIER: number = 2;
 export const TENANT_NAME_PLACEHOLDER: string = '{tenant_name}';
 // Regex to match either placeholder
+export const LEADING_TENANT_PLACEHOLDER_REGEX = /^https?:\/\/\{tenant_name\}\./;
 export const TENANT_PLACEHOLDER_REGEX = /\{tenant_name\}/;
 export const TENANT_PLACEHOLDER_MSG = '"{tenant_name}" placeholder';

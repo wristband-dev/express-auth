@@ -33,10 +33,8 @@ describe('Callback - App-Level Authorization Requests', () => {
       loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
       loginUrl,
       redirectUri,
-      parseTenantFromRootDomain,
       wristbandApplicationVanityDomain,
       applicationAuthorizationRequestsEnabled: true,
-      fallbackLoginUrl: `https://${wristbandApplicationVanityDomain}/login`,
       autoConfigureEnabled: false,
     });
 
@@ -80,10 +78,8 @@ describe('Callback - App-Level Authorization Requests', () => {
       loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
       loginUrl,
       redirectUri,
-      parseTenantFromRootDomain,
       wristbandApplicationVanityDomain,
       applicationAuthorizationRequestsEnabled: true,
-      fallbackLoginUrl: `https://${wristbandApplicationVanityDomain}/login`,
       autoConfigureEnabled: false,
     });
 
@@ -211,7 +207,6 @@ describe('Callback - App-Level Authorization Requests', () => {
       loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
       loginUrl,
       redirectUri,
-      parseTenantFromRootDomain,
       isApplicationCustomDomainActive: true,
       wristbandApplicationVanityDomain,
       autoConfigureEnabled: false,
@@ -256,10 +251,8 @@ describe('Callback - App-Level Authorization Requests', () => {
       loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
       loginUrl,
       redirectUri,
-      parseTenantFromRootDomain,
       wristbandApplicationVanityDomain,
       applicationAuthorizationRequestsEnabled: true,
-      fallbackLoginUrl: `https://${wristbandApplicationVanityDomain}/login`,
       autoConfigureEnabled: false,
     });
 

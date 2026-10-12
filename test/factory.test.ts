@@ -7,7 +7,6 @@ const CLIENT_SECRET = 'clientSecret';
 const LOGIN_STATE_COOKIE_SECRET = '7ffdbecc-ab7d-4134-9307-2dfcc52f7475';
 const LOGIN_URL = 'http://localhost:6001/api/auth/login';
 const REDIRECT_URI = 'http://localhost:6001/api/auth/callback';
-const ROOT_DOMAIN = 'business.invotastic.com';
 const WRISTBAND_APPLICATION_DOMAIN = 'invotasticb2b-invotastic.dev.wristband.dev';
 const SDK_CONFIG_ENDPOINT = `https://${WRISTBAND_APPLICATION_DOMAIN}/api/v1/clients/${CLIENT_ID}/sdk-configuration`;
 
@@ -117,7 +116,6 @@ describe('createWristbandAuth Instantiation Errors', () => {
           loginUrl: LOGIN_URL,
           redirectUri: getRedirectUriWithPlaceholder(TENANT_NAME_PLACEHOLDER),
           wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
-          parseTenantFromRootDomain: ROOT_DOMAIN,
           autoConfigureEnabled: false,
         });
       }).toThrow(TypeError);
@@ -132,7 +130,6 @@ describe('createWristbandAuth Instantiation Errors', () => {
           loginUrl: getLoginUrlWithPlaceholder(TENANT_NAME_PLACEHOLDER),
           redirectUri: REDIRECT_URI,
           wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
-          parseTenantFromRootDomain: ROOT_DOMAIN,
           autoConfigureEnabled: false,
         });
       }).toThrow(TypeError);
@@ -232,7 +229,7 @@ describe('discoverWristbandAuth', () => {
     expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
-  test('Discovery fails with partial manual config override', async () => {
+  test('Discovery succeeds when manual URL overrides take precedence over the SDK tenant domain suffix', async () => {
     const mockSdkConfig = {
       customApplicationLoginPageUrl: 'https://sdk-login.example.com',
       isApplicationCustomDomainActive: true,
@@ -242,6 +239,8 @@ describe('discoverWristbandAuth', () => {
     };
     mockFetchSdkConfig([{ status: 200, body: mockSdkConfig }]);
 
+    // The manual loginUrl has no {tenant_name} placeholder, so the SDK derives no tenant root domain from it
+    // and the SDK's loginUrlTenantDomainSuffix is not used.
     await expect(
       discoverWristbandAuth({
         clientId: CLIENT_ID,
@@ -251,7 +250,7 @@ describe('discoverWristbandAuth', () => {
         redirectUri: REDIRECT_URI, // Manual override
         wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
       })
-    ).rejects.toThrow();
+    ).resolves.toBeDefined();
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });

@@ -26,7 +26,6 @@ describe('Logout - App-Level Authorization Requests', () => {
       const wristbandApplicationVanityDomain = 'auth.invotastic.com';
       const loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
       const redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
-      const fallbackLoginUrl = 'https://fallback.invotastic.com/login';
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -34,10 +33,8 @@ describe('Logout - App-Level Authorization Requests', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
         applicationAuthorizationRequestsEnabled: true,
-        fallbackLoginUrl,
         autoConfigureEnabled: false,
       });
 
@@ -49,7 +46,8 @@ describe('Logout - App-Level Authorization Requests', () => {
 
       const logoutUrl = await wristbandAuth.logout(mockExpressReq, mockExpressRes);
 
-      expect(logoutUrl).toBe(fallbackLoginUrl);
+      // fallbackLoginUrl is derived from loginUrl by removing the {tenant_name} placeholder
+      expect(logoutUrl).toBe(`https://${parseTenantFromRootDomain}/api/auth/login`);
     });
   });
 
@@ -87,7 +85,6 @@ describe('Logout - App-Level Authorization Requests', () => {
       const wristbandApplicationVanityDomain = 'auth.invotastic.com';
       const loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
       const redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
-      const fallbackLoginUrl = 'https://fallback.invotastic.com/login';
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -95,10 +92,8 @@ describe('Logout - App-Level Authorization Requests', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
         applicationAuthorizationRequestsEnabled: true,
-        fallbackLoginUrl,
         autoConfigureEnabled: false,
       });
 
@@ -119,7 +114,6 @@ describe('Logout - App-Level Authorization Requests', () => {
       const wristbandApplicationVanityDomain = 'auth.invotastic.com';
       const loginUrl = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/login`;
       const redirectUri = `https://{tenant_name}.${parseTenantFromRootDomain}/api/auth/callback`;
-      const fallbackLoginUrl = 'https://fallback.invotastic.com/login';
 
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -127,10 +121,8 @@ describe('Logout - App-Level Authorization Requests', () => {
         loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
         loginUrl,
         redirectUri,
-        parseTenantFromRootDomain,
         wristbandApplicationVanityDomain,
         applicationAuthorizationRequestsEnabled: true,
-        fallbackLoginUrl,
         autoConfigureEnabled: false,
       });
 
