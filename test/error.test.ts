@@ -1,4 +1,5 @@
 import { WristbandError, InvalidGrantError, FetchError } from '../src/error';
+import { CryptoError } from '../src/error/crypto-error';
 
 describe('Error Classes', () => {
   describe('WristbandError', () => {
@@ -231,9 +232,11 @@ describe('Error Classes', () => {
       const mockResponse = new Response(null, { status: 400 });
       const body = { error: 'invalid_grant', error_description: 'The authorization code has expired' };
       const error = new FetchError(mockResponse, body);
+      const errorBody = error.body as { error: string; error_description: string };
 
-      expect(error.body.error).toBe('invalid_grant');
-      expect(error.body.error_description).toBe('The authorization code has expired');
+      expect(error.body).toBeDefined();
+      expect(errorBody.error).toBe('invalid_grant');
+      expect(errorBody.error_description).toBe('The authorization code has expired');
     });
 
     test('Response status is accessible via response property', () => {
@@ -241,6 +244,142 @@ describe('Error Classes', () => {
       const error = new FetchError(mockResponse, { error: 'unauthorized' });
 
       expect(error.response?.status).toBe(401);
+    });
+  });
+
+  describe('CryptoError', () => {
+    test('Creates error with code and message', () => {
+      const error = new CryptoError('DECRYPTION_FAILED', 'Decryption failed');
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(CryptoError);
+      expect(error.name).toBe('CryptoError');
+      expect(error.code).toBe('DECRYPTION_FAILED');
+      expect(error.message).toBe('Decryption failed');
+    });
+
+    test('Uses code as message when message not provided', () => {
+      const error = new CryptoError('INVALID_SECRET');
+
+      expect(error.message).toBe('INVALID_SECRET');
+    });
+
+    test('Creates error without cause', () => {
+      const error = new CryptoError('ENCRYPTION_FAILED', 'Encryption failed');
+
+      expect(error.cause).toBeUndefined();
+    });
+
+    test('Creates error with Error cause', () => {
+      const cause = new Error('Underlying error');
+      const error = new CryptoError('DECRYPTION_FAILED', 'Decryption failed', cause);
+
+      expect(error.cause).toBe(cause);
+      expect(error.cause?.message).toBe('Underlying error');
+    });
+
+    test('Preserves stack trace', () => {
+      const error = new CryptoError('EXPIRED', 'Cookie has expired');
+
+      expect(error.stack).toBeDefined();
+      expect(error.stack).toContain('CryptoError');
+    });
+
+    test('Supports every error code', () => {
+      const codes = [
+        'INVALID_SECRET',
+        'INVALID_SECRETS_LIST',
+        'INVALID_MAX_AGE',
+        'DATA_TOO_LARGE',
+        'MALFORMED_DATA',
+        'UNSUPPORTED_VERSION',
+        'EXPIRED',
+        'AUTH_FAILED',
+        'DECRYPTION_FAILED',
+        'ENCRYPTION_FAILED',
+        'NODE_CRYPTO_UNAVAILABLE',
+      ] as const;
+
+      codes.forEach((code) => {
+        const error = new CryptoError(code, 'Test message');
+        expect(error.code).toBe(code);
+      });
+    });
+
+    test('Preserves Error subclass cause as-is', () => {
+      const cause = new TypeError('Type error');
+      const error = new CryptoError('DECRYPTION_FAILED', 'Failed', cause);
+
+      expect(error.cause).toBe(cause);
+      expect(error.cause).toBeInstanceOf(TypeError);
+    });
+
+    test('Wraps string cause in Error', () => {
+      const error = new CryptoError('AUTH_FAILED', 'Auth failed', 'Invalid signature');
+
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(error.cause?.message).toBe('Invalid signature');
+    });
+
+    test('Wraps number cause in Error', () => {
+      const error = new CryptoError('DECRYPTION_FAILED', 'Failed', 404);
+
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(error.cause?.message).toBe('404');
+    });
+
+    test('Wraps object cause in Error', () => {
+      const error = new CryptoError('ENCRYPTION_FAILED', 'Failed', { detail: 'Some detail' });
+
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(error.cause?.message).toContain('object');
+    });
+
+    test('Ignores null cause', () => {
+      const error = new CryptoError('EXPIRED', 'Expired', null);
+
+      expect(error.cause).toBeUndefined();
+    });
+
+    test('Ignores undefined cause', () => {
+      const error = new CryptoError('EXPIRED', 'Expired', undefined);
+
+      expect(error.cause).toBeUndefined();
+    });
+
+    test('Error can be thrown and caught', () => {
+      expect(() => {
+        throw new CryptoError('AUTH_FAILED', 'Failed to decrypt data');
+      }).toThrow(CryptoError);
+    });
+
+    test('Error has correct prototype chain', () => {
+      const error = new CryptoError('DECRYPTION_FAILED', 'Failed');
+
+      expect(error instanceof CryptoError).toBe(true);
+      expect(error instanceof Error).toBe(true);
+    });
+
+    test('Error is not a WristbandError', () => {
+      const error = new CryptoError('DECRYPTION_FAILED', 'Failed');
+
+      expect(error instanceof WristbandError).toBe(false);
+    });
+
+    test('Creates error when Error.captureStackTrace is unavailable (non-V8 engines)', () => {
+      const originalCaptureStackTrace = Error.captureStackTrace;
+      // Simulate a non-V8 engine where Error.captureStackTrace does not exist
+      (Error as any).captureStackTrace = undefined;
+
+      try {
+        const error = new CryptoError('EXPIRED', 'Cookie has expired');
+
+        expect(error).toBeInstanceOf(CryptoError);
+        expect(error.code).toBe('EXPIRED');
+        expect(error.message).toBe('Cookie has expired');
+      } finally {
+        Error.captureStackTrace = originalCaptureStackTrace;
+      }
     });
   });
 });

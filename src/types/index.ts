@@ -41,7 +41,7 @@ export type AuthConfig = {
 /**
  * Represents the configuration for login.
  * @typedef {Object} LoginConfig
- * @property {Object.<string, any>} [customState] Custom state data for the login request.
+ * @property {Record<string, unknown>} [customState] Custom state data for the login request.
  * @property {string} [defaultTenantCustomDomain] An optional default tenant custom domain to use for the login request in the
  * event the tenant custom domain cannot be found in the "tenant_custom_domain" request query parameter.
  * @property {string} [defaultTenantName] An optional default tenant name to use for the login request in the
@@ -50,11 +50,7 @@ export type AuthConfig = {
  * @property {string} [returnUrl] The URL to return to after authentication is completed. If a value is provided, then it takes precence over the `return_url` request query parameter.
  */
 export type LoginConfig = {
-  // TODO: customState is typed `any` for consumer flexibility. Tightening to Record<string, unknown>
-  // would change consumer-side type-checking behavior (any allows unchecked property access, unknown
-  // does not), so this is deferred to the next major version alongside the iron-webcrypto v2 upgrade.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  customState?: { [key: string]: any };
+  customState?: Record<string, unknown>;
   defaultTenantCustomDomain?: string;
   defaultTenantName?: string;
   returnUrl?: string;
@@ -237,25 +233,20 @@ export interface UserInfo {
 
   // Custom claims
   /** Object containing any configured custom claims */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  customClaims?: Record<string, any>;
+  customClaims?: Record<string, unknown>;
 }
 
 /**
  * Represents the callback data received after authentication.
  * @typedef {TokenData} CallbackData
- * @property {Object.<string, any>} [customState] Custom state data received in the callback.
+ * @property {Record<string, unknown>} [customState] Custom state data received in the callback.
  * @property {string} [returnUrl] The URL to return to after authentication.
  * @property {string} [tenantCustomDomain] The tenant custom domain for the tenant that the user belongs to.
  * @property {string} [tenantName] The name of the tenant the user belongs to.
  * @property {UserInfo} userinfo User information received in the callback.
  */
 export type CallbackData = TokenData & {
-  // TODO: customState is typed `any` for consumer flexibility. Tightening to Record<string, unknown>
-  // would change consumer-side type-checking behavior, deferred to the next major version alongside
-  // the iron-webcrypto v2 upgrade.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  customState?: { [key: string]: any };
+  customState?: Record<string, unknown>;
   returnUrl?: string;
   tenantCustomDomain?: string;
   tenantName: string;
@@ -367,6 +358,45 @@ export interface AuthMiddlewareConfig {
 // ====================================================== //
 
 /**
+ * Error codes for CookieCrypto operations.
+ *
+ * Provides structured identifiers for cryptographic failures without
+ * exposing sensitive internal implementation details.
+ */
+export type CryptoErrorCode =
+  // --- Input validation ---
+  /** The provided secret is missing, too short, or invalid. */
+  | 'INVALID_SECRET'
+  /** The provided list of secrets is not an array, empty, or contains too many items. */
+  | 'INVALID_SECRETS_LIST'
+  /** The maxAge value is not a positive number or is otherwise invalid. */
+  | 'INVALID_MAX_AGE'
+
+  // --- Cookie structural errors ---
+  /** The data or encrypted cookie exceeds the maximum allowed size (4KB). */
+  | 'DATA_TOO_LARGE'
+  /** The encrypted cookie is malformed or cannot be parsed correctly. */
+  | 'MALFORMED_DATA'
+  /** The encrypted cookie version is unsupported by this SDK version. */
+  | 'UNSUPPORTED_VERSION'
+
+  // --- TTL / authentication errors ---
+  /** The encrypted data has expired based on the embedded timestamp and maxAge. */
+  | 'EXPIRED'
+  /** Authentication failed (e.g., data tampering detected, wrong secret). */
+  | 'AUTH_FAILED'
+
+  // --- Crypto operation failures ---
+  /** Decryption failed due to an internal cryptographic error. */
+  | 'DECRYPTION_FAILED'
+  /** Encryption failed due to an internal cryptographic error. */
+  | 'ENCRYPTION_FAILED'
+
+  // --- Node.js specific ---
+  /** Node.js crypto module is required but unavailable (sync methods). */
+  | 'NODE_CRYPTO_UNAVAILABLE';
+
+/**
  * Configuration object containing URLs and settings discovered from the Wristband SDK Configuration Endpoint.
  * These values are typically auto-configured by calling the Wristband API, but can also be manually provided
  * to override auto-discovered settings.
@@ -402,7 +432,7 @@ export type ValidateTenantCustomDomainResponse = {
  * Represents all possible state for the current login request, which is stored in the login state cookie.
  * @typedef {Object} LoginState
  * @property {string} codeVerifier The code verifier for PKCE.
- * @property {Object.<string, any>} [customState] Custom state data for the login state.
+ * @property {Record<string, unknown>} [customState] Custom state data for the login state.
  * @property {string} redirectUri The redirect URI for callback after authentication.
  * @property {string} [returnUrl] The URL to return to after authentication.
  * @property {string} state The state of the login process.
@@ -418,7 +448,7 @@ export type LoginState = {
 /**
  * Represents the configuration for the map which is stored in login state cookie.
  * @typedef {Object} LoginStateMapConfig
- * @property {Object.<string, any>} [customState] Custom state data for the login state map.
+ * @property {Record<string, unknown>} [customState] Custom state data for the login state map.
  * @property {string} [returnUrl] The URL to return to after authentication.
  */
 export type LoginStateMapConfig = {

@@ -1,10 +1,10 @@
 /* eslint-disable import/no-extraneous-dependencies */
 
+import { createHash } from 'crypto';
 import httpMocks from 'node-mocks-http';
 import {
   parseTenantSubdomain,
   generateRandomString,
-  base64URLEncode,
   encryptLoginState,
   decryptLoginState,
   getLoginStateCookie,
@@ -14,7 +14,6 @@ import {
   createLoginState,
   clearOldestLoginStateCookie,
   createLoginStateCookie,
-  encodeBase64,
   getAuthorizationUrlParams,
   getTenantLevelAuthorizationUrl,
   getAppLevelLoginUrl,
@@ -25,6 +24,8 @@ import {
   deriveTenantRootDomain,
   isTenantPlaceholderPositionValid,
 } from '../../src/utils';
+import { CookieCrypto } from '../../src/utils/crypto';
+import { CryptoError } from '../../src/error/crypto-error';
 import { LoginState, LoginStateMapConfig } from '../../src/types';
 import { STATE_PARAM_MAX_CHAR_LENGTH } from '../../src/utils/constants';
 
@@ -165,28 +166,6 @@ describe('Auth Utils', () => {
     });
   });
 
-  describe('base64URLEncode', () => {
-    test('Replaces URL-unsafe characters', () => {
-      const input = 'hello+world/test=';
-      const result = base64URLEncode(input);
-
-      expect(result).toBe('hello-world_test');
-    });
-
-    test('Leaves safe characters unchanged', () => {
-      const input = 'abcABC123_-';
-      const result = base64URLEncode(input);
-
-      expect(result).toBe('abcABC123_-');
-    });
-
-    test('Handles empty string', () => {
-      const result = base64URLEncode('');
-
-      expect(result).toBe('');
-    });
-  });
-
   describe('encryptLoginState and decryptLoginState', () => {
     const loginStateSecret = '12345678901234567890123456789012'; // 32 chars
 
@@ -259,6 +238,93 @@ describe('Auth Utils', () => {
       await expect(encryptLoginState(loginState, loginStateSecret)).rejects.toThrow(
         'Login state cookie exceeds 4kB in size'
       );
+    });
+
+    test('Throws TypeError when customState is not JSON-serializable', async () => {
+      const loginState: LoginState = {
+        state: 'test-state',
+        codeVerifier: 'test-verifier',
+        redirectUri: 'https://example.com/callback',
+        customState: { id: BigInt(1) },
+      };
+
+      await expect(encryptLoginState(loginState, loginStateSecret)).rejects.toThrow(TypeError);
+      await expect(encryptLoginState(loginState, loginStateSecret)).rejects.toThrow(
+        'The [customState] value must be JSON-serializable.'
+      );
+    });
+
+    test('Passes through other crypto errors from encryption unchanged', async () => {
+      const loginState: LoginState = {
+        state: 'test-state',
+        codeVerifier: 'test-verifier',
+        redirectUri: 'https://example.com/callback',
+      };
+
+      await expect(encryptLoginState(loginState, 'too-short-secret')).rejects.toThrow(CryptoError);
+      await expect(encryptLoginState(loginState, 'too-short-secret')).rejects.toMatchObject({
+        code: 'INVALID_SECRET',
+      });
+    });
+
+    test('Returns null when decrypting with the wrong secret', async () => {
+      const loginState: LoginState = {
+        state: 'test-state',
+        codeVerifier: 'test-verifier',
+        redirectUri: 'https://example.com/callback',
+      };
+      const encrypted = await encryptLoginState(loginState, loginStateSecret);
+
+      await expect(decryptLoginState(encrypted, 'x'.repeat(32))).resolves.toBeNull();
+    });
+
+    test('Decrypts a login state cookie that is still within its 1 hour max age', async () => {
+      const loginState: LoginState = {
+        state: 'test-state',
+        codeVerifier: 'test-verifier',
+        redirectUri: 'https://example.com/callback',
+      };
+      const startTime = Date.now();
+      const encrypted = await encryptLoginState(loginState, loginStateSecret);
+
+      jest.spyOn(Date, 'now').mockReturnValue(startTime + 3600 * 1000);
+      try {
+        await expect(decryptLoginState(encrypted, loginStateSecret)).resolves.toEqual(loginState);
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+
+    test('Returns null when the login state cookie is older than its 1 hour max age', async () => {
+      const loginState: LoginState = {
+        state: 'test-state',
+        codeVerifier: 'test-verifier',
+        redirectUri: 'https://example.com/callback',
+      };
+      const startTime = Date.now();
+      const encrypted = await encryptLoginState(loginState, loginStateSecret);
+
+      // 1 hour max age plus the 60-second clock skew tolerance, plus 1 second
+      jest.spyOn(Date, 'now').mockReturnValue(startTime + (3600 + 60 + 1) * 1000);
+      try {
+        await expect(decryptLoginState(encrypted, loginStateSecret)).resolves.toBeNull();
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+
+    test('Returns null when the login state cookie is malformed', async () => {
+      await expect(decryptLoginState('not-a-valid-cookie', loginStateSecret)).resolves.toBeNull();
+    });
+
+    test('Rethrows non-crypto errors from decryption unchanged', async () => {
+      const unexpectedError = new Error('Unexpected failure');
+      jest.spyOn(CookieCrypto, 'decrypt').mockRejectedValue(unexpectedError);
+      try {
+        await expect(decryptLoginState('any-cookie-value', loginStateSecret)).rejects.toBe(unexpectedError);
+      } finally {
+        jest.restoreAllMocks();
+      }
     });
   });
 
@@ -937,6 +1003,17 @@ describe('Auth Utils', () => {
       }).toThrow('More than one [idp_hint] query parameter was encountered');
     });
 
+    test('Uses the base64url-encoded SHA-256 hash of the code verifier as the code_challenge', () => {
+      const req = httpMocks.createRequest() as any;
+      const result = getAuthorizationUrlParams(req, baseParamsConfig);
+
+      // The SHA-256 hash of "test-code-verifier" contains "/" and "=" in standard base64,
+      // so this also confirms the URL-safe alphabet without padding is used.
+      const expectedChallenge = createHash('sha256').update(baseParamsConfig.codeVerifier).digest('base64url');
+      expect(result.get('code_challenge')).toBe(expectedChallenge);
+      expect(result.get('code_challenge')).not.toMatch(/[+/=]/);
+    });
+
     test('Generates different code_challenge and nonce on multiple calls', () => {
       const req = httpMocks.createRequest() as any;
       const result1 = getAuthorizationUrlParams(req, { ...baseParamsConfig, codeVerifier: 'verifier-1' });
@@ -1167,26 +1244,6 @@ describe('Auth Utils', () => {
       const result = isExpired(0);
 
       expect(result).toBe(true);
-    });
-  });
-
-  describe('encodeBase64', () => {
-    test('Encodes a simple ASCII string', () => {
-      expect(encodeBase64('hello')).toBe(btoa('hello'));
-    });
-
-    test('Encodes clientId:clientSecret format correctly', () => {
-      const input = 'myClientId:myClientSecret';
-      expect(encodeBase64(input)).toBe(btoa(input));
-    });
-
-    test('Encodes empty string', () => {
-      expect(encodeBase64('')).toBe('');
-    });
-
-    test('Produces valid base64 output', () => {
-      const result = encodeBase64('test-input');
-      expect(result).toMatch(/^[A-Za-z0-9+/]+=*$/);
     });
   });
 

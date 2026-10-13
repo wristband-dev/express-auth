@@ -259,7 +259,10 @@ export class AuthService {
     clearCookie(res, cookieName, dangerouslyDisableSecureCookies, cookieDomain);
 
     // Extract the login state from the cookie.
-    const loginState: LoginState = await decryptLoginState(loginStateCookie, loginStateSecret);
+    const loginState: LoginState | null = await decryptLoginState(loginStateCookie, loginStateSecret);
+    if (!loginState) {
+      return { type: 'redirect_required', redirectUrl: tenantLoginUrl, reason: 'invalid_login_state' };
+    }
     const { codeVerifier, customState, redirectUri, returnUrl, state: cookieState } = loginState;
 
     // Check for any potential error conditions

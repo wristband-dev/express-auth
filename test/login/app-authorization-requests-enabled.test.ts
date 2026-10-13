@@ -141,7 +141,7 @@ describe('Login - App-Level Authorization Requests', () => {
       expect(loginCookie.attributes.maxAge).toBe(3600);
       expect(loginCookie.attributes.secure).toBe(true);
 
-      const loginState: LoginState = await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET);
+      const loginState = (await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET)) as LoginState;
       expect(loginState.state).toEqual(keyParts[1]);
       expect(searchParams.get('state')).toEqual(keyParts[1]);
     });

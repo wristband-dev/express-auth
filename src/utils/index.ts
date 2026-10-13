@@ -1,29 +1,21 @@
 import { createHash, randomBytes } from 'crypto';
 import { Request, Response } from 'express';
-import { defaults, seal, unseal } from 'iron-webcrypto';
-import * as crypto from 'uncrypto';
+import { CookieCrypto } from './crypto';
+import { CryptoError } from '../error/crypto-error';
 
 import {
   LEADING_TENANT_PLACEHOLDER_REGEX,
+  LOGIN_STATE_COOKIE_MAX_AGE_SEC,
   LOGIN_STATE_COOKIE_PREFIX,
   LOGIN_STATE_COOKIE_SEPARATOR,
   STATE_PARAM_MAX_CHAR_LENGTH,
   TENANT_NAME_PLACEHOLDER,
   TENANT_PLACEHOLDER_REGEX,
 } from './constants';
-import { LoginConfig, LoginState, LoginStateMapConfig } from '../types';
+import { Base64 } from './base64';
 import { clearCookie, parseCookies, setCookie } from './cookies';
 import { WristbandError } from '../error';
-
-export function encodeBase64(input: string) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  let binary = '';
-  data.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary);
-}
+import { LoginConfig, LoginState, LoginStateMapConfig } from '../types';
 
 export function parseTenantSubdomain(req: Request, parseTenantFromRootDomain: string): string {
   const { host } = req.headers;
@@ -42,30 +34,44 @@ export function parseTenantSubdomain(req: Request, parseTenantFromRootDomain: st
 }
 
 export function generateRandomString(length: number): string {
-  return randomBytes(length).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-export function base64URLEncode(str: string): string {
-  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return Base64.urlEncode(randomBytes(length));
 }
 
 export async function encryptLoginState(loginState: LoginState, loginStateSecret: string): Promise<string> {
-  // @ts-expect-error - TODO: use our own encryption lib
-  const encryptedLoginState: string = await seal(crypto, loginState, loginStateSecret, defaults);
-
-  if (encryptedLoginState.length > 4096) {
-    throw new TypeError(
-      'Login state cookie exceeds 4kB in size. Ensure your [customState] and [returnUrl] values are a reasonable size.'
-    );
+  try {
+    return await CookieCrypto.encrypt(loginState, loginStateSecret);
+  } catch (error) {
+    if (error instanceof CryptoError && error.code === 'DATA_TOO_LARGE') {
+      throw new TypeError(
+        'Login state cookie exceeds 4kB in size. Ensure your [customState] and [returnUrl] values are a reasonable size.'
+      );
+    }
+    if (
+      error instanceof CryptoError &&
+      error.code === 'ENCRYPTION_FAILED' &&
+      error.message === 'Data must be JSON-serializable'
+    ) {
+      throw new TypeError('The [customState] value must be JSON-serializable.');
+    }
+    throw error;
   }
-
-  return encryptedLoginState;
 }
 
-export async function decryptLoginState(loginStateCookie: string, loginStateSecret: string): Promise<LoginState> {
-  // @ts-expect-error - TODO: use our own encryption lib
-  const loginState: unknown = await unseal(crypto, loginStateCookie, loginStateSecret, defaults);
-  return loginState as LoginState;
+export async function decryptLoginState(
+  loginStateCookie: string,
+  loginStateSecret: string
+): Promise<LoginState | null> {
+  try {
+    // The max age matches the login state cookie's Max-Age (1 hour)
+    return await CookieCrypto.decrypt(loginStateCookie, loginStateSecret, LOGIN_STATE_COOKIE_MAX_AGE_SEC);
+  } catch (error) {
+    // Any crypto failure (tampered, expired, malformed, legacy format, or encrypted with a different secret)
+    // means the cookie can't be trusted. Return null so the callback can redirect to login instead of failing.
+    if (error instanceof CryptoError) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export function getLoginStateCookie(req: Request): { cookieName: string; loginStateCookie: string } {
@@ -236,7 +242,7 @@ export function getAuthorizationUrlParams(
     response_type: 'code',
     state: config.state,
     scope: config.scopes.join(' '),
-    code_challenge: base64URLEncode(createHash('sha256').update(config.codeVerifier).digest('base64')),
+    code_challenge: Base64.urlEncode(createHash('sha256').update(config.codeVerifier).digest()),
     code_challenge_method: 'S256',
     nonce: generateRandomString(32),
     ...(!!idpHint && typeof idpHint === 'string' ? { idp_hint: idpHint } : {}),

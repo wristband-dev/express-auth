@@ -261,6 +261,96 @@ describe('Callback Errors', () => {
     expect(result.callbackData).toBeUndefined();
   });
 
+  test('Undecryptable login state cookie returns redirect_required with invalid_login_state reason', async () => {
+    const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now()}`;
+
+    const mockExpressReq = httpMocks.createRequest({
+      query: {
+        state: 'teststate',
+        code: 'testcode',
+        tenant_name: 'tenant1',
+      },
+      headers: {
+        cookie: `${cookieKey}=not-a-valid-cookie`,
+      },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+
+    expect(result.type).toBe('redirect_required');
+    expect(result.reason).toBe('invalid_login_state');
+    expect(result.redirectUrl).toBe(`${LOGIN_URL}?tenant_name=tenant1`);
+    expect(result.callbackData).toBeUndefined();
+
+    // The bad cookie is still cleared before redirecting
+    const clearedCookieHeader = mockExpressRes._getHeaders()['set-cookie'] as string;
+    expect(clearedCookieHeader).toContain(`${cookieKey}=;`);
+    expect(clearedCookieHeader).toContain('Max-Age=0');
+  });
+
+  test('Login state cookie encrypted with a different secret returns redirect_required with invalid_login_state reason', async () => {
+    const loginState: LoginState = {
+      codeVerifier: 'verifier123',
+      redirectUri: REDIRECT_URI,
+      state: 'teststate',
+    };
+    const encryptedLoginState = await encryptLoginState(loginState, 'a-different-secret-that-is-32-chars-or-more');
+    const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now()}`;
+
+    const mockExpressReq = httpMocks.createRequest({
+      query: {
+        state: 'teststate',
+        code: 'testcode',
+        tenant_name: 'tenant1',
+      },
+      headers: {
+        cookie: `${cookieKey}=${encodeURIComponent(encryptedLoginState)}`,
+      },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+
+    expect(result.type).toBe('redirect_required');
+    expect(result.reason).toBe('invalid_login_state');
+    expect(result.redirectUrl).toBe(`${LOGIN_URL}?tenant_name=tenant1`);
+    expect(result.callbackData).toBeUndefined();
+  });
+
+  test('Expired login state cookie returns redirect_required with invalid_login_state reason', async () => {
+    const loginState: LoginState = {
+      codeVerifier: 'verifier123',
+      redirectUri: REDIRECT_URI,
+      state: 'teststate',
+    };
+    const startTime = Date.now();
+    const encryptedLoginState = await encryptLoginState(loginState, LOGIN_STATE_COOKIE_SECRET);
+    const cookieKey = `login${LOGIN_STATE_COOKIE_SEPARATOR}teststate${LOGIN_STATE_COOKIE_SEPARATOR}${startTime}`;
+
+    const mockExpressReq = httpMocks.createRequest({
+      query: {
+        state: 'teststate',
+        code: 'testcode',
+        tenant_name: 'tenant1',
+      },
+      headers: {
+        cookie: `${cookieKey}=${encodeURIComponent(encryptedLoginState)}`,
+      },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    // 1 hour max age plus the 60-second clock skew tolerance, plus 1 second
+    jest.spyOn(Date, 'now').mockReturnValue(startTime + (3600 + 60 + 1) * 1000);
+
+    const result = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+
+    expect(result.type).toBe('redirect_required');
+    expect(result.reason).toBe('invalid_login_state');
+    expect(result.redirectUrl).toBe(`${LOGIN_URL}?tenant_name=tenant1`);
+    expect(result.callbackData).toBeUndefined();
+  });
+
   test('login_required error returns redirect_required with login_required reason', async () => {
     const loginState: LoginState = {
       codeVerifier: 'verifier123',
