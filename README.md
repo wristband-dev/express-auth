@@ -109,7 +109,8 @@ Learn more about Wristband's authentication patterns:
 
 On an older version of our SDK? Check out our migration guide:
 
-- [Instructions for migrating to Version 6.x (latest)](migration/v6/README.md)
+- [Instructions for migrating to Version 7.x (latest)](migration/v7/README.md)
+- [Instructions for migrating to Version 6.x](migration/v6/README.md)
 - [Instructions for migrating to Version 5.x](migration/v5/README.md)
 - [Instructions for migrating to Version 4.x](migration/v4/README.md)
 - [Instructions for migrating to Version 3.x](migration/v3/README.md)
@@ -124,9 +125,9 @@ On an older version of our SDK? Check out our migration guide:
 
 Before installing, ensure you have:
 
-- [Node.js](https://nodejs.org/en) >= 20.0.0
+- [Node.js](https://nodejs.org/en) >= 22.0.0
 - [Express](https://expressjs.com/) >= 4.0.0
-- Your preferred package manager (npm >= 9.6.0, yarn, pnpm, etc.)
+- Your preferred package manager (npm >= 10.5.1, yarn, pnpm, etc.)
 
 <br>
 
