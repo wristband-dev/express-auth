@@ -45,7 +45,7 @@ function onHeaders(res: Response, listener: () => void): void {
     if (!res.headersSent) {
       try {
         listener.call(res);
-      } catch (err) {
+      } catch {
         // Silent failure - if this throws, the environment is usually fundamentally broken
       }
     }
@@ -86,7 +86,7 @@ export function createWristbandSession(options: SessionOptions) {
         if (!res.headersSent) {
           try {
             req.session.flushSync();
-          } catch (err) {
+          } catch {
             // Silent failure - if this throws, the environment is usually fundamentally broken
           }
         }

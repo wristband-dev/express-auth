@@ -249,6 +249,40 @@ describe('Cookie Utils', () => {
       const setCookieHeader = res.getHeader('Set-Cookie');
       expect(setCookieHeader).toBe('test=value; HttpOnly; Path=/; Max-Age=1800; SameSite=Lax');
     });
+
+    test('Sets cookie with domain option', () => {
+      setCookie(res, 'sessionId', 'abc123', { domain: 'example.com' });
+
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      expect(setCookieHeader).toBe(
+        'sessionId=abc123; HttpOnly; Domain=example.com; Path=/; Max-Age=3600; SameSite=Lax; Secure'
+      );
+    });
+
+    test('Sets cookie with domain and dangerouslyDisableSecureCookies', () => {
+      setCookie(res, 'sessionId', 'abc123', { domain: 'example.com', dangerouslyDisableSecureCookies: true });
+
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      expect(setCookieHeader).toBe(
+        'sessionId=abc123; HttpOnly; Domain=example.com; Path=/; Max-Age=3600; SameSite=Lax'
+      );
+    });
+
+    test('Sets cookie with domain and custom maxAge', () => {
+      setCookie(res, 'sessionId', 'abc123', { domain: 'example.com', maxAge: 7200 });
+
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      expect(setCookieHeader).toBe(
+        'sessionId=abc123; HttpOnly; Domain=example.com; Path=/; Max-Age=7200; SameSite=Lax; Secure'
+      );
+    });
+
+    test('Does not include Domain attribute when domain is empty string', () => {
+      setCookie(res, 'sessionId', 'abc123', { domain: '' });
+
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      expect(setCookieHeader).toBe('sessionId=abc123; HttpOnly; Path=/; Max-Age=3600; SameSite=Lax; Secure');
+    });
   });
 
   describe('clearCookie', () => {
@@ -262,14 +296,14 @@ describe('Cookie Utils', () => {
       clearCookie(res, 'sessionId');
 
       const setCookieHeader = res.getHeader('Set-Cookie');
-      expect(setCookieHeader).toBe('sessionId=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+      expect(setCookieHeader).toBe('sessionId=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
     });
 
     test('Clears cookie without secure flag when dangerouslyDisableSecureCookies is true', () => {
       clearCookie(res, 'sessionId', true);
 
       const setCookieHeader = res.getHeader('Set-Cookie');
-      expect(setCookieHeader).toBe('sessionId=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
+      expect(setCookieHeader).toBe('sessionId=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
     });
 
     test('Clears multiple cookies', () => {
@@ -279,8 +313,8 @@ describe('Cookie Utils', () => {
       const setCookieHeaders = res.getHeader('Set-Cookie') as string[];
       expect(Array.isArray(setCookieHeaders)).toBe(true);
       expect(setCookieHeaders).toHaveLength(2);
-      expect(setCookieHeaders[0]).toBe('first=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
-      expect(setCookieHeaders[1]).toBe('second=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+      expect(setCookieHeaders[0]).toBe('first=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
+      expect(setCookieHeaders[1]).toBe('second=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
     });
 
     test('Appends clear cookie to existing cookies', () => {
@@ -294,14 +328,35 @@ describe('Cookie Utils', () => {
       expect(setCookieHeaders).toHaveLength(3);
       expect(setCookieHeaders[0]).toBe('keep=value1');
       expect(setCookieHeaders[1]).toBe('also-keep=value2');
-      expect(setCookieHeaders[2]).toBe('remove=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+      expect(setCookieHeaders[2]).toBe('remove=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
     });
 
     test('Clears cookie with special characters in name', () => {
       clearCookie(res, 'login#state#123');
 
       const setCookieHeader = res.getHeader('Set-Cookie');
-      expect(setCookieHeader).toBe('login#state#123=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+      expect(setCookieHeader).toBe('login#state#123=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
+    });
+
+    test('Clears cookie with domain option', () => {
+      clearCookie(res, 'sessionId', false, 'example.com');
+
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      expect(setCookieHeader).toBe('sessionId=; HttpOnly; Domain=example.com; Path=/; Max-Age=0; SameSite=Lax; Secure');
+    });
+
+    test('Clears cookie with domain and dangerouslyDisableSecureCookies', () => {
+      clearCookie(res, 'sessionId', true, 'example.com');
+
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      expect(setCookieHeader).toBe('sessionId=; HttpOnly; Domain=example.com; Path=/; Max-Age=0; SameSite=Lax');
+    });
+
+    test('Does not include Domain attribute when domain is empty string', () => {
+      clearCookie(res, 'sessionId', false, '');
+
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      expect(setCookieHeader).toBe('sessionId=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
     });
   });
 
@@ -381,7 +436,7 @@ describe('Cookie Utils', () => {
       clearCookie(res, 'sessionId');
 
       const setCookieHeader = res.getHeader('Set-Cookie');
-      expect(setCookieHeader).toBe('sessionId=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+      expect(setCookieHeader).toBe('sessionId=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
     });
 
     test('Set and clear cookies in same response', () => {
@@ -395,7 +450,7 @@ describe('Cookie Utils', () => {
       expect(Array.isArray(setCookieHeaders)).toBe(true);
       expect(setCookieHeaders).toHaveLength(3);
       expect(setCookieHeaders[0]).toBe('keep=keepValue; HttpOnly; Path=/; Max-Age=3600; SameSite=Lax; Secure');
-      expect(setCookieHeaders[1]).toBe('remove=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+      expect(setCookieHeaders[1]).toBe('remove=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax; Secure');
       expect(setCookieHeaders[2]).toBe('another=anotherValue; HttpOnly; Path=/; Max-Age=3600; SameSite=Lax');
     });
   });
