@@ -1,6 +1,6 @@
-import { CookieCrypto } from '../../src/utils/crypto';
-import { CryptoError } from '../../src/error/crypto-error';
-import { LoginState } from '../../src/types';
+import { CookieCrypto } from '../../../src/utils/crypto';
+import { CryptoError } from '../../../src/error/crypto-error';
+import { LoginState } from '../../../src/types';
 
 describe('CookieCrypto - Sync Methods', () => {
   const validSecret = 'a'.repeat(32);
@@ -509,6 +509,7 @@ describe('CookieCrypto - Sync Methods', () => {
 
   describe('Node crypto error handling', () => {
     it('should throw ENCRYPTION_FAILED when cipher operations fail', () => {
+      expect.assertions(3);
       // Mock Node crypto to make cipher fail
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const crypto = require('node:crypto');
@@ -519,7 +520,6 @@ describe('CookieCrypto - Sync Methods', () => {
 
       try {
         CookieCrypto.encryptSync(baseLoginState, validSecret);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('ENCRYPTION_FAILED');

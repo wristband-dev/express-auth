@@ -3,6 +3,8 @@
 import { createHash } from 'crypto';
 import httpMocks from 'node-mocks-http';
 import {
+  stripPort,
+  getRequestHost,
   parseTenantSubdomain,
   generateRandomString,
   encryptLoginState,
@@ -10,7 +12,7 @@ import {
   getLoginStateCookie,
   resolveTenantCustomDomainParam,
   resolveTenantName,
-  resolveRedirectUrl,
+  resolveReturnUrl,
   createLoginState,
   clearOldestLoginStateCookie,
   createLoginStateCookie,
@@ -30,6 +32,94 @@ import { LoginState, LoginStateMapConfig } from '../../src/types';
 import { STATE_PARAM_MAX_CHAR_LENGTH } from '../../src/utils/constants';
 
 describe('Auth Utils', () => {
+  describe('stripPort', () => {
+    test('Removes the port from a host', () => {
+      expect(stripPort('acme.myapp.com:3000')).toBe('acme.myapp.com');
+    });
+
+    test('Returns a host without a port unchanged', () => {
+      expect(stripPort('acme.myapp.com')).toBe('acme.myapp.com');
+    });
+
+    test('Removes the port from a bracketed IPv6 host', () => {
+      expect(stripPort('[::1]:3000')).toBe('[::1]');
+    });
+
+    test('Returns a bracketed IPv6 host without a port unchanged', () => {
+      expect(stripPort('[::1]')).toBe('[::1]');
+    });
+  });
+
+  describe('getRequestHost', () => {
+    // Setting "hostname" explicitly simulates Express resolving req.hostname from
+    // X-Forwarded-Host, which only happens when the app's "trust proxy" setting trusts the sender.
+
+    test('Returns the Host header with its port when no proxy headers are present', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'acme.myapp.com:3000' },
+      }) as any;
+
+      expect(getRequestHost(req)).toBe('acme.myapp.com:3000');
+    });
+
+    test('Returns X-Forwarded-Host when Express resolved the hostname from it', () => {
+      const req = httpMocks.createRequest({
+        hostname: 'acme.myapp.com',
+        headers: { host: 'localhost:3000', 'x-forwarded-host': 'acme.myapp.com' },
+      }) as any;
+
+      expect(getRequestHost(req)).toBe('acme.myapp.com');
+    });
+
+    test('Keeps the port from X-Forwarded-Host', () => {
+      const req = httpMocks.createRequest({
+        hostname: 'acme.myapp.com',
+        headers: { host: 'localhost:3000', 'x-forwarded-host': 'acme.myapp.com:8443' },
+      }) as any;
+
+      expect(getRequestHost(req)).toBe('acme.myapp.com:8443');
+    });
+
+    test('Uses the first value when X-Forwarded-Host contains a comma-separated list', () => {
+      const req = httpMocks.createRequest({
+        hostname: 'acme.myapp.com',
+        headers: { host: 'localhost:3000', 'x-forwarded-host': 'acme.myapp.com, other.com' },
+      }) as any;
+
+      expect(getRequestHost(req)).toBe('acme.myapp.com');
+    });
+
+    test('Ignores X-Forwarded-Host when Express resolved the hostname from the Host header', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'acme.myapp.com:3000', 'x-forwarded-host': 'evil.com' },
+      }) as any;
+
+      expect(getRequestHost(req)).toBe('acme.myapp.com:3000');
+    });
+
+    test('Prefers the Host header when both headers share the same hostname', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'acme.myapp.com:3000', 'x-forwarded-host': 'acme.myapp.com:9999' },
+      }) as any;
+
+      expect(getRequestHost(req)).toBe('acme.myapp.com:3000');
+    });
+
+    test('Falls back to the hostname when neither header matches it', () => {
+      const req = httpMocks.createRequest({
+        hostname: 'acme.myapp.com',
+      }) as any;
+
+      expect(getRequestHost(req)).toBe('acme.myapp.com');
+    });
+
+    test('Returns an empty string when the hostname is missing', () => {
+      const req = { headers: {} } as any;
+
+      expect(getRequestHost(req)).toBe('');
+    });
+  });
+
   describe('parseTenantSubdomain', () => {
     test('Extracts tenant subdomain when host matches root domain', () => {
       const req = httpMocks.createRequest({
@@ -134,6 +224,27 @@ describe('Auth Utils', () => {
     it('should return empty string when host is missing', () => {
       const mockReq = { headers: {} } as any;
       const result = parseTenantSubdomain(mockReq, 'example.com');
+      expect(result).toBe('');
+    });
+
+    test('Extracts tenant subdomain from X-Forwarded-Host when Express resolved the hostname from it', () => {
+      const req = httpMocks.createRequest({
+        hostname: 'tenant.business.example.com',
+        headers: { host: 'localhost:3000', 'x-forwarded-host': 'tenant.business.example.com:8443' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'business.example.com');
+
+      expect(result).toBe('tenant');
+    });
+
+    test('Ignores X-Forwarded-Host when Express resolved the hostname from the Host header', () => {
+      const req = httpMocks.createRequest({
+        headers: { host: 'localhost:3000', 'x-forwarded-host': 'tenant.business.example.com' },
+      }) as any;
+
+      const result = parseTenantSubdomain(req, 'business.example.com');
+
       expect(result).toBe('');
     });
   });
@@ -498,11 +609,11 @@ describe('Auth Utils', () => {
     });
   });
 
-  describe('resolveRedirectUrl', () => {
+  describe('resolveReturnUrl', () => {
     test('Returns undefined when no return URL is provided anywhere', () => {
       const req = httpMocks.createRequest() as any;
 
-      expect(resolveRedirectUrl(req)).toBeUndefined();
+      expect(resolveReturnUrl(req)).toBeUndefined();
     });
 
     test('Returns the return_url query parameter when no config is provided', () => {
@@ -510,13 +621,13 @@ describe('Auth Utils', () => {
         query: { return_url: 'https://example.com/dashboard' },
       }) as any;
 
-      expect(resolveRedirectUrl(req)).toBe('https://example.com/dashboard');
+      expect(resolveReturnUrl(req)).toBe('https://example.com/dashboard');
     });
 
     test('Returns LoginConfig.returnUrl when no query parameter is present', () => {
       const req = httpMocks.createRequest() as any;
 
-      expect(resolveRedirectUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
+      expect(resolveReturnUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
     });
 
     test('LoginConfig.returnUrl takes precedence over the return_url query parameter', () => {
@@ -524,7 +635,7 @@ describe('Auth Utils', () => {
         query: { return_url: 'https://example.com/query' },
       }) as any;
 
-      expect(resolveRedirectUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
+      expect(resolveReturnUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
     });
 
     test('Falls back to the query parameter when LoginConfig.returnUrl is an empty string', () => {
@@ -532,7 +643,7 @@ describe('Auth Utils', () => {
         query: { return_url: 'https://example.com/query' },
       }) as any;
 
-      expect(resolveRedirectUrl(req, { returnUrl: '' })).toBe('https://example.com/query');
+      expect(resolveReturnUrl(req, { returnUrl: '' })).toBe('https://example.com/query');
     });
 
     test('Returns undefined when the return_url query parameter is an empty string', () => {
@@ -540,7 +651,7 @@ describe('Auth Utils', () => {
         query: { return_url: '' },
       }) as any;
 
-      expect(resolveRedirectUrl(req)).toBeUndefined();
+      expect(resolveReturnUrl(req)).toBeUndefined();
     });
 
     test('Throws error for multiple return_url query parameters', () => {
@@ -549,7 +660,7 @@ describe('Auth Utils', () => {
       }) as any;
 
       expect(() => {
-        return resolveRedirectUrl(req);
+        return resolveReturnUrl(req);
       }).toThrow('More than one [return_url] query parameter was encountered');
     });
 
@@ -558,7 +669,7 @@ describe('Auth Utils', () => {
         query: { return_url: ['url1', 'url2'] },
       }) as any;
 
-      expect(resolveRedirectUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
+      expect(resolveReturnUrl(req, { returnUrl: 'https://example.com/config' })).toBe('https://example.com/config');
     });
   });
 
@@ -1290,6 +1401,12 @@ describe('Auth Utils', () => {
 
         expect(validateReturnUrl(req, '', tenantName, true, rootDomain)).toBeUndefined();
       });
+
+      test('Returns undefined when the request host cannot be determined', () => {
+        const req = { headers: {} } as any;
+
+        expect(validateReturnUrl(req, '/settings', tenantName, true, rootDomain)).toBeUndefined();
+      });
     });
 
     describe('Allowed hosts', () => {
@@ -1443,6 +1560,53 @@ describe('Auth Utils', () => {
         const req = buildReq('acme.localhost:6001', 'http');
 
         expect(validateReturnUrl(req, '/home', tenantName, true, 'localhost')).toBe('/home');
+      });
+    });
+
+    describe('Proxy headers', () => {
+      // Setting "hostname" explicitly simulates Express resolving req.hostname from
+      // X-Forwarded-Host, which only happens when the app's "trust proxy" setting trusts the sender.
+
+      test('Allows a relative path when Express resolved the hostname from X-Forwarded-Host', () => {
+        const req = httpMocks.createRequest({
+          protocol: 'https',
+          hostname: 'acme.myapp.com',
+          headers: { host: 'localhost:3000', 'x-forwarded-host': 'acme.myapp.com' },
+        }) as any;
+
+        expect(validateReturnUrl(req, '/settings', tenantName, true, rootDomain)).toBe('/settings');
+      });
+
+      test('Allows an absolute URL on the X-Forwarded-Host when Express resolved the hostname from it', () => {
+        const req = httpMocks.createRequest({
+          protocol: 'https',
+          hostname: 'acme.myapp.com',
+          headers: { host: 'localhost:3000', 'x-forwarded-host': 'acme.myapp.com' },
+        }) as any;
+        const returnUrl = 'https://acme.myapp.com/dashboard';
+
+        expect(validateReturnUrl(req, returnUrl, tenantName, true, rootDomain)).toBe(returnUrl);
+      });
+
+      test('Keeps the X-Forwarded-Host port when rewriting a relative path on the root domain', () => {
+        const req = httpMocks.createRequest({
+          protocol: 'https',
+          hostname: 'myapp.com',
+          headers: { host: 'localhost:3000', 'x-forwarded-host': 'myapp.com:8443' },
+        }) as any;
+
+        expect(validateReturnUrl(req, '/home', tenantName, true, rootDomain)).toBe('https://acme.myapp.com:8443/home');
+      });
+
+      test('Rejects a URL on the X-Forwarded-Host when Express resolved the hostname from the Host header', () => {
+        const req = httpMocks.createRequest({
+          protocol: 'https',
+          headers: { host: 'localhost:3000', 'x-forwarded-host': 'acme.myapp.com' },
+        }) as any;
+
+        expect(
+          validateReturnUrl(req, 'https://acme.myapp.com/dashboard', tenantName, true, rootDomain)
+        ).toBeUndefined();
       });
     });
   });

@@ -88,6 +88,17 @@ export class ConfigResolver {
     }
   }
 
+  /**
+   * Validates the configs that are always required, regardless of whether auto-configure is enabled.
+   *
+   * These values cannot come from the SDK Auto-Configuration Endpoint, so they are checked up front. This method
+   * checks that:
+   * - [clientId], [clientSecret], and [wristbandApplicationVanityDomain] each have a non-blank value.
+   * - [loginStateSecret], when provided, is at least 32 characters long.
+   * - [tokenExpirationBuffer], when provided, is greater than or equal to 0.
+   *
+   * @throws {TypeError} If any config fails the checks above.
+   */
   private validateRequiredAuthConfigs(): void {
     if (!this.authConfig.clientId || !this.authConfig.clientId.trim()) {
       throw new TypeError('The [clientId] config must have a value.');

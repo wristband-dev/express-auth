@@ -1,6 +1,6 @@
-import { CookieCrypto } from '../../src/utils/crypto';
-import { CryptoError } from '../../src/error/crypto-error';
-import { LoginState } from '../../src/types';
+import { CookieCrypto } from '../../../src/utils/crypto';
+import { CryptoError } from '../../../src/error/crypto-error';
+import { LoginState } from '../../../src/types';
 
 describe('CookieCrypto - Async Methods', () => {
   const validSecret = 'a'.repeat(32);
@@ -458,6 +458,7 @@ describe('CookieCrypto - Async Methods', () => {
 
   describe('Web Crypto error handling', () => {
     it('should throw ENCRYPTION_FAILED when key derivation fails', async () => {
+      expect.assertions(3);
       const originalSubtle = globalThis.crypto.subtle;
       const mockSubtle = {
         ...originalSubtle,
@@ -472,7 +473,6 @@ describe('CookieCrypto - Async Methods', () => {
 
       try {
         await CookieCrypto.encrypt(baseLoginState, validSecret);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('ENCRYPTION_FAILED');
@@ -487,6 +487,7 @@ describe('CookieCrypto - Async Methods', () => {
     });
 
     it('should throw ENCRYPTION_FAILED when Web Crypto encrypt fails', async () => {
+      expect.assertions(3);
       const originalSubtle = globalThis.crypto.subtle;
       const mockSubtle = {
         ...originalSubtle,
@@ -503,7 +504,6 @@ describe('CookieCrypto - Async Methods', () => {
 
       try {
         await CookieCrypto.encrypt(baseLoginState, validSecret);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('ENCRYPTION_FAILED');

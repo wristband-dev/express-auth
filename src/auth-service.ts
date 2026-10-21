@@ -18,10 +18,10 @@ import {
   getAuthorizationUrlParams,
   getTenantLevelAuthorizationUrl,
   isExpired,
+  resolveReturnUrl,
   resolveTenantCustomDomainParam,
   resolveTenantName,
   validateReturnUrl,
-  resolveRedirectUrl,
 } from './utils';
 import { WristbandService } from './wristband-service';
 import {
@@ -115,7 +115,7 @@ export class AuthService {
     const defaultTenantName: string = config.defaultTenantName || '';
 
     // Create the login state which will be cached in a cookie so that it can be accessed in the callback.
-    const resolvedReturnUrl = resolveRedirectUrl(req, config);
+    const resolvedReturnUrl = resolveReturnUrl(req, config);
     const loginState: LoginState = createLoginState(redirectUri, {
       customState: config.customState,
       returnUrl: resolvedReturnUrl,

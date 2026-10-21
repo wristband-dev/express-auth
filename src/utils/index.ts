@@ -17,8 +17,50 @@ import { clearCookie, parseCookies, setCookie } from './cookies';
 import { WristbandError } from '../error';
 import { LoginConfig, LoginState, LoginStateMapConfig } from '../types';
 
+/**
+ * Removes the port from a host value, using the same logic Express uses for req.hostname
+ * (including support for bracketed IPv6 literals like "[::1]:3000").
+ */
+export function stripPort(host: string): string {
+  const offset = host[0] === '[' ? host.indexOf(']') + 1 : 0;
+  const index = host.indexOf(':', offset);
+  return index !== -1 ? host.substring(0, index) : host;
+}
+
+/**
+ * Resolves the host (including any port) the browser used for the incoming request.
+ *
+ * Express's req.hostname already respects the app's "trust proxy" setting: it reads
+ * X-Forwarded-Host only when the sender is trusted, and the Host header otherwise. However,
+ * req.hostname drops the port, and in Express 4 req.host is deprecated and drops it too.
+ * This function returns whichever header Express chose for req.hostname, with its port intact.
+ */
+export function getRequestHost(req: Request): string {
+  const { hostname } = req;
+
+  // Should never happen (defensive measure)
+  if (!hostname) {
+    return '';
+  }
+
+  // Check the Host header first so an untrusted X-Forwarded-Host can never supply the port
+  // when both headers share the same hostname.
+  const host = req.get('host');
+  if (host && stripPort(host) === hostname) {
+    return host;
+  }
+
+  // Express only takes the first value when X-Forwarded-Host contains a comma-separated list.
+  const forwardedHost = req.get('x-forwarded-host')?.split(',')[0].trim();
+  if (forwardedHost && stripPort(forwardedHost) === hostname) {
+    return forwardedHost;
+  }
+
+  return hostname;
+}
+
 export function parseTenantSubdomain(req: Request, parseTenantFromRootDomain: string): string {
-  const { host } = req.headers;
+  const host = getRequestHost(req);
 
   // Should never happen (defensive measure)
   if (!host) {
@@ -26,7 +68,7 @@ export function parseTenantSubdomain(req: Request, parseTenantFromRootDomain: st
   }
 
   // Strip off the port if it exists
-  const hostname = host.split(':')[0];
+  const hostname = stripPort(host);
 
   return hostname.substring(hostname.indexOf('.') + 1) === parseTenantFromRootDomain
     ? hostname.substring(0, hostname.indexOf('.'))
@@ -117,7 +159,7 @@ export function resolveTenantCustomDomainParam(req: Request): string {
   return tenantCustomDomainParam || '';
 }
 
-export function resolveRedirectUrl(req: Request, config: LoginConfig = {}): string | undefined {
+export function resolveReturnUrl(req: Request, config: LoginConfig = {}): string | undefined {
   // The return URL from the LoginConfig takes priority over the query param.
   if (config.returnUrl) {
     return config.returnUrl;
@@ -345,12 +387,19 @@ export function validateReturnUrl(
     return undefined;
   }
 
+  const host = getRequestHost(req);
+
+  // Without a host, the request origin cannot be established safely.
+  if (!host) {
+    return undefined;
+  }
+
   try {
     // Resolve against the current request's origin so relative paths like "/settings"
     // land on the user's current host. Absolute URLs ignore the base, and the parser
     // normalizes tricks like "//evil.com" or "/\\evil.com" the same way the browser
     // will, so the hostname check below runs against the real redirect target.
-    const url = new URL(returnUrl, `${req.protocol}://${req.get('host')}`);
+    const url = new URL(returnUrl, `${req.protocol}://${host}`);
 
     // Only allow redirects to the root domain or the exact host that served
     // this request, over the same protocol. Anything else is treated as
@@ -358,7 +407,7 @@ export function validateReturnUrl(
     // https -> http.
     if (
       url.protocol !== `${req.protocol}:` ||
-      (url.hostname !== parseTenantFromRootDomain && url.hostname !== req.hostname)
+      (url.hostname !== parseTenantFromRootDomain && url.hostname !== stripPort(host))
     ) {
       return undefined;
     }

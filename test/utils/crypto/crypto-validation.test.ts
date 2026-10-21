@@ -1,6 +1,6 @@
-import { CookieCrypto } from '../../src/utils/crypto';
-import { CryptoError } from '../../src/error/crypto-error';
-import { LoginState } from '../../src/types';
+import { CookieCrypto } from '../../../src/utils/crypto';
+import { CryptoError } from '../../../src/error/crypto-error';
+import { LoginState } from '../../../src/types';
 
 describe('CookieCrypto - Validation', () => {
   const baseLoginState: LoginState = {
@@ -45,11 +45,11 @@ describe('CookieCrypto - Validation', () => {
     });
 
     it('should include actual length in error message', async () => {
+      expect.assertions(2);
       const secret = 'short';
 
       try {
         await CookieCrypto.encrypt(baseLoginState, secret);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).message).toContain('5'); // actual length
@@ -303,9 +303,9 @@ describe('CookieCrypto - Validation', () => {
     const validSecret = 'a'.repeat(32);
 
     it('should throw INVALID_SECRET for bad secret', async () => {
+      expect.assertions(2);
       try {
         await CookieCrypto.encrypt(baseLoginState, 'short');
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('INVALID_SECRET');
@@ -313,9 +313,9 @@ describe('CookieCrypto - Validation', () => {
     });
 
     it('should throw INVALID_SECRETS_LIST for bad secrets array', async () => {
+      expect.assertions(2);
       try {
         await CookieCrypto.decryptWithSecrets('test', [], 3600);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('INVALID_SECRETS_LIST');
@@ -323,9 +323,9 @@ describe('CookieCrypto - Validation', () => {
     });
 
     it('should throw INVALID_MAX_AGE for bad maxAge', async () => {
+      expect.assertions(2);
       try {
         await CookieCrypto.decrypt('test', validSecret, 0);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('INVALID_MAX_AGE');
@@ -333,9 +333,9 @@ describe('CookieCrypto - Validation', () => {
     });
 
     it('should throw ENCRYPTION_FAILED for bad data', async () => {
+      expect.assertions(2);
       try {
         await CookieCrypto.encrypt(null as any, validSecret);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('ENCRYPTION_FAILED');
@@ -343,9 +343,9 @@ describe('CookieCrypto - Validation', () => {
     });
 
     it('should throw MALFORMED_DATA for bad encrypted value', async () => {
+      expect.assertions(2);
       try {
         await CookieCrypto.decrypt('', validSecret, 3600);
-        fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CryptoError);
         expect((error as CryptoError).code).toBe('MALFORMED_DATA');

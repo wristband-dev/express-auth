@@ -11,7 +11,7 @@ export const API_RETRY_DELAY_MS: number = 100;
 // Multiplier applied to the delay after each retry attempt (exponential backoff).
 export const API_RETRY_DELAY_MULTIPLIER: number = 2;
 export const TENANT_NAME_PLACEHOLDER: string = '{tenant_name}';
-// Regex to match either placeholder
+// Regexes to match the {tenant_name} placeholder
 export const LEADING_TENANT_PLACEHOLDER_REGEX = /^https?:\/\/\{tenant_name\}\./;
 export const TENANT_PLACEHOLDER_REGEX = /\{tenant_name\}/;
 export const TENANT_PLACEHOLDER_MSG = '"{tenant_name}" placeholder';
