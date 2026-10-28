@@ -10,7 +10,8 @@
   <p align="center">
     <b>
       <a href="https://wristband.dev">Website</a> • 
-      <a href="https://docs.wristband.dev/">Documentation</a>
+      <a href="https://docs.wristband.dev/">Documentation</a> • 
+      <a href="https://docs.wristband.dev/llms.txt">LLMs.txt</a>
     </b>
   </p>
 </div>
@@ -86,10 +87,10 @@ Learn more about Wristband's authentication patterns:
   - [The Session Object](#the-session-object)
   - [Session Access Patterns](#session-access-patterns)
   - [Session API](#session-api)
-    - [session.fromCallback()](#sessionfromcallbackcallbackdata-customfields)
+    - [session.fromCallback()](#sessionfromcallback)
     - [session.save()](#sessionsave)
     - [session.destroy()](#sessiondestroy)
-    - [session.getSessionResponse()](#sessiongetsessionresponsemetadata)
+    - [session.getSessionResponse()](#sessiongetsessionresponse)
     - [session.getTokenResponse()](#sessiongettokenresponse)
   - [CSRF Protection](#csrf-protection)
 - [Authentication Middleware](#authentication-middleware)
@@ -160,9 +161,13 @@ import { createWristbandAuth } from '@wristband/express-auth';
 export const wristbandAuth = createWristbandAuth({
   clientId: "replace-me-with-your-client-id",
   clientSecret: "replace-me-with-your-client-secret",
-  wristbandApplicationVanityDomain: "auth.yourapp.io",
+  wristbandApplicationVanityDomain: "replace-me-with-your-vanity-domain",
 });
 ```
+
+> **💡 Disabling Secure Cookies in Local Development**
+>
+> By default, `WristbandAuth` creates secure cookies (for tracking login state), meaning they are only sent over HTTPS connections. Most browsers make an exception for localhost and allow secure cookies to be sent over HTTP (e.g., http://localhost). However, some browsers, such as Safari, enforce stricter rules and never send secure cookies over HTTP, even for localhost. If you need to disable the secure cookies for local development, set `dangerouslyDisableSecureCookies: true`. However, be sure to **re-enable secure cookies before deploying to production**.
 
 <br>
 
@@ -219,7 +224,16 @@ This approach requires no additional dependencies and works seamlessly with Wris
 
 ### 3) Add Auth Endpoints
 
-There are <ins>four core API endpoints</ins> your Express server should expose to facilitate both the Login and Logout workflows in Wristband. You'll need to add them to wherever your Express routes/controllers are.
+There are **four core API endpoints** your Express server should expose to facilitate authentication workflows in Wristband:
+
+- Login Endpoint
+- Callback Endpoint
+- Logout Endpoint
+- Session Endpoint
+
+You'll need to add these endpoints to your Express API routes. There's also one additional endpoint you can implement depending on your authentication needs:
+
+- Token Endpoint (optional)
 
 <br>
 
@@ -252,18 +266,18 @@ app.get('/auth/callback', async (req, res) => {
   const callbackResult = await wristbandAuth.callback(req, res);
   const { callbackData, reason, redirectUrl, type } = callbackResult;
 
-  // For certain edge cases, the SDK will require you to redirect back to login.
+  // Certain edge cases may require you to redirect back to the Login Endpoint
   if (type === 'redirect_required') {
     console.debug(reason); // <- Optional debugging info
     res.redirect(redirectUrl);
     return;
   }
 
-  // Save necessary fields in the user's session.
+  // Save authentication data in the session
   req.session.fromCallback(callbackData);
   await req.session.save();
 
-  // Send the user back to your application.
+  // Send the user back to your application
   res.redirect(callbackData.returnUrl || `<your_app_home_url>`);
 });
 ```
@@ -297,7 +311,9 @@ app.get('/auth/logout', async (req, res) => {
 > [!NOTE]
 > This endpoint is required for Wristband frontend SDKs to function. For more details, see the [Wristband Session Management documentation](https://docs.wristband.dev/docs/session-management-backend-server).
 
-Wristband frontend SDKs require a Session Endpoint in your backend to verify authentication status and retrieve session metadata. Create a protected session endpoint that uses `session.getSessionResponse()` to return the session response format expected by Wristband's frontend SDKs. The response type will always have a `userId` and a `tenantId` in it. You can include any additional data for your frontend by customizing the `metadata` parameter (optional), which requires JSON-serializable values. **The response must not be cached**.
+Wristband frontend SDKs require a Session Endpoint in your backend to verify authentication status and retrieve session metadata. Create a protected session endpoint that uses `session.getSessionResponse()` to return the session response format expected by Wristband's frontend SDKs. The response type will always have a `userId` and a `tenantId` in it. You can include any additional data for your frontend by customizing the `metadata` parameter (optional), which requires JSON-serializable values.
+
+**The response must not be cached**. When this endpoint is protected with your auth middleware (e.g. `requireWristbandAuth`), the middleware automatically sets `Cache-Control: no-store` and `Pragma: no-cache` headers on the response.
 
 > **⚠️ Important:**
 > This endpoint must be protected with authentication middleware, which is shown in [4) Protect Your API Routes](#4-protect-your-api-routes).
@@ -310,8 +326,6 @@ Wristband frontend SDKs require a Session Endpoint in your backend to verify aut
 // Session Endpoint - Route path can be whatever you prefer
 app.get('/auth/session', (req, res) => {
   const sessionResponse = req.session.getSessionResponse({ foo: 'bar' });
-  res.header('Cache-Control', 'no-store');
-  res.header('Pragma', 'no-cache');
   return res.status(200).json(sessionResponse);
 });
 ```
@@ -338,9 +352,9 @@ The Session Endpoint returns the `SessionResponse` type to your frontend:
 >
 > If your application doesn't need frontend access to tokens (e.g., all API calls go through your backend), you can skip this endpoint.
 
-Some applications require the frontend to make direct API calls to Wristband or other protected services using the user's access token. The Token Endpoint provides a secure way for your frontend to retrieve the current access token and its expiration time without exposing it in the session cookie or in browser storage.
+Some applications require the frontend to make direct API calls to Wristband or other protected services using the user's access token. The Token Endpoint provides a secure way for your frontend to retrieve the current access token and its expiration time without exposing it in the session cookie or in browser storage. Create a protected token endpoint that uses `session.getTokenResponse()` to return the token data expected by Wristband's frontend SDKs.
 
-Create a protected token endpoint that uses `session.getTokenResponse()` to return the token data expected by Wristband's frontend SDKs. **The response must not be cached**.
+**The response must not be cached**. When this endpoint is protected with your auth middleware (e.g. `requireWristbandAuth`), the middleware automatically sets `Cache-Control: no-store` and `Pragma: no-cache` headers on the response.
 
 > **⚠️ Important:**
 > This endpoint must be protected with authentication middleware, which is shown in [4) Protect Your API Routes](#4-protect-your-api-routes).
@@ -353,8 +367,6 @@ Create a protected token endpoint that uses `session.getTokenResponse()` to retu
 // Token Endpoint - Route path can be whatever you prefer
 app.get('/auth/token', (req, res) => {
   const tokenResponse = req.session.getTokenResponse();
-  res.header('Cache-Control', 'no-store');
-  res.header('Pragma', 'no-cache');
   return res.status(200).json(tokenResponse);
 });
 ```
@@ -531,7 +543,7 @@ Both functions accept an `AuthConfig` object containing the settings required to
 | clientId | string | Yes | No | The ID of the Wristband client. |
 | clientSecret | string | Yes | No | The client's secret. |
 | customApplicationLoginPageUrl | string | No | Yes | Custom Application-Level Login Page URL (i.e. Tenant Discovery Page URL), for when you self-host that page. Only used when `applicationAuthorizationRequestsEnabled` is set to `false`. In that case, whenever `login()` or `logout()` cannot resolve a Tenant-Level domain, the SDK returns this URL instead of your Wristband-hosted Application-Level Login Page URL. |
-| dangerouslyDisableSecureCookies | boolean | No | No | **USE WITH CAUTION:** If set to `true`, the "Secure" attribute will not be included in any cookie settings. This should only be done when testing in local development environments that don't have HTTPS enabed.  If not provided, this value defaults to `false`. |
+| dangerouslyDisableSecureCookies | boolean | No | No | **USE WITH CAUTION:** If set to `true`, the "Secure" attribute will not be included in any cookie settings. This should only be done when testing in local development environments that don't have HTTPS enabled.  If not provided, this value defaults to `false`. |
 | isApplicationCustomDomainActive | boolean | No | Yes | Indicates whether your Wristband application is configured with an Application-Level custom domain that is active. Defaults to `false`. This tells the SDK which URL format to use when constructing the Wristband Authorize Endpoint URL. This has no effect on any tenant custom domains passed to your Login Endpoint either via the `tenant_custom_domain` query parameter or via the `defaultTenantCustomDomain` config. |
 | loginStateSecret | string | No | No | A 32 character (or longer) secret used for encryption and decryption of login state cookies. If not provided, it will default to using the client secret. For enhanced security, it is recommended to provide a value that is unique from the client secret. You can generate a secure secret key at [https://securepassword.dev](https://securepassword.dev/?type=secret_key). |
 | loginUrl | string | Yes | Yes | The URL of your application's login endpoint.  This is the endpoint within your application that redirects to Wristband to initialize the login flow. If you intend to use tenant subdomains in your Login Endpoint URL, then this value must contain the `{tenant_name}` placeholder exactly once, as the leftmost part of the hostname. For example: `https://{tenant_name}.yourapp.com/auth/login`. The SDK uses this value to determine your application's root domain for parsing tenant subdomains (e.g. `yourapp.com`), and to determine a non-tenant-specific Login Endpoint URL by removing the `{tenant_name}` subdomain (e.g. `https://yourapp.com/auth/login`). |
@@ -632,7 +644,7 @@ The `login()` function can also take optional configuration if your application 
 
 | LoginConfig Field | Type | Required | Description |
 | ----------------- | ---- | -------- | ----------- |
-| customState | JSON | No | Additional state to save in the Login State Cookie during login. When the callback completes successfully, `callback()` returns this custom state unmodified as `customState` in the callback data. This is useful for carrying application-specific context through the login redirect, such as which flow or action started the login. Empty objects are ignored. |
+| customState | `Record<string, unknown>` | No | Additional state to save in the Login State Cookie during login. When the callback completes successfully, `callback()` returns this custom state unmodified as `customState` in the callback data. This is useful for carrying application-specific context through the login redirect, such as which flow or action started the login. Empty objects are ignored. |
 | defaultTenantName | string | No | An optional default tenant name to use for the login request in the event the tenant name cannot be found in either the subdomain or query parameters (depending on your subdomain configuration). Useful when most or all users of your application belong to the same tenant, so they skip tenant discovery. Because it always resolves a tenant, Application-Level authorization requests and the Tenant Discovery Page are never used when it is set. |
 | defaultTenantCustomDomain | string | No | An optional default tenant custom domain to use for the login request in the event the tenant custom domain cannot be found in the query parameters. Useful when most or all users of your application log in through the same tenant custom domain, so they skip tenant discovery. Because it always resolves a tenant, Application-Level authorization requests and the Tenant Discovery Page are never used when it is set. |
 | returnUrl | string | No | A URL to send the user to after authentication is completed. This is useful for returning users to the page they were trying to reach before being asked to log in, so they land back where they started instead of on a default page. It is stored in the Login State Cookie and returned as `returnUrl` in the callback data, where your Callback Endpoint can redirect to it. If provided, it takes precedence over the `return_url` query parameter. The value is validated during the callback: relative URLs are resolved against the callback request, and URLs that do not match your application's domain are dropped. See [Return URLs](#return-urls) for more details. |
@@ -862,7 +874,7 @@ After a user authenticates on the Tenant-Level Login Page, Wristband will redire
 GET https://customer01.yourapp.io/auth/callback?state=f983yr893hf89ewn0idjw8e9f&code=shcsh90jf9wc09j9w0jewc
 ```
 
-The SDK will validate that the incoming state matches the Login State Cookie, and then it will call the Wristband Token Endpoint to exchange the authorizaiton code for JWTs. Lastly, it will call the Wristband Userinfo Endpoint to get any user data as specified by the `scopes` in your SDK configuration. The return type of the callback function is a `CallbackResult` object containing the result of what happened during callback execution as well as any accompanying data:
+The SDK will validate that the incoming state matches the Login State Cookie, and then it will call the Wristband Token Endpoint to exchange the authorization code for JWTs. Lastly, it will call the Wristband Userinfo Endpoint to get any user data as specified by the `scopes` in your SDK configuration. The return type of the callback function is a `CallbackResult` object containing the result of what happened during callback execution as well as any accompanying data:
 
 | CallbackResult Field | Type | Description |
 | -------------------- | ---- | ----------- |
@@ -898,7 +910,7 @@ When the callback returns a `'completed'` result, all of the token and userinfo 
 | CallbackData Field | Type | Description |
 | ------------------ | ---- | ----------- |
 | accessToken | string | The access token that can be used for accessing Wristband APIs as well as protecting your application's backend APIs. |
-| customState | JSON or `undefined` | If you injected custom state into the Login State Cookie during the Login Endpoint for the current auth request, then that same custom state will be returned in this field. |
+| customState | `Record<string, unknown>` or `undefined` | If you injected custom state into the Login State Cookie during the Login Endpoint for the current auth request, then that same custom state will be returned in this field. |
 | expiresAt | number | The absolute expiration time of the access token in milliseconds since the Unix epoch. The `tokenExpirationBuffer` SDK configuration is accounted for in this value. |
 | expiresIn | number | The duration from the current time until the access token is expired (in seconds). The `tokenExpirationBuffer` SDK configuration is accounted for in this value. |
 | idToken | string | The ID token uniquely identifies the user that is authenticating and contains claim data about the user. |
@@ -956,7 +968,7 @@ There are certain scenarios where, instead of callback data, the SDK returns a r
 
 In all of these cases, the redirect URL points back to your Express Login Endpoint for the same tenant, so a new login can start. If your application uses tenant subdomains, the tenant subdomain is used in the URL. Otherwise, the tenant is passed via the `tenant_name` query parameter. If a tenant custom domain was used, it is included via the `tenant_custom_domain` query parameter. The result also includes a `reason` field indicating which case occurred.
 
-In these events, the your application should redirect the user to that location.
+In these events, your application should redirect the user to that location.
 
 #### Error Parameters
 
