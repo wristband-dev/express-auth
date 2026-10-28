@@ -74,7 +74,9 @@ describe('WristbandService', () => {
   describe('getSdkConfiguration', () => {
     test('Returns SDK configuration successfully', async () => {
       const expectedSdkConfig: SdkConfiguration = {
+        applicationAuthorizationRequestsEnabled: false,
         customApplicationLoginPageUrl: 'https://custom.example.com/login',
+        fallbackLoginUrl: null,
         isApplicationCustomDomainActive: true,
         loginUrl: 'https://your-wristband-domain/login',
         loginUrlTenantDomainSuffix: '.tenant',

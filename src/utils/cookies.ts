@@ -66,6 +66,7 @@ export const parseCookies = (req: Request): Record<string, string> => {
  * @param options - Cookie options
  * @param options.maxAge - Cookie lifetime in milliseconds
  * @param options.dangerouslyDisableSecureCookies - Whether to omit the Secure flag
+ * @param options.domain - The domain that the cookie is set on
  */
 export function setCookie(
   res: Response,
@@ -74,15 +75,21 @@ export function setCookie(
   options: {
     maxAge?: number;
     dangerouslyDisableSecureCookies?: boolean;
+    domain?: string;
   } = {}
 ): void {
   // Fallback to default options if not provided
-  const { maxAge = 3600, dangerouslyDisableSecureCookies = false } = options;
-  const cookieString = `${name}=${encodeURIComponent(value)}; HttpOnly; Path=/; Max-Age=${maxAge}; SameSite=Lax${
-    dangerouslyDisableSecureCookies ? '' : '; Secure'
-  }`;
+  const { maxAge = 3600, dangerouslyDisableSecureCookies = false, domain } = options;
 
-  appendCookieToHeader(res, cookieString);
+  const cookieAttributes = [
+    'HttpOnly',
+    ...(domain ? [`Domain=${domain}`] : []),
+    'Path=/',
+    `Max-Age=${maxAge}`,
+    'SameSite=Lax',
+    ...(dangerouslyDisableSecureCookies ? [] : ['Secure']),
+  ].join('; ');
+  appendCookieToHeader(res, `${name}=${encodeURIComponent(value)}; ${cookieAttributes}`);
 }
 
 /**
@@ -91,11 +98,21 @@ export function setCookie(
  * @param res - Express Response object
  * @param cookieName - Name of the cookie to clear
  * @param dangerouslyDisableSecureCookies - Whether to omit the Secure flag (defaults to false)
+ * @param domain - The domain that the cookie is set on
  */
-export function clearCookie(res: Response, cookieName: string, dangerouslyDisableSecureCookies = false): void {
-  const cookieString = `${cookieName}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${
-    dangerouslyDisableSecureCookies ? '' : '; Secure'
-  }`;
-
-  appendCookieToHeader(res, cookieString);
+export function clearCookie(
+  res: Response,
+  cookieName: string,
+  dangerouslyDisableSecureCookies = false,
+  domain?: string
+): void {
+  const cookieAttributes = [
+    'HttpOnly',
+    ...(domain ? [`Domain=${domain}`] : []),
+    'Path=/',
+    'Max-Age=0',
+    'SameSite=Lax',
+    ...(dangerouslyDisableSecureCookies ? [] : ['Secure']),
+  ].join('; ');
+  appendCookieToHeader(res, `${cookieName}=; ${cookieAttributes}`);
 }
