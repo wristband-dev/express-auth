@@ -4,7 +4,7 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { decryptLoginState, encryptLoginState } from '../../src/utils';
+import { decryptLoginState, encryptLoginState } from '../../src/utils/login-state';
 import { LoginState } from '../../src/types';
 import { LOGIN_STATE_COOKIE_SEPARATOR, STATE_PARAM_MAX_CHAR_LENGTH } from '../../src/utils/constants';
 import { mockWristbandFetch } from '../helpers/mock-fetch';
@@ -938,6 +938,35 @@ describe('Multi Tenant Login', () => {
       // tenant_name and tenant_custom_domain query param is missing, which should redirect to app-level login.
       const mockExpressReq = httpMocks.createRequest({
         headers: { host: parseTenantFromRootDomain },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes));
+
+      // Validate Redirect response
+      const { statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      expect(location).toBe(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
+    });
+
+    test('Invalid tenant_name query param falls back to application-level login', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+        applicationAuthorizationRequestsEnabled: false,
+      });
+
+      // A tenant_name that is not a valid tenant name is ignored, so login never redirects to evil.com.
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+        query: { tenant_name: 'evil.com#' },
       }) as any;
       const mockExpressRes = httpMocks.createResponse() as any;
 

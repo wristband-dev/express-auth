@@ -1,21 +1,32 @@
-import { createHash, randomBytes } from 'crypto';
-import { Request, Response } from 'express';
-import { CookieCrypto } from './crypto';
-import { CryptoError } from '../error/crypto-error';
+import { Request } from 'express';
 
 import {
+  DOMAIN_NAME_REGEX,
   LEADING_TENANT_PLACEHOLDER_REGEX,
-  LOGIN_STATE_COOKIE_MAX_AGE_SEC,
-  LOGIN_STATE_COOKIE_PREFIX,
-  LOGIN_STATE_COOKIE_SEPARATOR,
   STATE_PARAM_MAX_CHAR_LENGTH,
   TENANT_NAME_PLACEHOLDER,
+  TENANT_NAME_REGEX,
   TENANT_PLACEHOLDER_REGEX,
 } from './constants';
-import { Base64 } from './base64';
-import { clearCookie, parseCookies, setCookie } from './cookies';
 import { WristbandError } from '../error';
-import { LoginConfig, LoginState, LoginStateMapConfig } from '../types';
+import { LoginConfig } from '../types';
+import { createCodeChallenge, generateRandomString } from './crypto';
+
+/**
+ * Returns the tenant name if it is a valid DNS label, otherwise an empty string. Tenant names become part of
+ * Wristband URL hosts, so anything else (e.g. `evil.com#`) could redirect users off Wristband.
+ */
+export function toSafeTenantName(value: string | undefined): string {
+  return value && TENANT_NAME_REGEX.test(value) ? value : '';
+}
+
+/**
+ * Returns the domain if it is a valid DNS hostname (two or more labels, no port, path, or credentials),
+ * otherwise an empty string.
+ */
+export function toSafeDomainName(value: string | undefined): string {
+  return value && DOMAIN_NAME_REGEX.test(value) ? value : '';
+}
 
 /**
  * Removes the port from a host value, using the same logic Express uses for req.hostname
@@ -75,69 +86,9 @@ export function parseTenantSubdomain(req: Request, parseTenantFromRootDomain: st
     : '';
 }
 
-export function generateRandomString(length: number): string {
-  return Base64.urlEncode(randomBytes(length));
-}
-
-export async function encryptLoginState(loginState: LoginState, loginStateSecret: string): Promise<string> {
-  try {
-    return await CookieCrypto.encrypt(loginState, loginStateSecret);
-  } catch (error) {
-    if (error instanceof CryptoError && error.code === 'DATA_TOO_LARGE') {
-      throw new TypeError(
-        'Login state cookie exceeds 4kB in size. Ensure your [customState] and [returnUrl] values are a reasonable size.'
-      );
-    }
-    if (
-      error instanceof CryptoError &&
-      error.code === 'ENCRYPTION_FAILED' &&
-      error.message === 'Data must be JSON-serializable'
-    ) {
-      throw new TypeError('The [customState] value must be JSON-serializable.');
-    }
-    throw error;
-  }
-}
-
-export async function decryptLoginState(
-  loginStateCookie: string,
-  loginStateSecret: string
-): Promise<LoginState | null> {
-  try {
-    // The max age matches the login state cookie's Max-Age (1 hour)
-    return await CookieCrypto.decrypt(loginStateCookie, loginStateSecret, LOGIN_STATE_COOKIE_MAX_AGE_SEC);
-  } catch (error) {
-    // Any crypto failure (tampered, expired, malformed, legacy format, or encrypted with a different secret)
-    // means the cookie can't be trusted. Return null so the callback can redirect to login instead of failing.
-    if (error instanceof CryptoError) {
-      return null;
-    }
-    throw error;
-  }
-}
-
-export function getLoginStateCookie(req: Request): { cookieName: string; loginStateCookie: string } {
-  const { state } = req.query;
-  const paramState = state ? state.toString() : '';
-  const cookies = parseCookies(req);
-
-  // This should always resolve to a single cookie with this prefix, or possibly no cookie at all
-  // if it got cleared or expired before the callback was triggered.
-  const matchingLoginCookieNames = Object.keys(cookies).filter((cookieName) => {
-    return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}${paramState}${LOGIN_STATE_COOKIE_SEPARATOR}`);
-  });
-
-  if (matchingLoginCookieNames.length > 0) {
-    const cookieName = matchingLoginCookieNames[0];
-    return { cookieName, loginStateCookie: cookies[cookieName] };
-  }
-
-  return { cookieName: '', loginStateCookie: '' };
-}
-
 export function resolveTenantName(req: Request, parseTenantFromRootDomain: string): string {
   if (parseTenantFromRootDomain) {
-    return parseTenantSubdomain(req, parseTenantFromRootDomain) || '';
+    return toSafeTenantName(parseTenantSubdomain(req, parseTenantFromRootDomain));
   }
 
   const { tenant_name: tenantNameParam } = req.query;
@@ -146,7 +97,7 @@ export function resolveTenantName(req: Request, parseTenantFromRootDomain: strin
     throw new TypeError('More than one [tenant_name] query parameter was encountered');
   }
 
-  return tenantNameParam || '';
+  return toSafeTenantName(tenantNameParam);
 }
 
 export function resolveTenantCustomDomainParam(req: Request): string {
@@ -179,61 +130,6 @@ export function resolveReturnUrl(req: Request, config: LoginConfig = {}): string
   return returnUrlParam;
 }
 
-export function createLoginState(redirectUri: string, config: LoginStateMapConfig = {}): LoginState {
-  return {
-    state: generateRandomString(32),
-    codeVerifier: generateRandomString(32),
-    redirectUri,
-    ...(!!config.returnUrl && typeof config.returnUrl === 'string' ? { returnUrl: config.returnUrl } : {}),
-    ...(!!config.customState && !!Object.keys(config.customState).length ? { customState: config.customState } : {}),
-  };
-}
-
-export function clearOldestLoginStateCookie(
-  req: Request,
-  res: Response,
-  dangerouslyDisableSecureCookies: boolean,
-  domain?: string
-): void {
-  const cookies = parseCookies(req);
-
-  // The max amount of concurrent login state cookies we allow is 3.  If there are already 3 cookies,
-  // then we clear the one with the oldest creation timestamp to make room for the new one.
-  const allLoginCookieNames: string[] = Object.keys(cookies).filter((cookieName: string) => {
-    return cookieName.startsWith(`${LOGIN_STATE_COOKIE_PREFIX}`);
-  });
-
-  // Retain only the 2 cookies with the most recent timestamps.
-  if (allLoginCookieNames.length >= 3) {
-    const mostRecentTimestamps: string[] = allLoginCookieNames
-      .map((cookieName: string) => {
-        return cookieName.split(LOGIN_STATE_COOKIE_SEPARATOR)[2];
-      })
-      .sort()
-      .reverse()
-      .slice(0, 2);
-
-    allLoginCookieNames.forEach((cookieName: string) => {
-      const timestamp: string = cookieName.split(LOGIN_STATE_COOKIE_SEPARATOR)[2];
-      if (!mostRecentTimestamps.includes(timestamp)) {
-        clearCookie(res, cookieName, dangerouslyDisableSecureCookies, domain);
-      }
-    });
-  }
-}
-
-export function createLoginStateCookie(
-  res: Response,
-  state: string,
-  encryptedLoginState: string,
-  dangerouslyDisableSecureCookies: boolean,
-  domain?: string
-): void {
-  // Add the new login state cookie (1 hour max age).
-  const cookieName = `${LOGIN_STATE_COOKIE_PREFIX}${state}${LOGIN_STATE_COOKIE_SEPARATOR}${Date.now().valueOf()}`;
-  setCookie(res, cookieName, encryptedLoginState, { maxAge: 3600, dangerouslyDisableSecureCookies, domain });
-}
-
 export function getAppLevelLoginUrl(
   wristbandApplicationVanityDomain: string,
   clientId: string,
@@ -258,7 +154,7 @@ export function getAppLevelLoginUrl(
   return `${apploginUrl}?client_id=${clientId}${stateParam}`;
 }
 
-export function getAuthorizationUrlParams(
+export async function getAuthorizationUrlParams(
   req: Request,
   config: {
     clientId: string;
@@ -267,7 +163,7 @@ export function getAuthorizationUrlParams(
     scopes: string[];
     state: string;
   }
-): URLSearchParams {
+): Promise<URLSearchParams> {
   const { idp_hint: idpHint, login_hint: loginHint } = req.query;
 
   if (!!idpHint && typeof idpHint !== 'string') {
@@ -278,13 +174,15 @@ export function getAuthorizationUrlParams(
     throw new TypeError('More than one [login_hint] query parameter was encountered');
   }
 
+  const codeChallenge = await createCodeChallenge(config.codeVerifier);
+
   return new URLSearchParams({
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: 'code',
     state: config.state,
     scope: config.scopes.join(' '),
-    code_challenge: Base64.urlEncode(createHash('sha256').update(config.codeVerifier).digest()),
+    code_challenge: codeChallenge,
     code_challenge_method: 'S256',
     nonce: generateRandomString(32),
     ...(!!idpHint && typeof idpHint === 'string' ? { idp_hint: idpHint } : {}),
@@ -355,11 +253,6 @@ export function getTenantLevelAuthorizationUrl(
     return `https://${config.defaultTenantCustomDomain}/api/v1/oauth2/authorize?${queryString}`;
   }
   return `https://${config.defaultTenantName}${separator}${wristbandApplicationVanityDomain}/api/v1/oauth2/authorize?${queryString}`;
-}
-
-export function isExpired(expiresAt: number): boolean {
-  const currentTime = Date.now().valueOf();
-  return currentTime >= expiresAt;
 }
 
 /**

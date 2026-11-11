@@ -5,6 +5,9 @@ import { AuthConfig, AuthMiddlewareConfig } from '../../../src/types';
 
 jest.mock('@wristband/typescript-jwt');
 
+// The auth middleware skips the SESSION strategy when the request has no session cookie.
+const SESSION_COOKIE = 'session=encrypted-session';
+
 describe('AuthService - Multi-Strategy - Additional Coverage', () => {
   let authService: AuthService;
   let mockReq: Partial<Request>;
@@ -26,7 +29,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
     };
 
     mockReq = {
-      headers: {},
+      headers: { cookie: SESSION_COOKIE },
       session: mockSession,
     } as any;
 
@@ -82,12 +85,11 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // Verify SESSION was attempted first (even though it didn't call save)
-      // JWT should be attempted second
+      // No session cookie, so SESSION is skipped and JWT is used
       expect(mockJwtValidator.extractBearerToken).toHaveBeenCalled();
     });
 
-    it('should execute strategies in exact configured order [JWT, SESSION]', async () => {
+    it('should reject when the JWT fails and not fall back to SESSION [JWT, SESSION]', async () => {
       const config: AuthMiddlewareConfig = {
         authStrategies: ['JWT', 'SESSION'],
         sessionConfig: {
@@ -98,20 +100,20 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
       const middleware = authService.createAuthMiddleware(config);
 
       // JWT fails
-      mockReq.headers = { authorization: 'Bearer invalid-token' };
+      mockReq.headers = { cookie: SESSION_COOKIE, authorization: 'Bearer invalid-token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('invalid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: false, payload: null! });
 
-      // SESSION succeeds
+      // SESSION would succeed
       mockSession.isAuthenticated = true;
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // JWT should be tried first
+      // JWT is tried first and its failure is final, so SESSION is never tried
       expect(mockJwtValidator.validate).toHaveBeenCalled();
-      // Then SESSION
-      expect(mockSession.save).toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalled();
+      expect(mockSession.save).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockNext).not.toHaveBeenCalled();
     });
 
     it('should stop at first successful strategy and not try remaining ones', async () => {
@@ -128,7 +130,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
       mockSession.isAuthenticated = true;
 
       // JWT would also succeed
-      mockReq.headers = { authorization: 'Bearer valid-token' };
+      mockReq.headers = { cookie: SESSION_COOKIE, authorization: 'Bearer valid-token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
       mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: { sub: 'user-123' } });
 
@@ -139,6 +141,56 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
       // JWT should NOT be attempted
       expect(mockJwtValidator.extractBearerToken).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should reject when the session fails and not fall back to JWT [SESSION, JWT]', async () => {
+      const config: AuthMiddlewareConfig = {
+        authStrategies: ['SESSION', 'JWT'],
+        sessionConfig: {
+          sessionOptions: { secrets: 'test-secret' },
+        },
+      };
+
+      const middleware = authService.createAuthMiddleware(config);
+
+      // SESSION fails
+      mockSession.isAuthenticated = false;
+
+      // JWT would succeed
+      mockReq.headers = { cookie: SESSION_COOKIE, authorization: 'Bearer valid-token' };
+      mockJwtValidator.extractBearerToken.mockReturnValue('valid-token');
+      mockJwtValidator.validate.mockResolvedValue({ isValid: true, payload: { sub: 'user-123' } });
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      // The session cookie is present, so its failure is final and JWT is never tried
+      expect(mockJwtValidator.extractBearerToken).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when the request has no session cookie and no Authorization header', async () => {
+      const config: AuthMiddlewareConfig = {
+        authStrategies: ['SESSION', 'JWT'],
+        sessionConfig: {
+          sessionOptions: { secrets: 'test-secret' },
+        },
+      };
+
+      const middleware = authService.createAuthMiddleware(config);
+
+      // SESSION would succeed if it were tried
+      mockSession.isAuthenticated = true;
+      mockReq.headers = {};
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      // Both strategies are skipped
+      expect(mockSession.save).not.toHaveBeenCalled();
+      expect(mockJwtValidator.extractBearerToken).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+      expect(mockNext).not.toHaveBeenCalled();
     });
   });
 
@@ -231,7 +283,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       jest.clearAllMocks();
 
-      // Request 2: JWT auth (session not authenticated)
+      // Request 2: JWT auth (no session cookie)
       mockSession.isAuthenticated = false;
       mockReq.headers = { authorization: 'Bearer token' };
       mockJwtValidator.extractBearerToken.mockReturnValue('token');
@@ -245,7 +297,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       // Request 3: SESSION auth again
       mockSession.isAuthenticated = true;
-      delete mockReq.headers!.authorization;
+      mockReq.headers = { cookie: SESSION_COOKIE };
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
@@ -291,7 +343,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       mockSession.isAuthenticated = true;
       mockSession.csrfToken = 'valid-token';
-      mockReq.headers = { 'x-csrf-token': 'wrong-token' };
+      mockReq.headers = { cookie: SESSION_COOKIE, 'x-csrf-token': 'wrong-token' };
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -359,7 +411,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
           save: jest.fn().mockResolvedValue(undefined),
         };
         (mockReq as any).session = mockSession;
-        mockReq.headers = {};
+        mockReq.headers = { cookie: SESSION_COOKIE };
 
         const config: AuthMiddlewareConfig = {
           authStrategies: ['SESSION'],
@@ -376,7 +428,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
         } else if (testCase.reason === 'csrf_failed') {
           mockSession.isAuthenticated = true;
           mockSession.csrfToken = 'valid-token';
-          mockReq.headers = { 'x-csrf-token': 'wrong-token' };
+          mockReq.headers = { cookie: SESSION_COOKIE, 'x-csrf-token': 'wrong-token' };
         } else if (testCase.reason === 'token_refresh_failed') {
           mockSession.isAuthenticated = true;
           mockSession.refreshToken = 'refresh-token';
@@ -414,7 +466,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       const middleware = authService.createAuthMiddleware(config);
 
-      // SESSION fails (not authenticated)
+      // No session cookie, so SESSION is skipped
       mockSession.isAuthenticated = false;
 
       // JWT succeeds
@@ -457,7 +509,7 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      // Token refresh should NOT have been attempted because SESSION failed auth
+      // Token refresh should NOT have been attempted because SESSION was skipped (no session cookie)
       expect(refreshSpy).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalled();
     });
@@ -578,6 +630,15 @@ describe('AuthService - Multi-Strategy - Additional Coverage', () => {
 
       expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
       expect(mockRes.status).not.toHaveBeenCalled();
+    });
+
+    it('should report no credential for an unknown strategy', () => {
+      // createAuthMiddleware rejects unknown strategies, so this calls the private method directly.
+      mockReq.headers = { cookie: SESSION_COOKIE, authorization: 'Bearer token' };
+
+      const hasCredential = (authService as any).hasCredential(mockReq, 'INVALID', {});
+
+      expect(hasCredential).toBe(false);
     });
   });
 });

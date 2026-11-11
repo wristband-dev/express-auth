@@ -1,7 +1,7 @@
 import { WristbandError } from './error';
 import { AuthConfig, SdkConfiguration } from './types';
 import { TENANT_PLACEHOLDER_REGEX, TENANT_PLACEHOLDER_MSG } from './utils/constants';
-import { deriveFallbackLoginUrl, deriveTenantRootDomain, isTenantPlaceholderPositionValid } from './utils';
+import { deriveFallbackLoginUrl, deriveTenantRootDomain, isTenantPlaceholderPositionValid } from './utils/urls';
 import { WristbandService } from './wristband-service';
 
 const DEFAULT_SCOPES = ['openid', 'offline_access', 'email'];

@@ -87,6 +87,23 @@ describe('Logout - Tenant Custom Domain Validation', () => {
 
       expect(new URL(logoutUrl).origin).toEqual(`https://${CONFIG_CUSTOM_DOMAIN}`);
     });
+
+    test('Skips a config value that is not a valid domain name and falls through to the tenant name', async () => {
+      mockWristbandFetch({ tenantCustomDomainValid: true });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+        query: { tenant_name: 'devs4you' },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      const logoutUrl: string = await wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+        tenantCustomDomain: 'evil.com#x',
+      });
+
+      expectValidateNotCalled();
+      expect(new URL(logoutUrl).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
+    });
   });
 
   describe('Priority 2: logoutConfig.tenantName', () => {
@@ -151,6 +168,22 @@ describe('Logout - Tenant Custom Domain Validation', () => {
       const logoutUrl: string = await wristbandAuth.logout(mockExpressReq, mockExpressRes);
 
       expectValidateCalled(wristbandApplicationVanityDomain, PARAM_CUSTOM_DOMAIN);
+      expect(new URL(logoutUrl).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
+    });
+
+    test('Skips a query param that is not a valid domain name without calling the API', async () => {
+      // The validation endpoint would accept anything, so only the format check can skip this value.
+      mockWristbandFetch({ tenantCustomDomainValid: true });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+        query: { tenant_custom_domain: 'evil.com#', tenant_name: 'devs4you' },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      const logoutUrl: string = await wristbandAuth.logout(mockExpressReq, mockExpressRes);
+
+      expectValidateNotCalled();
       expect(new URL(logoutUrl).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
     });
 

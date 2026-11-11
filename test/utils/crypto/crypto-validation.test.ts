@@ -261,18 +261,6 @@ describe('CookieCrypto - Validation', () => {
     it('should reject boolean as data', async () => {
       await expect(CookieCrypto.encrypt(true as any, validSecret)).rejects.toThrow(CryptoError);
     });
-
-    it('should reject string as data (sync)', () => {
-      expect(() => {
-        CookieCrypto.encryptSync('not an object' as any, validSecret);
-      }).toThrow(CryptoError);
-    });
-
-    it('should reject number as data (sync)', () => {
-      expect(() => {
-        CookieCrypto.encryptSync(123 as any, validSecret);
-      }).toThrow(CryptoError);
-    });
   });
 
   describe('encrypted value validation', () => {

@@ -4,7 +4,7 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { decryptLoginState } from '../../src/utils';
+import { decryptLoginState } from '../../src/utils/login-state';
 import { LoginState } from '../../src/types';
 import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 import { mockWristbandFetch } from '../helpers/mock-fetch';
@@ -810,6 +810,40 @@ describe('Custom Login Configurations', () => {
       const loginState = (await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET)) as LoginState;
       expect(loginState.state).toEqual(keyParts[1]);
       expect(loginState.customState).toBeUndefined();
+    });
+
+    test('02: Skips a default tenant name that is not a valid tenant name', async () => {
+      parseTenantFromRootDomain = 'business.invotastic.com';
+      wristbandApplicationVanityDomain = 'auth.invotastic.com';
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl: `https://${parseTenantFromRootDomain}/api/auth/login`,
+        redirectUri: `https://${parseTenantFromRootDomain}/api/auth/callback`,
+        isApplicationCustomDomainActive: true,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: `${parseTenantFromRootDomain}` },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      mockExpressRes.redirect(
+        await wristbandAuth.login(mockExpressReq, mockExpressRes, { defaultTenantName: 'evil.com#' })
+      );
+
+      // No valid tenant remains, so login uses the application-level Authorize Endpoint instead of evil.com.
+      const { statusCode } = mockExpressRes;
+      expect(statusCode).toEqual(302);
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { pathname, origin } = locationUrl;
+      expect(origin).toEqual(`https://${wristbandApplicationVanityDomain}`);
+      expect(pathname).toEqual('/api/v1/oauth2/authorize');
     });
   });
 });

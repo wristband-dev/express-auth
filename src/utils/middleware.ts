@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { timingSafeEqual } from 'crypto';
 
 import { AuthMiddlewareConfig, NormalizedAuthMiddlewareConfig, AuthStrategy, AuthFailureReason } from '../types';
 
@@ -122,7 +123,12 @@ export function isValidCsrf(req: Request, csrfToken: string | undefined, csrfHea
     return false;
   }
 
-  return csrfToken === headerValue;
+  const expected = Buffer.from(csrfToken);
+  const received = Buffer.from(headerValue);
+  if (expected.length !== received.length) {
+    return false;
+  }
+  return timingSafeEqual(expected, received);
 }
 
 /**

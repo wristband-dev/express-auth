@@ -126,7 +126,7 @@ On an older version of our SDK? Check out our migration guide:
 
 Before installing, ensure you have:
 
-- [Node.js](https://nodejs.org/en) >= 22.0.0
+- [Node.js](https://nodejs.org/en) >= 22.3.0
 - [Express](https://expressjs.com/) >= 4.0.0
 - Your preferred package manager (npm >= 10.5.1, yarn, pnpm, etc.)
 
@@ -454,11 +454,11 @@ export default router;
 
 The middleware automatically:
 
-- ✅ Validates authentication - Checks each auth strategy in order until one succeeds
+- ✅ Validates authentication - Checks each auth strategy in order, skipping any strategy whose credential isn't in the request
+- ✅ Validates CSRF tokens - Checks CSRF token in request header, if enabled in your session options (`SESSION` strategy only)
 - ✅ Refreshes expired tokens - When using `SESSION` strategy AND when `refreshToken` and `expiresAt` are present in session (with up to 3 retry attempts)
 - ✅ Extends session expiration - Rolling session window on each authenticated request (`SESSION` strategy only)
-- ✅ Validates CSRF tokens - Checks CSRF token in request header, if enabled in your session options (`SESSION` strategy only)
-- ✅ Returns 401 for unauthenticated requests - Automatically rejects requests that fail all auth strategies
+- ✅ Returns 401 for unauthenticated requests - Automatically rejects requests whose credential fails, or that have no credential for any strategy
 
 <br>
 
@@ -646,7 +646,7 @@ The `login()` function can also take optional configuration if your application 
 | ----------------- | ---- | -------- | ----------- |
 | customState | `Record<string, unknown>` | No | Additional state to save in the Login State Cookie during login. When the callback completes successfully, `callback()` returns this custom state unmodified as `customState` in the callback data. This is useful for carrying application-specific context through the login redirect, such as which flow or action started the login. Empty objects are ignored. |
 | defaultTenantName | string | No | An optional default tenant name to use for the login request in the event the tenant name cannot be found in either the subdomain or query parameters (depending on your subdomain configuration). Useful when most or all users of your application belong to the same tenant, so they skip tenant discovery. Because it always resolves a tenant, Application-Level authorization requests and the Tenant Discovery Page are never used when it is set. |
-| defaultTenantCustomDomain | string | No | An optional default tenant custom domain to use for the login request in the event the tenant custom domain cannot be found in the query parameters. Useful when most or all users of your application log in through the same tenant custom domain, so they skip tenant discovery. Because it always resolves a tenant, Application-Level authorization requests and the Tenant Discovery Page are never used when it is set. |
+| defaultTenantCustomDomain | string | No | An optional default tenant custom domain to use for the login request in the event the tenant custom domain cannot be found in the query parameters. Useful when most or all users of your application log in through the same tenant custom domain, so they skip tenant discovery. Because it always resolves a tenant, Application-Level authorization requests and the Tenant Discovery Page are never used when it is set. This value must come from your application, not from the incoming request. The SDK doesn't validate it against your Wristband application. |
 | returnUrl | string | No | A URL to send the user to after authentication is completed. This is useful for returning users to the page they were trying to reach before being asked to log in, so they land back where they started instead of on a default page. It is stored in the Login State Cookie and returned as `returnUrl` in the callback data, where your Callback Endpoint can redirect to it. If provided, it takes precedence over the `return_url` query parameter. The value is validated during the callback: relative URLs are resolved against the callback request, and URLs that do not match your application's domain are dropped. See [Return URLs](#return-urls) for more details. |
 
 #### Which Domains Are Used in the Authorize URL?
@@ -1015,7 +1015,7 @@ If your application created a session, it should destroy it before invoking the 
 | redirectUrl | string | No | Optional URL that Wristband redirects to after it finishes ending the user's authentication session on Wristband's side. This does not end your application's own session, which your app must clear itself. If a Tenant-Level domain cannot be determined during `logout()`, the SDK returns this URL. If no `redirectUrl` is set in that case, the SDK returns your Login Endpoint URL (with the `{tenant_name}` subdomain removed if your `loginUrl` contains it), or the Application-Level Login Page URL when `applicationAuthorizationRequestsEnabled` is `false`. |
 | refreshToken | string | No | The refresh token to revoke during logout. Always pass this if your application uses refresh tokens, so the token can't be used to get new access tokens after the user logs out. |
 | state | string | No | Optional value that will be appended as a query parameter to the resolved logout URL, if provided. Maximum length of 512 characters. |
-| tenantCustomDomain | string | No | The tenant custom domain of the tenant the user belongs to, if that tenant has one. When set, `logout()` uses it to build the Tenant-Level Logout URL, and it takes priority over every other way of determining the tenant domain. |
+| tenantCustomDomain | string | No | The tenant custom domain of the tenant the user belongs to, if that tenant has one. When set, `logout()` uses it to build the Tenant-Level Logout URL, and it takes priority over every other way of determining the tenant domain. This value must come from your application, not from the incoming request. The SDK doesn't validate it against your Wristband application. |
 | tenantName | string | No | The name of the tenant the user belongs to. When set, `logout()` uses it to build the Tenant-Level Logout URL. It takes priority over the `tenant_custom_domain` query parameter and the tenant name resolved from the request, but not over `LogoutConfig.tenantCustomDomain`. |
 
 #### Which Domains Are Used in the Logout URL?
@@ -1256,7 +1256,6 @@ These `SessionData` fields are automatically populated when you call `req.sessio
 | tenantId | string or `undefined` | Unique identifier for the tenant that the user belongs to. |
 | tenantName | string or `undefined` | Name of the tenant that the user belongs to. |
 | identityProviderName | string or `undefined` | Name of the identity provider that the user belongs to. |
-| csrfToken | string or `undefined` | CSRF token for request validation. Token value is automatically generated by `fromCallback()`. |
 | refreshToken | string or `undefined` | Refresh token for obtaining new access tokens when they expire. Only present if `offline_access` scope was requested during authentication. |
 | tenantCustomDomain | string or `undefined` | Custom domain for the tenant, if configured. Only present if a tenant custom domain was used during authentication. |
 
@@ -1330,11 +1329,9 @@ await req.session.save();
 
 For more session operations, see the [@wristband/typescript-session](https://github.com/wristband-dev/typescript-session#core-methods-all-runtimes) documentation which provides additional methods like:
 
-- `session.get(key)` - Get a value with optional default
+- `session.get(key)` - Get a value
 - `session.set(key, value)` - Set a value
 - `session.delete(key)` - Delete a value
-- `session.has(key)` - Check if key exists
-- `session.clear()` - Clear all session data
 - `session.toJSON()` - Get session as plain object
 
 #### Limitations
@@ -1362,8 +1359,9 @@ fromCallback(callbackData: CallbackData, customFields?: Record<string, any>): vo
 Create a session from Wristband callback data after successful authentication. This is a convenience method that automatically:
 
 - Extracts a core subset of user and tenant info from callback data
-- Optionally generates a CSRF token (if `enableCsrfProtection` is enabled)
-- Marks the session for persistence in an encrypted session cookie
+- Updates the session data in memory only
+
+Call `save()` afterward to write the encrypted session cookie. If `enableCsrfProtection` is enabled, `save()` also generates the CSRF token.
 
 | Parameters | Type | Required | Default | Description |
 | ---------- | ---- | -------- | ------- | ----------- |
@@ -1392,7 +1390,6 @@ The following fields from the callback data are automatically stored in the sess
 - `tenantId` (from `callbackData.userinfo.tenantId`)
 - `tenantName`
 - `identityProviderName` (from `callbackData.userinfo.identityProviderName`)
-- `csrfToken` (auto-generated only if `enableCsrfProtection` is enabled)
 - `refreshToken` (only if `offline_access` scope was requested)
 - `tenantCustomDomain` (only if a tenant custom domain was used during authentication)
 
@@ -1601,7 +1598,7 @@ First, you configure and create an instance of the middleware in your Wristband 
 
 // Advanced Example (All Options)
 export const requireWristbandAuth = wristbandAuth.createAuthMiddleware({
-  // Try JWT validation first (access token), fallback to SESSION validation (session cookie)
+  // Check JWT first (Authorization header), then SESSION (session cookie)
   authStrategies: ['JWT', 'SESSION'],
 
   // Session configuration (required when using SESSION strategy)
@@ -1646,7 +1643,7 @@ app.get('/api/orders', requireWristbandAuth, (req, res) => {
 
 | AuthMiddlewareConfig | Type | Required | Default | Description |
 | -------------------- | ---- | -------- | ------- | ----------- |
-| authStrategies | `AuthStrategy[]` | Yes | N/A | Array of authentication strategies to try in sequential order. At least one strategy is required. The middleware will attempt each strategy until one succeeds.<br><br> Available strategies: <br>- `'SESSION'` (cookie-based sessions)<br>- `'JWT'` (bearer token authentication) |
+| authStrategies | `AuthStrategy[]` | Yes | N/A | Array of authentication strategies to check in order. At least one strategy is required. A strategy is skipped when the request doesn't have its credential: no `Authorization` header for `'JWT'`, or no session cookie for `'SESSION'`. When the credential is present but fails, the request is rejected, and later strategies aren't tried.<br><br> Available strategies: <br>- `'SESSION'` (cookie-based sessions)<br>- `'JWT'` (bearer token authentication) |
 | sessionConfig | object | Required if using `'SESSION'` strategy | N/A | Configuration object for session-based authentication. Must be provided when `'SESSION'` is included in authStrategies. Contains session options, CSRF settings, and endpoint paths. |
 | jwtConfig | object | No | `undefined` | Optional configuration object for JWT bearer token authentication. Contains caching settings for JSON Web Key Sets (JWKS) used to verify JWT signatures. This is only needed if you are using the `'JWT'` strategy and don't want to rely on default config values. |
 
@@ -1662,8 +1659,8 @@ The auth middleware supports two authentication strategies that can be used inde
 The `'SESSION'` strategy validates authentication using encrypted session cookies. The middleware performs these steps for protected routes:
 
 1. **Validates session cookie** - Checks for valid encrypted session (`session.isAuthenticated === true`)
-2. **Refreshes expired tokens** - Automatically refreshes access tokens if both `refreshToken` and `expiresAt` exist in session and the access token is expired
-3. **Validates CSRF tokens (optional)** - Checks CSRF token in request header if `enableCsrfProtection` is `true`
+2. **Validates CSRF tokens (optional)** - Checks CSRF token in request header if `enableCsrfProtection` is `true`
+3. **Refreshes expired tokens** - Automatically refreshes access tokens if both `refreshToken` and `expiresAt` exist in session and the access token is expired
 4. **Extends session expiration** - Updates session cookie `maxAge` on each request (rolling sessions)
 5. **Saves session changes** - Persists any token refreshes or expiration updates to session cookie
 
@@ -1800,13 +1797,18 @@ app.get('/api/data', requireWristbandAuth, (req, res) => {
 
 #### Strategy Order
 
-When multiple strategies are configured, they are tried in the order specified. The first strategy that successfully authenticates the request is used:
+When multiple strategies are configured, they are checked in the order specified. Each strategy has its own credential:
+
+- `'JWT'`: the `Authorization` header
+- `'SESSION'`: the session cookie
+
+A strategy is skipped when the request doesn't have its credential. The first strategy whose credential is present decides the result. If that credential fails, the request is rejected, and later strategies aren't tried.
 
 ```typescript
-// Try JWT first, fall back to SESSION
+// Check JWT first, then SESSION
 authStrategies: ['JWT', 'SESSION']
 
-// Try SESSION first, fall back to JWT  
+// Check SESSION first, then JWT
 authStrategies: ['SESSION', 'JWT']
 ```
 
@@ -1825,7 +1827,7 @@ export const requireWristbandAuth = wristbandAuth.createAuthMiddleware({
 });
 ```
 
-If all strategies fail, the request is considered unauthenticated and returns HTTP 401.
+If the request's credential fails, or the request has no credential for any strategy, the middleware returns HTTP 401.
 
 <br>
 

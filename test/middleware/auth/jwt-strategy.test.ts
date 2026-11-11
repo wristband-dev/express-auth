@@ -87,7 +87,9 @@ describe('AuthService - JWT Strategy', () => {
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockJwtValidator.extractBearerToken).toHaveBeenCalledWith(undefined);
+      // No Authorization header means the JWT strategy is skipped, so the token is never extracted.
+      expect(mockJwtValidator.extractBearerToken).not.toHaveBeenCalled();
+      expect(mockJwtValidator.validate).not.toHaveBeenCalled();
       expect((mockReq as any).auth).toEqual({});
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
@@ -119,6 +121,25 @@ describe('AuthService - JWT Strategy', () => {
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockJwtValidator.extractBearerToken).toHaveBeenCalledWith('InvalidFormat token');
+      expect((mockReq as any).auth).toEqual({});
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when extracting the bearer token throws for a non-Bearer header', async () => {
+      const middleware = authService.createAuthMiddleware(jwtConfig);
+
+      mockReq.headers = { authorization: 'Basic abc123' };
+      (authService as any).jwtValidator = mockJwtValidator;
+      mockJwtValidator.extractBearerToken.mockImplementation(() => {
+        throw new Error('Authorization header must provide "Bearer" token');
+      });
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockJwtValidator.extractBearerToken).toHaveBeenCalledWith('Basic abc123');
+      expect(mockJwtValidator.validate).not.toHaveBeenCalled();
       expect((mockReq as any).auth).toEqual({});
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({ error: 'Unauthorized' });

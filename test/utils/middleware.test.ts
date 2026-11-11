@@ -1,6 +1,13 @@
+import { timingSafeEqual } from 'crypto';
 import { Request, Response } from 'express';
 import { normalizeAuthMiddlewareConfig, isValidCsrf, sendAuthFailureResponse } from '../../src/utils/middleware';
 import { AuthMiddlewareConfig } from '../../src/types';
+
+// Wrap the real timingSafeEqual so tests can check that it's called.
+jest.mock('crypto', () => {
+  const actual = jest.requireActual<typeof import('crypto')>('crypto');
+  return { ...actual, timingSafeEqual: jest.fn(actual.timingSafeEqual) };
+});
 
 describe('Middleware Utils', () => {
   describe('normalizeAuthMiddlewareConfig', () => {
@@ -458,6 +465,35 @@ describe('Middleware Utils', () => {
       const result = isValidCsrf(mockReq as Request, 'token', 'x-csrf-token');
 
       expect(result).toBe(false);
+    });
+
+    it('should compare same-length tokens with a constant-time comparison', () => {
+      jest.mocked(timingSafeEqual).mockClear();
+      mockReq.headers = { 'x-csrf-token': 'session-tokeX' };
+
+      const result = isValidCsrf(mockReq as Request, 'session-token', 'x-csrf-token');
+
+      expect(result).toBe(false);
+      expect(timingSafeEqual).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return false without a constant-time comparison when token lengths differ', () => {
+      jest.mocked(timingSafeEqual).mockClear();
+      mockReq.headers = { 'x-csrf-token': 'short' };
+
+      const result = isValidCsrf(mockReq as Request, 'session-token', 'x-csrf-token');
+
+      expect(result).toBe(false);
+      expect(timingSafeEqual).not.toHaveBeenCalled();
+    });
+
+    it('should return false without throwing when tokens have the same character count but different byte lengths', () => {
+      mockReq.headers = { 'x-csrf-token': 'tokén' };
+
+      expect(() => {
+        isValidCsrf(mockReq as Request, 'token', 'x-csrf-token');
+      }).not.toThrow();
+      expect(isValidCsrf(mockReq as Request, 'token', 'x-csrf-token')).toBe(false);
     });
   });
 

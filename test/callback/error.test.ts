@@ -1,7 +1,7 @@
 import httpMocks from 'node-mocks-http';
 
 import { LoginState } from '../../src/types';
-import { encryptLoginState } from '../../src/utils';
+import { encryptLoginState } from '../../src/utils/login-state';
 import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src/index';
 import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 

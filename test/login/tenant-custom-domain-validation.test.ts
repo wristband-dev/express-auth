@@ -70,6 +70,22 @@ describe('Login - Tenant Custom Domain Validation', () => {
     expect(new URL(authorizeUrl).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
   });
 
+  test('Skips a tenant_custom_domain query param that is not a valid domain name without calling the API', async () => {
+    // The validation endpoint would accept anything, so only the format check can skip this value.
+    mockWristbandFetch({ tenantCustomDomainValid: true });
+
+    const mockExpressReq = httpMocks.createRequest({
+      headers: { host: parseTenantFromRootDomain },
+      query: { tenant_custom_domain: 'evil.com#', tenant_name: 'devs4you' },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    const authorizeUrl: string = await wristbandAuth.login(mockExpressReq, mockExpressRes);
+
+    expectValidateNotCalled();
+    expect(new URL(authorizeUrl).origin).toEqual(`https://devs4you-${wristbandApplicationVanityDomain}`);
+  });
+
   test('Skips an invalid tenant custom domain and falls through to the defaultTenantCustomDomain config', async () => {
     mockWristbandFetch({ tenantCustomDomainValid: false });
 
@@ -128,6 +144,21 @@ describe('Login - Tenant Custom Domain Validation', () => {
 
     expectValidateNotCalled();
     expect(new URL(authorizeUrl).origin).toEqual('https://default.tenant.com');
+  });
+
+  test('Skips a defaultTenantCustomDomain config that is not a valid domain name', async () => {
+    mockWristbandFetch();
+
+    const mockExpressReq = httpMocks.createRequest({ headers: { host: parseTenantFromRootDomain } }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    const appLoginUrl: string = await wristbandAuth.login(mockExpressReq, mockExpressRes, {
+      defaultTenantCustomDomain: 'evil.com#x',
+    });
+
+    // No valid tenant remains, so login goes to the application-level login page instead of evil.com.
+    expectValidateNotCalled();
+    expect(appLoginUrl).toEqual(`https://${wristbandApplicationVanityDomain}/login?client_id=${CLIENT_ID}`);
   });
 
   test('Propagates a FetchError when the validation endpoint fails', async () => {

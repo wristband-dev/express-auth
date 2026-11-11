@@ -165,6 +165,29 @@ describe('Multi Tenant Logout', () => {
 
         expectRevokeCalled(wristbandApplicationVanityDomain);
       });
+
+      test('Skips a tenantName config that is not a valid tenant name', async () => {
+        wristbandAuth = createWristbandAuth({
+          clientId: CLIENT_ID,
+          clientSecret: CLIENT_SECRET,
+          loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+          loginUrl,
+          redirectUri,
+          wristbandApplicationVanityDomain,
+          autoConfigureEnabled: false,
+        });
+
+        const mockExpressReq = httpMocks.createRequest({
+          headers: { host: `${parseTenantFromRootDomain}` },
+          query: { tenant_name: 'nextpriority' },
+        }) as any;
+        const mockExpressRes = httpMocks.createResponse() as any;
+
+        const location = await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'evil.com#' });
+
+        // The invalid config value is skipped, so the next priority (the tenant_name query param) is used.
+        expect(new URL(location).origin).toEqual(`https://nextpriority-${wristbandApplicationVanityDomain}`);
+      });
     });
 
     describe('Priority 3: tenant_custom_domain query parameter', () => {
@@ -417,6 +440,29 @@ describe('Multi Tenant Logout', () => {
           expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
 
           expectRevokeCalled(wristbandApplicationVanityDomain);
+        });
+
+        test('Skips a tenant_name query parameter that is not a valid tenant name', async () => {
+          wristbandAuth = createWristbandAuth({
+            clientId: CLIENT_ID,
+            clientSecret: CLIENT_SECRET,
+            loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+            loginUrl,
+            redirectUri,
+            wristbandApplicationVanityDomain,
+            autoConfigureEnabled: false,
+          });
+
+          const mockExpressReq = httpMocks.createRequest({
+            headers: { host: `${parseTenantFromRootDomain}` },
+            query: { tenant_name: 'evil.com#' },
+          }) as any;
+          const mockExpressRes = httpMocks.createResponse() as any;
+
+          const location = await wristbandAuth.logout(mockExpressReq, mockExpressRes);
+
+          // No tenant resolves, so logout falls back to the Login URL instead of building a Wristband URL.
+          expect(location).toBe(loginUrl);
         });
       });
     });
@@ -1311,6 +1357,42 @@ describe('Multi Tenant Logout', () => {
       expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
     });
 
+    test('Logout URL-encodes state and redirectUrl parameters', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      const redirectUrl = 'https://example.com/logged-out?lang=en&theme=dark';
+      const state = 'step=2&from=settings #top';
+
+      mockExpressRes.redirect(
+        await wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'devs4you', state, redirectUrl })
+      );
+
+      const location: string = mockExpressRes._getRedirectUrl();
+      expect(location).toBeTruthy();
+      const locationUrl: URL = new URL(location);
+      const { searchParams } = locationUrl;
+
+      expect(searchParams.get('redirect_url')).toEqual(redirectUrl);
+      expect(searchParams.get('state')).toEqual(state);
+      expect(searchParams.get('client_id')).toEqual(CLIENT_ID);
+      expect(searchParams.has('theme')).toBe(false);
+      expect(searchParams.has('from')).toBe(false);
+      expect(locationUrl.hash).toBe('');
+    });
+
     test('Logout with empty state parameter (should not include state in query)', async () => {
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
@@ -1390,6 +1472,33 @@ describe('Multi Tenant Logout', () => {
       await expect(
         wristbandAuth.logout(mockExpressReq, mockExpressRes, { tenantName: 'devs4you', state: 'a'.repeat(513) })
       ).rejects.toThrow('The [state] logout config cannot exceed 512 characters.');
+    });
+
+    test('Logout does not revoke the refresh token when state exceeds 512 characters', async () => {
+      wristbandAuth = createWristbandAuth({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        loginStateSecret: LOGIN_STATE_COOKIE_SECRET,
+        loginUrl,
+        redirectUri,
+        wristbandApplicationVanityDomain,
+        autoConfigureEnabled: false,
+      });
+      mockFetchRevoke(200);
+
+      const mockExpressReq = httpMocks.createRequest({
+        headers: { host: parseTenantFromRootDomain },
+      }) as any;
+      const mockExpressRes = httpMocks.createResponse() as any;
+
+      await expect(
+        wristbandAuth.logout(mockExpressReq, mockExpressRes, {
+          refreshToken: 'refreshToken',
+          tenantName: 'devs4you',
+          state: 'a'.repeat(513),
+        })
+      ).rejects.toThrow('The [state] logout config cannot exceed 512 characters.');
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     test('Logout with state parameter in fallback scenario (app-level login)', async () => {
