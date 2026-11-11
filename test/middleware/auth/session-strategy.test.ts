@@ -5,6 +5,9 @@ import { AuthService } from '../../../src/auth-service';
 import { AuthConfig, AuthMiddlewareConfig, TokenData } from '../../../src/types';
 import { WristbandAuthImpl } from '../../../src/wristband-auth';
 
+// The auth middleware skips the SESSION strategy when the request has no session cookie.
+const SESSION_COOKIE = 'session=encrypted-session';
+
 describe('AuthService - SESSION Strategy - Additional Coverage', () => {
   let authService: AuthService;
   let mockReq: Partial<Request>;
@@ -29,7 +32,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
     } as Partial<Session> & { save: jest.Mock };
 
     mockReq = {
-      headers: {},
+      headers: { cookie: SESSION_COOKIE },
       session: mockSession as Session,
     } as any;
 
@@ -190,7 +193,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
 
       mockSession.isAuthenticated = true;
       mockSession.csrfToken = 'valid-token';
-      mockReq.headers = { 'x-csrf-token': 'wrong-token' };
+      mockReq.headers = { cookie: SESSION_COOKIE, 'x-csrf-token': 'wrong-token' };
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -435,7 +438,7 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
 
       mockSession.isAuthenticated = true;
       mockSession.csrfToken = 'valid-token';
-      mockReq.headers = { 'x-csrf-token': 'wrong-token' };
+      mockReq.headers = { cookie: SESSION_COOKIE, 'x-csrf-token': 'wrong-token' };
 
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -464,6 +467,75 @@ describe('AuthService - SESSION Strategy - Additional Coverage', () => {
       await middleware(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockSession.save).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+    });
+  });
+
+  describe('Session Cookie Presence', () => {
+    it('should return 401 without checking the session when there is no session cookie', async () => {
+      const sessionConfig: AuthMiddlewareConfig = {
+        authStrategies: ['SESSION'],
+        sessionConfig: {
+          sessionOptions: {
+            secrets: 'test-secret',
+          },
+        },
+      };
+
+      const middleware = authService.createAuthMiddleware(sessionConfig);
+
+      mockSession.isAuthenticated = true;
+      mockReq.headers = {};
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockSession.save).not.toHaveBeenCalled();
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    });
+
+    it('should look for the session cookie under a custom cookieName', async () => {
+      const sessionConfig: AuthMiddlewareConfig = {
+        authStrategies: ['SESSION'],
+        sessionConfig: {
+          sessionOptions: {
+            secrets: 'test-secret',
+            cookieName: 'my-session',
+          },
+        },
+      };
+
+      const middleware = authService.createAuthMiddleware(sessionConfig);
+
+      mockSession.isAuthenticated = true;
+      mockReq.headers = { cookie: 'my-session=encrypted-session' };
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockSession.save).toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should ignore the default session cookie name when a custom cookieName is set', async () => {
+      const sessionConfig: AuthMiddlewareConfig = {
+        authStrategies: ['SESSION'],
+        sessionConfig: {
+          sessionOptions: {
+            secrets: 'test-secret',
+            cookieName: 'my-session',
+          },
+        },
+      };
+
+      const middleware = authService.createAuthMiddleware(sessionConfig);
+
+      mockSession.isAuthenticated = true;
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockSession.save).not.toHaveBeenCalled();
+      expect(mockNext).not.toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(401);
     });
   });

@@ -2,7 +2,7 @@ import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { CallbackResult, LoginState } from '../../src/types';
-import { encryptLoginState } from '../../src/utils';
+import { encryptLoginState } from '../../src/utils/login-state';
 import { FetchError } from '../../src/error';
 import { expectValidateCalled, expectValidateNotCalled, mockWristbandFetch } from '../helpers/mock-fetch';
 
@@ -89,6 +89,22 @@ describe('Callback - Tenant Custom Domain Validation', () => {
     const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
 
     expectValidateCalled(wristbandApplicationVanityDomain, TENANT_CUSTOM_DOMAIN);
+    expect(callbackResult.type).toBe('completed');
+    expect(callbackResult.callbackData?.tenantCustomDomain).toBeUndefined();
+  });
+
+  test('Skips a tenant_custom_domain query param that is not a valid domain name without calling the API', async () => {
+    mockWristbandFetch({ tenantCustomDomainValid: true, tokens: MOCK_TOKENS, userinfo: MOCK_USERINFO });
+
+    const mockExpressReq = httpMocks.createRequest({
+      query: { state: 'state', code: 'code', tenant_name: 'devs4you', tenant_custom_domain: 'evil.com#' },
+      headers: { cookie: await createLoginStateCookieHeader() },
+    }) as any;
+    const mockExpressRes = httpMocks.createResponse() as any;
+
+    const callbackResult: CallbackResult = await wristbandAuth.callback(mockExpressReq, mockExpressRes);
+
+    expectValidateNotCalled();
     expect(callbackResult.type).toBe('completed');
     expect(callbackResult.callbackData?.tenantCustomDomain).toBeUndefined();
   });

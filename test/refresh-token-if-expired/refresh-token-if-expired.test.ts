@@ -269,21 +269,32 @@ describe('Refresh Token If Expired', () => {
     );
   });
 
-  test('Parameter validation - zero expiresAt', async () => {
-    await expect(wristbandAuth.refreshTokenIfExpired('refreshToken', 0)).rejects.toThrow(
-      'The expiresAt field must be an integer greater than 0'
-    );
+  test('Zero expiresAt is treated as expired, perform a token refresh', async () => {
+    const mockTokens = {
+      access_token: 'accessToken',
+      expires_in: 1800,
+      id_token: 'idToken',
+      refresh_token: 'refreshToken',
+      token_type: 'bearer',
+    };
+    mockFetchToken([{ status: 200, body: mockTokens }]);
+
+    const tokenData = await wristbandAuth.refreshTokenIfExpired('refreshToken', 0);
+
+    expect(tokenData).toBeDefined();
+    expect(tokenData?.accessToken).toBe('accessToken');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   test('Parameter validation - negative expiresAt', async () => {
     await expect(wristbandAuth.refreshTokenIfExpired('refreshToken', -1000)).rejects.toThrow(
-      'The expiresAt field must be an integer greater than 0'
+      'The expiresAt field must be an integer greater than or equal to 0'
     );
   });
 
   test('Parameter validation - null expiresAt', async () => {
     await expect(wristbandAuth.refreshTokenIfExpired('refreshToken', null as any)).rejects.toThrow(
-      'The expiresAt field must be an integer greater than 0'
+      'The expiresAt field must be an integer greater than or equal to 0'
     );
   });
 });

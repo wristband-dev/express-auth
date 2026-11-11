@@ -43,7 +43,8 @@ export type AuthConfig = {
  * @typedef {Object} LoginConfig
  * @property {Record<string, unknown>} [customState] Custom state data for the login request.
  * @property {string} [defaultTenantCustomDomain] An optional default tenant custom domain to use for the login request in the
- * event the tenant custom domain cannot be found in the "tenant_custom_domain" request query parameter.
+ * event the tenant custom domain cannot be found in the "tenant_custom_domain" request query parameter. This value must
+ * come from your application, not from the incoming request. The SDK doesn't validate it against your Wristband application.
  * @property {string} [defaultTenantName] An optional default tenant name to use for the login request in the
  * event the tenant name cannot be found in either the subdomain or the "tenant_name" request query parameter (depending on
  * your subdomain configuration).
@@ -261,6 +262,8 @@ export type CallbackData = TokenData & {
  * @property {string} [refreshToken] The refresh token to revoke during logout.
  * @property {string} [state] Optional value that will be appended as a query parameter to the resolved redirect URL, if provided.
  * @property {string} [tenantCustomDomain] The tenant custom domain for the tenant that the user belongs to (if applicable).
+ * This value must come from your application, not from the incoming request. The SDK doesn't validate it against your
+ * Wristband application.
  * @property {string} [tenantName] The name of the tenant the user belongs to.
  */
 export type LogoutConfig = {
@@ -322,7 +325,7 @@ export interface AuthMiddlewareConfig {
      * sessionOptions: {
      *   secrets: process.env.SESSION_SECRET!,
      *   cookieName: 'my-session',
-     *   maxAge: 24 * 60 * 60 * 1000, // 24 hours
+     *   maxAge: 24 * 60 * 60, // 24 hours
      * }
      * ```
      */

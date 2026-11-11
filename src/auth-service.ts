@@ -7,22 +7,17 @@ import {
 
 import { LOGIN_REQUIRED_ERROR, STATE_PARAM_MAX_CHAR_LENGTH, TENANT_PLACEHOLDER_REGEX } from './utils/constants';
 import {
-  clearOldestLoginStateCookie,
-  createLoginState,
-  createLoginStateCookie,
-  decryptLoginState,
-  encryptLoginState,
-  getLoginStateCookie,
   getAppLevelAuthorizationUrl,
   getAppLevelLoginUrl,
   getAuthorizationUrlParams,
   getTenantLevelAuthorizationUrl,
-  isExpired,
   resolveReturnUrl,
   resolveTenantCustomDomainParam,
   resolveTenantName,
+  toSafeDomainName,
+  toSafeTenantName,
   validateReturnUrl,
-} from './utils';
+} from './utils/urls';
 import { WristbandService } from './wristband-service';
 import {
   AuthConfig,
@@ -42,7 +37,15 @@ import {
 import { FetchError, InvalidGrantError, WristbandError } from './error';
 import { ConfigResolver } from './config-resolver';
 import { isValidCsrf, normalizeAuthMiddlewareConfig, sendAuthFailureResponse } from './utils/middleware';
-import { clearCookie } from './utils/cookies';
+import { clearCookie, parseCookies } from './utils/cookies';
+import {
+  clearOldestLoginStateCookie,
+  createLoginState,
+  createLoginStateCookie,
+  decryptLoginState,
+  encryptLoginState,
+  getLoginStateCookie,
+} from './utils/login-state';
 
 /**
  * Core service class that handles Wristband authentication operations.
@@ -111,8 +114,8 @@ export class AuthService {
     // Determine which domain-related values are present as it will be needed for the authorize URL.
     const tenantCustomDomain: string = await this.resolveValidTenantCustomDomain(resolveTenantCustomDomainParam(req));
     const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
-    const defaultTenantCustomDomain: string = config.defaultTenantCustomDomain || '';
-    const defaultTenantName: string = config.defaultTenantName || '';
+    const defaultTenantCustomDomain: string = toSafeDomainName(config.defaultTenantCustomDomain);
+    const defaultTenantName: string = toSafeTenantName(config.defaultTenantName);
 
     // Create the login state which will be cached in a cookie so that it can be accessed in the callback.
     const resolvedReturnUrl = resolveReturnUrl(req, config);
@@ -146,7 +149,7 @@ export class AuthService {
         );
 
         // Send users to the app-level Authorize Endpoint with a login state cookie instead of going to login URL.
-        const authorizationParams = getAuthorizationUrlParams(req, authorizationParamConfig);
+        const authorizationParams = await getAuthorizationUrlParams(req, authorizationParamConfig);
         return getAppLevelAuthorizationUrl(wristbandApplicationVanityDomain, authorizationParams);
       }
 
@@ -163,7 +166,7 @@ export class AuthService {
     createLoginStateCookie(res, loginState.state, encryptedLoginState, dangerouslyDisableSecureCookies, cookieDomain);
 
     // Return the tenant-level Wristband Authorize Endpoint URL which the user will get redirected to.
-    const authorizationParams = getAuthorizationUrlParams(req, authorizationParamConfig);
+    const authorizationParams = await getAuthorizationUrlParams(req, authorizationParamConfig);
     return getTenantLevelAuthorizationUrl(wristbandApplicationVanityDomain, authorizationParams, {
       isApplicationCustomDomainActive,
       tenantCustomDomain,
@@ -359,6 +362,10 @@ export class AuthService {
     const parseTenantFromRootDomain = await this.configResolver.getParseTenantFromRootDomain();
     const wristbandApplicationVanityDomain = this.configResolver.getWristbandApplicationVanityDomain();
 
+    if (config.state && config.state.length > STATE_PARAM_MAX_CHAR_LENGTH) {
+      throw new TypeError(`The [state] logout config cannot exceed ${STATE_PARAM_MAX_CHAR_LENGTH} characters.`);
+    }
+
     // Revoke the refresh token only if present.
     if (config.refreshToken) {
       try {
@@ -369,29 +376,30 @@ export class AuthService {
       }
     }
 
-    if (config.state && config.state.length > STATE_PARAM_MAX_CHAR_LENGTH) {
-      throw new TypeError(`The [state] logout config cannot exceed ${STATE_PARAM_MAX_CHAR_LENGTH} characters.`);
-    }
-
     // The client ID is always required by the Wristband Logout Endpoint.
-    const logoutRedirectUrl: string = config.redirectUrl ? `&redirect_url=${config.redirectUrl}` : '';
-    const state: string = config.state ? `&state=${config.state}` : '';
+    const logoutRedirectUrl: string = config.redirectUrl
+      ? `&redirect_url=${encodeURIComponent(config.redirectUrl)}`
+      : '';
+    const state: string = config.state ? `&state=${encodeURIComponent(config.state)}` : '';
+
     const logoutPath: string = `/api/v1/logout?client_id=${clientId}${logoutRedirectUrl}${state}`;
     const separator = isApplicationCustomDomainActive ? '.' : '-';
     const tenantCustomDomainParam: string = await this.resolveValidTenantCustomDomain(
       resolveTenantCustomDomainParam(req)
     );
     const tenantName: string = resolveTenantName(req, parseTenantFromRootDomain);
+    const configTenantCustomDomain: string = toSafeDomainName(config.tenantCustomDomain);
+    const configTenantName: string = toSafeTenantName(config.tenantName);
 
     // Domain priority order resolution:
     // 1) If the LogoutConfig has a tenant custom domain explicitly defined, use that.
-    if (config.tenantCustomDomain) {
-      return `https://${config.tenantCustomDomain}${logoutPath}`;
+    if (configTenantCustomDomain) {
+      return `https://${configTenantCustomDomain}${logoutPath}`;
     }
 
     // 2) If the LogoutConfig has a tenant name defined, then use that.
-    if (config.tenantName) {
-      return `https://${config.tenantName}${separator}${wristbandApplicationVanityDomain}${logoutPath}`;
+    if (configTenantName) {
+      return `https://${configTenantName}${separator}${wristbandApplicationVanityDomain}${logoutPath}`;
     }
 
     // 3) If the tenant_custom_domain query param exists, then use that.
@@ -428,7 +436,7 @@ export class AuthService {
    * @param {string} refreshToken - The refresh token to use for obtaining a new access token.
    * @param {number} expiresAt - Unix timestamp in milliseconds when the current token expires.
    * @returns {Promise<TokenData | null>} A Promise with new token data if refresh occurred, or null if token is still valid.
-   * @throws {TypeError} When refreshToken is invalid or expiresAt is not a positive integer.
+   * @throws {TypeError} When refreshToken is invalid or expiresAt is missing or negative.
    * @throws {WristbandError} When token refresh fails due to invalid credentials or unexpected errors.
    */
   async refreshTokenIfExpired(refreshToken: string, expiresAt: number): Promise<TokenData | null> {
@@ -439,12 +447,12 @@ export class AuthService {
     if (!refreshToken) {
       throw new TypeError('Refresh token must be a valid string');
     }
-    if (!expiresAt || expiresAt < 0) {
-      throw new TypeError('The expiresAt field must be an integer greater than 0');
+    if (expiresAt === undefined || expiresAt === null || expiresAt < 0) {
+      throw new TypeError('The expiresAt field must be an integer greater than or equal to 0');
     }
 
     // Nothing to do here if the access token is still valid.
-    if (!isExpired(expiresAt)) {
+    if (Date.now() < expiresAt) {
       return null;
     }
 
@@ -495,7 +503,11 @@ export class AuthService {
 
   /**
    * Create middleware that ensures authenticated session using multiple strategies.
-   * Tries strategies in order until one succeeds. Supports both SESSION and JWT auth.
+   * Supports both SESSION and JWT auth.
+   *
+   * Strategies are checked in order. A strategy is skipped when the request doesn't carry its credential:
+   * no session cookie for SESSION, or no Authorization header for JWT. When a credential is present but
+   * fails, the request is rejected right away, and later strategies aren't tried.
    *
    * @param {AuthMiddlewareConfig} config - Configuration for the auth middleware.
    * @returns {Function} Express middleware function that validates authentication.
@@ -503,13 +515,13 @@ export class AuthService {
    * @example
    * ```typescript
    * // SESSION only
-   * const requireAuth = authService.createMiddlewareAuth({
+   * const requireAuth = authService.createAuthMiddleware({
    *   authStrategies: ['SESSION'],
    *   sessionConfig: {
    *     sessionOptions: {
    *       secrets: process.env.SESSION_SECRET!,
    *       cookieName: 'my-session',
-   *       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+   *       maxAge: 24 * 60 * 60, // 24 hours
    *       enableCsrfProtection: true,
    *     }
    *   }
@@ -517,13 +529,13 @@ export class AuthService {
    * app.use('/api/protected', requireAuth);
    *
    * // JWT only
-   * const requireJwtAuth = authService.createMiddlewareAuth({
+   * const requireJwtAuth = authService.createAuthMiddleware({
    *   authStrategies: ['JWT']
    * });
    * app.use('/api/protected', requireJwtAuth);
    *
-   * // Try SESSION first, fallback to JWT
-   * const requireAuth = authService.createMiddlewareAuth({
+   * // SESSION or JWT, whichever credential the request carries
+   * const requireAuth = authService.createAuthMiddleware({
    *   authStrategies: ['SESSION', 'JWT'],
    *   sessionConfig: {
    *     sessionOptions: {
@@ -553,9 +565,7 @@ export class AuthService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (req as any).auth = {};
 
-      let result: AuthStrategyResult = { authenticated: false, reason: 'not_authenticated' };
-
-      // Try all auth strategies in sequential order
+      // Check the auth strategies in sequential order
       for (let i = 0; i < normalizedConfig.authStrategies.length; i += 1) {
         const strategy = normalizedConfig.authStrategies[i];
 
@@ -570,22 +580,26 @@ export class AuthService {
           return;
         }
 
-        // eslint-disable-next-line no-await-in-loop
-        result = await this.tryAuthStrategy(req, strategy, normalizedConfig);
-
-        if (result.authenticated) {
-          break;
+        // Skip to the next strategy when the request doesn't carry this strategy's credential.
+        if (!this.hasCredential(req, strategy, normalizedConfig)) {
+          continue;
         }
-      }
 
-      // If no strategy succeeded, return appropriate error
-      if (!result.authenticated) {
-        sendAuthFailureResponse(res, result.reason);
+        // The credential is present, so its result is final: later strategies aren't tried.
+        // eslint-disable-next-line no-await-in-loop
+        const result: AuthStrategyResult = await this.tryAuthStrategy(req, strategy, normalizedConfig);
+        if (!result.authenticated) {
+          sendAuthFailureResponse(res, result.reason);
+          return;
+        }
+
+        // Authentication succeeded - continue
+        next();
         return;
       }
 
-      // Authentication succeeded - continue
-      next();
+      // Every strategy was skipped because the request carried no credentials.
+      sendAuthFailureResponse(res, 'not_authenticated');
     };
   }
 
@@ -598,12 +612,36 @@ export class AuthService {
    * @returns {Promise<string>} The tenant custom domain when valid, otherwise an empty string.
    */
   private async resolveValidTenantCustomDomain(tenantCustomDomain: string): Promise<string> {
-    if (!tenantCustomDomain) {
+    // Skip the API call for anything that isn't a valid domain name.
+    if (!toSafeDomainName(tenantCustomDomain)) {
       return '';
     }
 
     const isValid = await this.wristbandService.validateTenantCustomDomain(tenantCustomDomain);
     return isValid ? tenantCustomDomain : '';
+  }
+
+  /**
+   * Checks whether the request carries the credential for an auth strategy: a session cookie for SESSION,
+   * or an Authorization header for JWT. Only presence is checked, not validity.
+   *
+   * @param req - The incoming Express request.
+   * @param strategy - The auth strategy to check.
+   * @param config - The fully normalized middleware configuration.
+   * @returns True if the credential is present, otherwise false.
+   */
+  private hasCredential(req: Request, strategy: AuthStrategy, config: NormalizedAuthMiddlewareConfig): boolean {
+    if (strategy === 'SESSION') {
+      // Matches typescript-session's default session cookie name.
+      const cookieName = config.sessionConfig.sessionOptions?.cookieName ?? 'session';
+      return !!parseCookies(req)[cookieName];
+    }
+
+    if (strategy === 'JWT') {
+      return !!req.headers.authorization;
+    }
+
+    return false;
   }
 
   /**
@@ -662,14 +700,25 @@ export class AuthService {
     }
 
     if (strategy === 'JWT') {
+      let jwtValidator;
       try {
-        const jwtValidator = this.getJwtValidator(config.jwtConfig);
+        jwtValidator = this.getJwtValidator(config.jwtConfig);
+      } catch {
+        return { authenticated: false, reason: 'unexpected_error' };
+      }
 
-        const bearerToken = jwtValidator.extractBearerToken(req.headers.authorization);
-        if (!bearerToken) {
-          return { authenticated: false, reason: 'not_authenticated' };
-        }
+      let bearerToken: string;
+      try {
+        bearerToken = jwtValidator.extractBearerToken(req.headers.authorization);
+      } catch {
+        return { authenticated: false, reason: 'not_authenticated' };
+      }
 
+      if (!bearerToken) {
+        return { authenticated: false, reason: 'not_authenticated' };
+      }
+
+      try {
         const validationResult = await jwtValidator.validate(bearerToken);
         const { isValid, payload } = validationResult;
         if (!isValid) {
