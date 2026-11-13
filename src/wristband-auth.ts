@@ -1,5 +1,10 @@
 import { NextFunction, Request, Response } from 'express';
 
+import {
+  discoverWristbandAuth as discoverCoreAuth,
+  WristbandAuth as CoreWristbandAuth,
+} from '@wristband/typescript-auth';
+
 import { AuthService } from './auth-service';
 import { AuthConfig, AuthMiddlewareConfig, CallbackResult, LoginConfig, LogoutConfig, TokenData } from './types';
 
@@ -156,23 +161,10 @@ export class WristbandAuthImpl implements WristbandAuth {
    * Creates an instance of WristbandAuth.
    *
    * @param {AuthConfig} authConfig The configuration for Wristband authentication.
+   * @param {CoreWristbandAuth} [core] An already created core instance (used by discovery).
    */
-  constructor(authConfig: AuthConfig) {
-    this.authService = new AuthService(authConfig);
-  }
-
-  /**
-   * Internal method to eagerly fetch and cache all auto-configurable values from the
-   * Wristband SDK Configuration Endpoint. This triggers the API call and caches results,
-   * allowing any validation errors to be thrown early (fail-fast).
-   *
-   * @private
-   * @returns {Promise<void>} A Promise that resolves when configuration is preloaded.
-   * @throws {WristbandError} When auto-configuration endpoint is unreachable or returns invalid data.
-   * @throws {TypeError} When required configuration values cannot be resolved.
-   */
-  private async discover(): Promise<void> {
-    await this.authService.preloadConfig();
+  constructor(authConfig: AuthConfig, core?: CoreWristbandAuth) {
+    this.authService = new AuthService(authConfig, core);
   }
 
   /**
@@ -203,9 +195,7 @@ export class WristbandAuthImpl implements WristbandAuth {
    * ```
    */
   static async createWithDiscovery(authConfig: AuthConfig): Promise<WristbandAuthImpl> {
-    const auth = new WristbandAuthImpl(authConfig);
-    await auth.discover();
-    return auth;
+    return new WristbandAuthImpl(authConfig, await discoverCoreAuth(authConfig));
   }
 
   /**

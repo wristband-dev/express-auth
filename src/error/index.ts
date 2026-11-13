@@ -1,3 +1,2 @@
-export * from './fetch-error';
-export * from './invalid-grant-error';
-export * from './wristband-error';
+// Re-exported from the core so `instanceof WristbandError` works for errors thrown by either package.
+export { WristbandError } from '@wristband/typescript-auth';

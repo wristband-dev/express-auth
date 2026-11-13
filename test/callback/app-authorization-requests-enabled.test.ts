@@ -43,7 +43,7 @@ describe('Callback - App-Level Authorization Requests', () => {
     const loginRes = httpMocks.createResponse() as any;
     const authorizeUrl = await wristbandAuth.login(loginReq, loginRes);
     const state = new URL(authorizeUrl).searchParams.get('state');
-    const loginSetCookieHeader = loginRes._getHeaders()['set-cookie'] as string;
+    const loginSetCookieHeader = (loginRes._getHeaders()['set-cookie'] as string[])[0];
     const [cookieNameValue] = loginSetCookieHeader.split('; ');
 
     // Step 2: simulate the callback landing on a resolved tenant subdomain, carrying that same cookie
@@ -61,7 +61,7 @@ describe('Callback - App-Level Authorization Requests', () => {
       'Invalid query parameter [code] passed from Wristband during callback'
     );
 
-    const clearedCookieHeader = callbackRes._getHeaders()['set-cookie'] as string;
+    const clearedCookieHeader = (callbackRes._getHeaders()['set-cookie'] as string[])[0];
     expect(clearedCookieHeader).toContain('Max-Age=0');
     expect(clearedCookieHeader).toContain(`Domain=.${parseTenantFromRootDomain}`);
   });
@@ -91,7 +91,7 @@ describe('Callback - App-Level Authorization Requests', () => {
     const loginRes = httpMocks.createResponse() as any;
     const authorizeUrl = await wristbandAuth.login(loginReq, loginRes);
     const state = new URL(authorizeUrl).searchParams.get('state');
-    const loginSetCookieHeader = loginRes._getHeaders()['set-cookie'] as string;
+    const loginSetCookieHeader = (loginRes._getHeaders()['set-cookie'] as string[])[0];
     expect(loginSetCookieHeader).toContain(`Domain=.${parseTenantFromRootDomain}`);
     const [cookieNameValue] = loginSetCookieHeader.split('; ');
 
@@ -109,7 +109,7 @@ describe('Callback - App-Level Authorization Requests', () => {
       'Invalid query parameter [code] passed from Wristband during callback'
     );
 
-    const clearedCookieHeader = callbackRes._getHeaders()['set-cookie'] as string;
+    const clearedCookieHeader = (callbackRes._getHeaders()['set-cookie'] as string[])[0];
     expect(clearedCookieHeader).toContain('Max-Age=0');
     expect(clearedCookieHeader).toContain(`Domain=.${parseTenantFromRootDomain}`);
   });
@@ -134,7 +134,7 @@ describe('Callback - App-Level Authorization Requests', () => {
     const loginRes = httpMocks.createResponse() as any;
     const authorizeUrl = await wristbandAuth.login(loginReq, loginRes);
     const state = new URL(authorizeUrl).searchParams.get('state');
-    const loginSetCookieHeader = loginRes._getHeaders()['set-cookie'] as string;
+    const loginSetCookieHeader = (loginRes._getHeaders()['set-cookie'] as string[])[0];
     const [cookieNameValue] = loginSetCookieHeader.split('; ');
 
     const callbackReq = httpMocks.createRequest({
@@ -147,7 +147,7 @@ describe('Callback - App-Level Authorization Requests', () => {
       'Invalid query parameter [code] passed from Wristband during callback'
     );
 
-    const clearedCookieHeader = callbackRes._getHeaders()['set-cookie'] as string;
+    const clearedCookieHeader = (callbackRes._getHeaders()['set-cookie'] as string[])[0];
     expect(clearedCookieHeader).toContain('Max-Age=0');
     expect(clearedCookieHeader).not.toContain('Domain=');
   });
@@ -176,7 +176,7 @@ describe('Callback - App-Level Authorization Requests', () => {
     const loginRes = httpMocks.createResponse() as any;
     const authorizeUrl = await wristbandAuth.login(loginReq, loginRes);
     const state = new URL(authorizeUrl).searchParams.get('state');
-    const loginSetCookieHeader = loginRes._getHeaders()['set-cookie'] as string;
+    const loginSetCookieHeader = (loginRes._getHeaders()['set-cookie'] as string[])[0];
     expect(loginSetCookieHeader).not.toContain('Domain=');
     const [cookieNameValue] = loginSetCookieHeader.split('; ');
 
@@ -190,7 +190,7 @@ describe('Callback - App-Level Authorization Requests', () => {
       'Invalid query parameter [code] passed from Wristband during callback'
     );
 
-    const clearedCookieHeader = callbackRes._getHeaders()['set-cookie'] as string;
+    const clearedCookieHeader = (callbackRes._getHeaders()['set-cookie'] as string[])[0];
     expect(clearedCookieHeader).toContain('Max-Age=0');
     expect(clearedCookieHeader).not.toContain('Domain=');
   });
@@ -220,7 +220,7 @@ describe('Callback - App-Level Authorization Requests', () => {
     const loginRes = httpMocks.createResponse() as any;
     const authorizeUrl = await wristbandAuth.login(loginReq, loginRes);
     const state = new URL(authorizeUrl).searchParams.get('state');
-    const loginSetCookieHeader = loginRes._getHeaders()['set-cookie'] as string;
+    const loginSetCookieHeader = (loginRes._getHeaders()['set-cookie'] as string[])[0];
     expect(loginSetCookieHeader).not.toContain('Domain=');
     const [cookieNameValue] = loginSetCookieHeader.split('; ');
 
@@ -234,7 +234,7 @@ describe('Callback - App-Level Authorization Requests', () => {
       'Invalid query parameter [code] passed from Wristband during callback'
     );
 
-    const clearedCookieHeader = callbackRes._getHeaders()['set-cookie'] as string;
+    const clearedCookieHeader = (callbackRes._getHeaders()['set-cookie'] as string[])[0];
     expect(clearedCookieHeader).toContain('Max-Age=0');
     expect(clearedCookieHeader).not.toContain('Domain=');
   });

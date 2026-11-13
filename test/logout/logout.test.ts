@@ -521,7 +521,8 @@ describe('Multi Tenant Logout', () => {
         expect(statusCode).toEqual(302);
         const location: string = mockExpressRes._getRedirectUrl();
         expect(location).toBeTruthy();
-        expect(location).toBe(`${customLoginUrl}?client_id=${CLIENT_ID}`);
+        // 7.1: URLs are built with URL, which adds the trailing slash to a bare origin.
+        expect(location).toBe(`${customLoginUrl}/?client_id=${CLIENT_ID}`);
       });
 
       test('fallback with redirect URL takes precedence over login URLs', async () => {

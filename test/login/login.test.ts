@@ -4,9 +4,13 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { decryptLoginState, encryptLoginState } from '../../src/utils/login-state';
+import {
+  decryptLoginState,
+  encryptLoginState,
+  LOGIN_STATE_COOKIE_SEPARATOR,
+  STATE_PARAM_MAX_CHAR_LENGTH,
+} from '../helpers/login-state';
 import { LoginState } from '../../src/types';
-import { LOGIN_STATE_COOKIE_SEPARATOR, STATE_PARAM_MAX_CHAR_LENGTH } from '../../src/utils/constants';
 import { mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';
@@ -748,7 +752,7 @@ describe('Multi Tenant Login', () => {
       );
     });
 
-    test('Multiple return_url query parameters are ignored when LoginConfig returnUrl is set', async () => {
+    test('Multiple return_url query parameters throw even when LoginConfig returnUrl is set', async () => {
       wristbandAuth = createWristbandAuth({
         clientId: CLIENT_ID,
         clientSecret: CLIENT_SECRET,
@@ -768,15 +772,11 @@ describe('Multi Tenant Login', () => {
       }) as any;
       const mockExpressRes = httpMocks.createResponse() as any;
 
-      mockExpressRes.redirect(
-        await wristbandAuth.login(mockExpressReq, mockExpressRes, { returnUrl: 'https://example.com/from-config' })
-      );
-
-      const headers = mockExpressRes._getHeaders();
-      const cookies = extractCookiesFromHeaders(headers);
-      const loginCookie = cookies[0];
-      const loginState = (await decryptLoginState(loginCookie.value, LOGIN_STATE_COOKIE_SECRET)) as LoginState;
-      expect(loginState.returnUrl).toBe('https://example.com/from-config');
+      // 7.1: all query params are checked before anything else happens, so a duplicate return_url throws even when
+      // LoginConfig.returnUrl is set (7.0 ignored it).
+      await expect(
+        wristbandAuth.login(mockExpressReq, mockExpressRes, { returnUrl: 'https://example.com/from-config' })
+      ).rejects.toThrow(new TypeError('More than one [return_url] query parameter was encountered'));
     });
 
     test('With only customState in LoginConfig', async () => {
@@ -1240,7 +1240,8 @@ describe('Multi Tenant Login', () => {
         expect(statusCode).toEqual(302);
         const location: string = mockExpressRes._getRedirectUrl();
         expect(location).toBeTruthy();
-        expect(location).toBe(`https://google.com?client_id=${CLIENT_ID}`);
+        // 7.1: URLs are built with URL, which adds the trailing slash to a bare origin.
+        expect(location).toBe(`https://google.com/?client_id=${CLIENT_ID}`);
       });
 
       test('Unresolved tenant subdomain with return_url query param passes state', async () => {
@@ -1305,7 +1306,8 @@ describe('Multi Tenant Login', () => {
         mockExpressRes.redirect(await wristbandAuth.login(mockExpressReq, mockExpressRes, { returnUrl }));
 
         const location: string = mockExpressRes._getRedirectUrl();
-        expect(location).toBe(`https://google.com?client_id=${CLIENT_ID}&state=${encodeURIComponent(returnUrl)}`);
+        // 7.1: URLs are built with URL, which adds the trailing slash to a bare origin.
+        expect(location).toBe(`https://google.com/?client_id=${CLIENT_ID}&state=${encodeURIComponent(returnUrl)}`);
       });
     });
   });

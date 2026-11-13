@@ -120,6 +120,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@wristband/typescript-auth": "file:../typescript-auth/wristband-typescript-auth-0.1.0.tgz",
     "@wristband/typescript-jwt": "^0.3.0",
     "@wristband/typescript-session": "^1.0.2"
   }
