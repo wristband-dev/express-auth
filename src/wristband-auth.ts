@@ -181,7 +181,7 @@ export class WristbandAuthImpl implements WristbandAuth {
    * @returns {Promise<WristbandAuthImpl>} A Promise that resolves to an instance of WristbandAuthImpl
    *   with all configuration values already resolved and validated.
    * @throws {WristbandError} When auto-configuration endpoint is unreachable or returns invalid data.
-   * @throws {TypeError} When autoConfigureEnabled is false or required configuration values cannot be resolved.
+   * @throws {TypeError} When required configuration values cannot be resolved.
    *
    * @example
    * ```typescript

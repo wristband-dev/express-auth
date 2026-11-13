@@ -1,4 +1,5 @@
 import { createWristbandAuth, discoverWristbandAuth } from '../src/factory';
+import { WristbandError } from '../src/error';
 import { TENANT_NAME_PLACEHOLDER } from './helpers/login-state';
 
 const CLIENT_ID = 'clientId';
@@ -180,8 +181,7 @@ describe('discoverWristbandAuth', () => {
         wristbandApplicationVanityDomain: WRISTBAND_APPLICATION_DOMAIN,
         autoConfigureEnabled: false,
       })
-      // 7.1: a configuration mistake, so it throws a TypeError like the other config checks (was WristbandError).
-    ).rejects.toThrow(TypeError);
+    ).rejects.toThrow(WristbandError);
   });
 
   test('Successfully creates WristbandAuth with SDK discovery', async () => {
