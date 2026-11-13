@@ -2,8 +2,7 @@ import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { CallbackData, CallbackResult, LoginState } from '../../src/types';
-import { encryptLoginState } from '../../src/utils/login-state';
-import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
+import { encryptLoginState, LOGIN_STATE_COOKIE_SEPARATOR } from '../helpers/login-state';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';

@@ -1,9 +1,8 @@
 import httpMocks from 'node-mocks-http';
 
 import { LoginState } from '../../src/types';
-import { encryptLoginState } from '../../src/utils/login-state';
+import { encryptLoginState, LOGIN_STATE_COOKIE_SEPARATOR } from '../helpers/login-state';
 import { createWristbandAuth, WristbandAuth, WristbandError } from '../../src/index';
-import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 
 const CLIENT_ID = 'clientId';
 const CLIENT_SECRET = 'clientSecret';
@@ -284,7 +283,7 @@ describe('Callback Errors', () => {
     expect(result.callbackData).toBeUndefined();
 
     // The bad cookie is still cleared before redirecting
-    const clearedCookieHeader = mockExpressRes._getHeaders()['set-cookie'] as string;
+    const clearedCookieHeader = (mockExpressRes._getHeaders()['set-cookie'] as string[])[0];
     expect(clearedCookieHeader).toContain(`${cookieKey}=;`);
     expect(clearedCookieHeader).toContain('Max-Age=0');
   });

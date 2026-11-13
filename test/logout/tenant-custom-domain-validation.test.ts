@@ -55,7 +55,8 @@ describe('Logout - Tenant Custom Domain Validation', () => {
       expect(new URL(logoutUrl).origin).toEqual(`https://${CONFIG_CUSTOM_DOMAIN}`);
     });
 
-    test('Still validates the query param even though the config value outranks it', async () => {
+    // 7.1: the query param is only validated when it's needed, so the config value skips the validation call.
+    test('Skips validating the query param when the config value outranks it', async () => {
       mockWristbandFetch({ tenantCustomDomainValid: true });
 
       const mockExpressReq = httpMocks.createRequest({
@@ -68,7 +69,10 @@ describe('Logout - Tenant Custom Domain Validation', () => {
         tenantCustomDomain: CONFIG_CUSTOM_DOMAIN,
       });
 
-      expectValidateCalled(wristbandApplicationVanityDomain, PARAM_CUSTOM_DOMAIN);
+      expect(global.fetch).not.toHaveBeenCalledWith(
+        `https://${wristbandApplicationVanityDomain}/api/v1/custom-domains/validate`,
+        expect.anything()
+      );
       expect(new URL(logoutUrl).origin).toEqual(`https://${CONFIG_CUSTOM_DOMAIN}`);
     });
 

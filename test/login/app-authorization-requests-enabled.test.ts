@@ -4,9 +4,8 @@
 import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
-import { decryptLoginState, encryptLoginState } from '../../src/utils/login-state';
+import { decryptLoginState, encryptLoginState, LOGIN_STATE_COOKIE_SEPARATOR } from '../helpers/login-state';
 import { LoginState } from '../../src/types';
-import { LOGIN_STATE_COOKIE_SEPARATOR } from '../../src/utils/constants';
 import { mockWristbandFetch } from '../helpers/mock-fetch';
 
 const CLIENT_ID = 'clientId';

@@ -2,7 +2,7 @@ import httpMocks from 'node-mocks-http';
 
 import { createWristbandAuth, WristbandAuth } from '../../src/index';
 import { CallbackResult, LoginState } from '../../src/types';
-import { encryptLoginState } from '../../src/utils/login-state';
+import { encryptLoginState } from '../helpers/login-state';
 import { FetchError } from '../../src/error';
 import { expectValidateCalled, expectValidateNotCalled, mockWristbandFetch } from '../helpers/mock-fetch';
 
